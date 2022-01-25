@@ -1,0 +1,21 @@
+{
+	"folders":
+	[
+		{
+			"name": "SiPM GUI/DAQ Software",
+			"path": ".",
+			"file_exclude_patterns" : [
+				".gitignore",
+				".gitmodules",
+				".clang-tidy"
+			],
+			"folder_exclude_patterns": [
+				"build"
+			]
+		}
+	],
+	"settings":
+	{
+		"SublimeLinter.linters.clangtidy.compile_commands": "${project_path}\\build"
+	}
+}

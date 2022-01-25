@@ -1,0 +1,36 @@
+[File]
+RunDir = "../RUNS"
+RunName = "Testing"
+
+[Teensy]
+Port = "COM4"
+
+PIDRelay = false
+GeneralRelay = false
+
+PID1Enable = false
+PID1TempSetpoint = 0
+PID1CurrentSetpoint = 3
+PID1TKp = 1000
+PID1TTi = 100
+PID1TTd = 0
+PID1AKp = 200
+PID1ATi = 100
+PID1ATd = 0
+
+PID2Enable = false
+PID2TempSetpoint = 0
+PID2CurrentSetpoint = 3
+PID2TKp = 1000
+PID2TTi = 100
+PID2TTd = 0
+PID2AKp = 200
+PID2ATi = 100
+PID2ATd = 0
+
+[CAEN]
+Channel = 0
+Offset = 0x8000
+RecordLength = 2048
+Range = 1
+Threshold = 0x2000
