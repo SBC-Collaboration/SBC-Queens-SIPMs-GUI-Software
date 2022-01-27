@@ -13,6 +13,12 @@
 
 namespace SBCQueens {
 
+	struct CAENError {
+		std::string ErrorMessage = "";
+		CAEN_DGTZ_ErrorCode ErrorCode;
+		bool isError = false;
+	};
+
 	struct ChannelConfig {
 		uint8_t Channel = 0;
 
@@ -29,15 +35,17 @@ namespace SBCQueens {
 			= CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY;
 
 		// DT5730 max buffers is 1024
-		uint32_t MaxEventsPerRead = 1024;
+		uint32_t MaxEventsPerRead = 512;
 		CAEN_DGTZ_AcqMode_t AcqMode 
 			= CAEN_DGTZ_AcqMode_t::CAEN_DGTZ_SW_CONTROLLED;
 
-		// True = enabled, False = disabled
+		// True = disabled, False = enabled
 		bool TriggerOverlappingEn = true;
 		// 0L = Rising edge, 1L = Falling edge
 		CAEN_DGTZ_TriggerPolarity_t TriggerPolarity =
 			CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge;
+
+		uint32_t PostTriggerPorcentage = 50;
 	};
 
 	// Holds the CAEN raw data, the size of the buffer, the size
@@ -62,19 +70,15 @@ namespace SBCQueens {
 		CAEN() {}
 		CAEN(const CAEN_DGTZ_ConnectionType& ct, const int& ln, const int& cn, 
 			const uint32_t& addr, std::unique_ptr<int>& h,
-			const CAEN_DGTZ_ErrorCode& err) :
+			const CAENError& err) :
 		ConnectionType(ct), LinkNum(ln), ConetNode(cn), VMEBaseAddress(addr),
 		Handle(std::move(h)), LatestError(err) {
 
-			ReadData = std::make_shared<CAENData>(Data);
-			WriteData = std::make_shared<CAENData>(BackupData);
 		}
 
 		~CAEN() {
 			CAEN_DGTZ_FreeReadoutBuffer(&Data.Buffer);
-			CAEN_DGTZ_FreeReadoutBuffer(&BackupData.Buffer);
 			Data.Buffer = nullptr;
-			BackupData.Buffer = nullptr;
 		}
 
 		// Only move
@@ -90,20 +94,45 @@ namespace SBCQueens {
 		uint32_t VMEBaseAddress;
 
 		std::unique_ptr<int> Handle;
+		CAENError LatestError;
 
 		CAENData Data;
-		CAENData BackupData;
-
-		std::shared_ptr<CAENData> ReadData;
-		std::shared_ptr<CAENData> WriteData;
-
-		CAEN_DGTZ_ErrorCode LatestError;
 
 	};
 
 	using CAEN_ptr = std::unique_ptr<CAEN>;
 
-	std::string translate_caen_code(const CAEN_DGTZ_ErrorCode&) noexcept;
+	template<typename PrintFunc>
+	// Check if there is an error and prints it out using the lambda/function f
+	bool check_error(CAEN_ptr& res, PrintFunc&& f) noexcept {
+		if(!res) {
+			f("There is no resource to check error, maybe that is the"
+				"problem?");
+			return true;
+		}
+
+		if(res->LatestError.isError) {
+			auto error_str =
+				std::to_string(static_cast<int>(res->LatestError.ErrorCode));
+			f("Error code: " + error_str);
+			f(res->LatestError.ErrorMessage);
+
+			return true;
+		}
+
+		// This is here in case isError is false but there is a error
+		// probably by a programmer mistake
+		if(res->LatestError.ErrorCode < 0) {
+			auto error_str =
+				std::to_string(static_cast<int>(res->LatestError.ErrorCode));
+			f("Error code: " + error_str);
+			f(res->LatestError.ErrorMessage);
+
+			return true;
+		}
+
+		return false;
+	}
 
 	// Opens the resource and returns a handle if successful.
 	// ct -> Physical communication channel. CAEN_DGTZ_USB,
@@ -117,46 +146,49 @@ namespace SBCQueens {
 	//  addressed.
 	// addr -> VME Base adress of the board. Only for VME models.
 	//  0 in all other cases
-	bool connect(CAEN_ptr&, const CAEN_DGTZ_ConnectionType&, const int&,
+	void connect(CAEN_ptr&, const CAEN_DGTZ_ConnectionType&, const int&,
 		const int&, const uint32_t&) noexcept;
 
 	// Simplifies connect() func for the use of USB only.
-	bool connect_usb(CAEN_ptr&, const int&) noexcept;
+	void connect_usb(CAEN_ptr&, const int&) noexcept;
 
 	// Releases the resources and closes the communication
 	// with the CAEN digitizer
-	bool disconnect(CAEN_ptr&) noexcept;
+	void disconnect(CAEN_ptr&) noexcept;
 
 	// Reset. Returns all internal registers to defaults
-	bool reset(CAEN_ptr&) noexcept;
+	void reset(CAEN_ptr&) noexcept;
 
 	// Calibrates the device only after the temperature has stabilized.
 	// NOT YET IMPLEMENTED
-	bool calibrate(CAEN_ptr&) noexcept;
+	void calibrate(CAEN_ptr&) noexcept;
 
 	// Calls a bunch of setup functions for each channel passed down in the
 	// list configs
-	bool setup(CAEN_ptr&,
+	void setup(CAEN_ptr&,
 		const std::initializer_list<ChannelConfig>& configs) noexcept;
 
 	// Enables the acquisition and allocates the memory for the acquired data.
-	bool enable_acquisition(CAEN_ptr&) noexcept;
+	void enable_acquisition(CAEN_ptr&) noexcept;
 
 	// Disables the acquisition
-	bool disable_acquisition(CAEN_ptr&) noexcept;
+	void disable_acquisition(CAEN_ptr&) noexcept;
 
 	// Writes to registers in ADDR with VALUE
-	bool write_register(CAEN_ptr&,
+	void write_register(CAEN_ptr&,
 		uint32_t&& addr,
 		const uint32_t& value) noexcept;
 
 	// Reads contents of register ADDR into register value
-	bool read_register(CAEN_ptr&,
+	void read_register(CAEN_ptr&,
 		uint32_t&& addr,
 		uint32_t& value) noexcept;
 
 	// Forces a trigger in the digitizer.
-	bool software_trigger(CAEN_ptr&) noexcept;
+	void software_trigger(CAEN_ptr&) noexcept;
+
+	// Asks CAEN how many events are in the buffer
+	uint32_t get_events_in_buffer(CAEN_ptr&) noexcept;
 
 	// Runs a bunch of commands to retrieve the buffer and process it
 	// using CAEN functions.
@@ -164,14 +196,19 @@ namespace SBCQueens {
 	// This is to optimize for speed.
 	void retrieve_data(CAEN_ptr&) noexcept;
 
+	// Retrieves events if the events in buffer are equal or higher than n
+	void retrieve_data_n_events(CAEN_ptr&, int&& n) noexcept;
+
 	// Extracts event i from the data retrieved by retrieve_data(...)
 	// If i is beyond the NumEvents, it does nothing and returns an empty event.
 	// If an error happened, output event is empty, this is to allow concurrency.
 	Event extract_event(CAEN_ptr&, const uint32_t& i) noexcept;
 
 	// Extracts event i from the data retrieved by retrieve_data(...)
-	// into Event evt
-	// If i is beyond the NumEvents, it does nothing
+	// into Event evt.
+	// If evt == NULL it allocates memory, slower
+	// evt can be allocated using allocate_event(...) before hand.
+	// If i is beyond the NumEvents, it does nothing.
 	// If an error happened, it does nothing this is to allow concurrency.
 	// Event must have been allocated beforehand, if not this will not work.
 	// NO ERROR CHECKING. Optimized for speed
@@ -188,7 +225,10 @@ namespace SBCQueens {
 	// This is to optimize for speed.
 	void clear_data(CAEN_ptr&) noexcept;
 
-	// Check if the port has any error
-	bool check_for_error(CAEN_ptr&) noexcept;
+	// From CAEN:
+	// Retrieves how many times per second the input pulse crossed the
+	// programmed threshold of the channel n digital discriminator.
+	// Only for 725S 730S models
+	// uint32_t channel_self_trigger_meter(CAEN_ptr&, uint8_t channel) noexcept;
 
 } // namespace SBCQueens

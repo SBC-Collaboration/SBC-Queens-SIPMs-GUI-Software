@@ -28,6 +28,7 @@ namespace SBCQueens {
 		LATEST_BOX_BME_TEMP,
 
 		// CAEN Indicators
+		CAENBUFFEREVENTS,
 		FREQUENCY,
 		DARK_NOISE_RATE,
 		GAIN

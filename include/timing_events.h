@@ -30,8 +30,15 @@ namespace SBCQueens {
 
 		using time_format = Y;
 
-		TotalTimeEvent(FuncName&& f, const time_format& total_time) 
+		TotalTimeEvent(const time_format& total_time, FuncName&& f)
 			: _needToCall(true), _total_wait_time(total_time), _f(f) {  };
+
+		TotalTimeEvent(TotalTimeEvent<FuncName, Y>&&) = default;
+		TotalTimeEvent(const TotalTimeEvent<FuncName, Y>&) = delete;
+
+		TotalTimeEvent<FuncName, Y>& operator=(TotalTimeEvent<FuncName, Y>&) = default;
+		TotalTimeEvent<FuncName, Y>& operator=(TotalTimeEvent<FuncName, Y>&&) = default;
+
 
 		template<typename... Args>
 		auto operator()(Args&&... args) {
@@ -47,7 +54,11 @@ namespace SBCQueens {
 				if(_needToCall) {
 					_init_time = std::chrono::high_resolution_clock::now();
 
-					_f(std::forward<Args>(args)...);
+					if constexpr (std::is_pointer_v<FuncName>) {
+						_f->operator()(std::forward<Args>(args)...);
+					} else {
+						_f(std::forward<Args>(args)...);
+					}
 
 					_needToCall = false;
 				}
@@ -73,11 +84,13 @@ namespace SBCQueens {
 				if(_needToCall) {
 					_init_time = std::chrono::high_resolution_clock::now();
 
-					auto r = _f(std::forward<Args>(args)...);
+					if constexpr (std::is_pointer_v<FuncName>) {
+						*return_of_func = _f->operator()(std::forward<Args>(args)...);
+					} else {
+						*return_of_func = _f(std::forward<Args>(args)...);
+					}
 
 					_needToCall = false;
-					// return the same thing as f(args)
-					return_of_func = std::make_optional(r);
 				}
 
 				_final_time = std::chrono::high_resolution_clock::now();
@@ -110,7 +123,7 @@ namespace SBCQueens {
 	template<typename FuncName, typename Y = std::chrono::milliseconds>
 	inline TotalTimeEvent<FuncName, Y> make_total_timed_event(const Y& total_time, FuncName&& f) {
 
-		return TotalTimeEvent<FuncName, Y>{std::forward<FuncName>(f), total_time};
+		return TotalTimeEvent<FuncName, Y>{total_time, std::forward<FuncName>(f)};
 
 	}
 
@@ -125,7 +138,14 @@ namespace SBCQueens {
 
 		using time_format = Y;
 
-		BlockingTotalTimeEvent(FuncName&& f, const time_format& total_time) : _total_wait_time(total_time), _f(f) {  };
+		BlockingTotalTimeEvent(const time_format& total_time, FuncName&& f) : _total_wait_time(total_time), _f(f) {  };
+
+		// Allow moving and referencing but no copying
+		BlockingTotalTimeEvent(BlockingTotalTimeEvent<FuncName, Y>&&) = default;
+		BlockingTotalTimeEvent(const BlockingTotalTimeEvent<FuncName, Y>&) = delete;
+
+		BlockingTotalTimeEvent<FuncName, Y>& operator=(BlockingTotalTimeEvent<FuncName, Y>&) = default;
+		BlockingTotalTimeEvent<FuncName, Y>& operator=(BlockingTotalTimeEvent<FuncName, Y>&&) = default;
 
 		template<typename... Args>
 		auto operator()(Args&&... args) {
@@ -136,7 +156,11 @@ namespace SBCQueens {
 
 				_init_time = std::chrono::high_resolution_clock::now();
 
-				_f(std::forward<Args>(args)...);
+				if constexpr (std::is_pointer_v<FuncName>) {
+					_f->operator()(std::forward<Args>(args)...);
+				} else {
+					_f(std::forward<Args>(args)...);
+				}
 
 				_final_time = std::chrono::high_resolution_clock::now();
 
@@ -148,9 +172,16 @@ namespace SBCQueens {
 				} 
 			// If it does not, return the rest
 			} else {
-				_init_time = std::chrono::high_resolution_clock::now();
 
-				auto r = _f(std::forward<Args>(args)...);
+				_init_time = std::chrono::high_resolution_clock::now();
+				// If function does not return in this call, optional is empty
+				std::invoke_result_t<FuncName, Args...> return_of_func;
+
+				if constexpr (std::is_pointer_v<FuncName>) {
+					return_of_func = _f->operator()(std::forward<Args>(args)...);
+				} else {
+					return_of_func = _f(std::forward<Args>(args)...);
+				}
 
 				_final_time = std::chrono::high_resolution_clock::now();
 
@@ -161,7 +192,7 @@ namespace SBCQueens {
 					std::this_thread::sleep_for(_total_wait_time - elapsed_time);
 				} 
 
-				return r;
+				return return_of_func;
 			}
 		}
 
@@ -178,7 +209,7 @@ namespace SBCQueens {
 	template<typename FuncName, typename Y = std::chrono::milliseconds>
 	inline BlockingTotalTimeEvent<FuncName, Y> make_blocking_total_timed_event(const Y& total_time, FuncName&& f) {
 
-		return BlockingTotalTimeEvent<FuncName, Y>{std::forward<FuncName>(f), total_time};
+		return BlockingTotalTimeEvent<FuncName, Y>{total_time, std::forward<FuncName>(f)};
 
 	}
 
@@ -191,18 +222,32 @@ namespace SBCQueens {
 
 		using time_format = Y;
 
-		BlockingFixedTimeEvent(FuncName&& f, const Y& total_time) : _total_wait_time(total_time), _f(f) {  };
+		BlockingFixedTimeEvent(const Y& total_time, FuncName&& f)
+			: _total_wait_time(total_time), _f(f) {  };
+
+		BlockingFixedTimeEvent(BlockingFixedTimeEvent<FuncName, Y>&&) = default;
+		BlockingFixedTimeEvent(const BlockingFixedTimeEvent<FuncName, Y>&) = delete;
+		BlockingFixedTimeEvent<FuncName, Y>& operator=(BlockingFixedTimeEvent<FuncName, Y>&&) = default;
 
 		template<typename... Args>
 		auto operator()(Args&&... args) const {
 
 			if constexpr (std::is_void_v<std::result_of_t<FuncName&&(Args&&...)>> ) {
-				_f(std::forward<Args>(args)...);
+				if constexpr (std::is_pointer_v<FuncName>) {
+					_f->operator()(std::forward<Args>(args)...);
+				} else {
+					_f(std::forward<Args>(args)...);
+				}
 				std::this_thread::sleep_for(_total_wait_time);
 			} else {
-				auto r = _f(std::forward<Args>(args)...);
+				std::invoke_result_t<FuncName, Args...> return_of_func;
+				if constexpr (std::is_pointer_v<FuncName>) {
+					return_of_func = _f->operator()(std::forward<Args>(args)...);
+				} else {
+					return_of_func = _f(std::forward<Args>(args)...);
+				}
 				std::this_thread::sleep_for(_total_wait_time);
-				return r;
+				return return_of_func;
 			}
 			
 
@@ -216,7 +261,7 @@ namespace SBCQueens {
 	template<typename FuncName, typename Y = std::chrono::milliseconds>
 	inline BlockingFixedTimeEvent<FuncName, Y> make_blocking_fixed_timed_event(const Y& total_time, FuncName&& f) {
 
-		return BlockingFixedTimeEvent<FuncName, Y>{std::forward<FuncName>(f), total_time};
+		return BlockingFixedTimeEvent<FuncName, Y>{total_time, std::forward<FuncName>(f)};
 
 	}
 

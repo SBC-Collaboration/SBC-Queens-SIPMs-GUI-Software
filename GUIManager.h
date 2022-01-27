@@ -18,8 +18,10 @@
 #include "imgui.h"
 #include "imgui_helpers.h"
 #include "implot_helpers.h"
+#include "include/caen_helper.h"
 #include "include/imgui_helpers.h"
 #include "include/implot_helpers.h"
+#include "include/indicators.h"
 #include "indicators.h"
 
 namespace SBCQueens {
@@ -82,6 +84,7 @@ private:
 		// End Teensy
 
 		// CAEN
+			SiPMIndicator eventsBuffer;
 			SiPMIndicator frequency;
 			SiPMIndicator dark_noise;
 			SiPMIndicator gain;
@@ -191,6 +194,9 @@ public:
 			// End Teensy
 
 			// CAEN
+			eventsBuffer = make_indicator(IndicatorNames::CAENBUFFEREVENTS, 4,
+				NumericFormat::Default);
+			_plotManager.add(eventsBuffer);
 			frequency = make_indicator(IndicatorNames::FREQUENCY, 4, NumericFormat::Scientific);
 			_plotManager.add(frequency);
 			dark_noise = make_indicator(IndicatorNames::DARK_NOISE_RATE, 3, NumericFormat::Scientific);
@@ -524,11 +530,22 @@ public:
 					static float connected_mod = 1.5;
 
 					static auto CAENConf = config["CAEN"];
-					static int channel = CAENConf["Channel"].value_or(0);
-					static int offset = CAENConf["Offset"].value_or(0x8000);;
-					static int recordLength = CAENConf["RecordLength"].value_or(2048);
-					static int range = CAENConf["Range"].value_or(0);
-					static int threshold = CAENConf["Threshold"].value_or(0x8000);
+					static int maxEventsPerRead
+						= CAENConf["MaxEventsPerRead"].value_or(512u);
+					static int channel
+						= CAENConf["Channel"].value_or(0u);
+					static int offset
+						= CAENConf["Offset"].value_or(0x8000u);;
+					static int recordLength
+						= CAENConf["RecordLength"].value_or(2048u);
+					static int polarity
+						= CAENConf["Polarity"].value_or(0u);
+					static int range
+						= CAENConf["Range"].value_or(0u);
+					static int postbuffer
+						= CAENConf["PostBufferPorcentage"].value_or(50u);
+					static int threshold
+						= CAENConf["Threshold"].value_or(0x8000u);
 
 
 					static int caen_port = 0;
@@ -553,12 +570,24 @@ public:
 					if(caen_connect_btn(caenQueueFunc,
 						[=](CAENInterfaceState& state) {
 							state.PortNum = caen_port;
-							state.Config.Channel = channel;
-							state.Config.DCOffset = offset;
-							state.Config.RecordLength = recordLength;
-							state.Config.DCRange = range;
-							state.Config.TriggerThreshold = threshold;
-							state.CurrentState = CAENInterfaceStates::AttemptConnection;
+							state.Config.Channel =
+								static_cast<uint8_t>(channel);
+							state.Config.MaxEventsPerRead =
+								static_cast<uint32_t>(maxEventsPerRead);
+							state.Config.DCOffset =
+								static_cast<uint32_t>(offset);
+							state.Config.RecordLength =
+								static_cast<uint32_t>(recordLength);
+							state.Config.DCRange =
+								static_cast<uint8_t>(range);
+							state.Config.TriggerThreshold =
+								static_cast<uint32_t>(threshold);
+							state.Config.TriggerPolarity =
+								static_cast<CAEN_DGTZ_TriggerPolarity_t>(polarity);
+							state.Config.PostTriggerPorcentage =
+								static_cast<uint32_t>(postbuffer);
+							state.CurrentState =
+								CAENInterfaceStates::AttemptConnection;
 							return true;
 						}
 					)) {
@@ -579,10 +608,12 @@ public:
 					
 					if(caen_disconnect_btn(caenQueueFunc,
 						[=](CAENInterfaceState& state) {
+
 							// Only change the state if any of these states
 							if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
 								state.CurrentState == CAENInterfaceStates::StatisticsMode ||
 								state.CurrentState == CAENInterfaceStates::RunMode){
+									spdlog::info("Going to disconnect the CAEN");
 									state.CurrentState = CAENInterfaceStates::Disconnected;
 							}
 							return true;
@@ -609,11 +640,16 @@ public:
 
 					ImGui::InputInt("Channel", &channel);
 
+					ImGui::InputInt("MaxEventsPerRead", &maxEventsPerRead);
 					ImGui::InputInt("Offset", &offset);
 					
 					ImGui::InputInt("Record Length", &recordLength);
         			ImGui::RadioButton("2V", &range, 0); ImGui::SameLine();
         			ImGui::RadioButton("0.5V", &range, 1);
+        			ImGui::Text("Trigger Polarity:"); ImGui::SameLine();
+        			ImGui::RadioButton("Positive", &polarity, 0); ImGui::SameLine();
+        			ImGui::RadioButton("Negative", &polarity, 1);
+        			ImGui::InputInt("Post-Trigger buffer %", &postbuffer);
         			ImGui::InputInt("Threshold", &threshold);
 
         			start_processing_btn(caenQueueFunc,
@@ -628,7 +664,7 @@ public:
 
 					// (TODO: Hector) What other things do I need for CAEN?
 
-				}
+		}
 
 				ImGui::EndTabBar();
 			} 
@@ -768,6 +804,7 @@ public:
 
 			// CAEN
 			ImGui::Text("SiPM Statistics");
+			ImGui::Text("Events in buffer"); ImGui::SameLine(); eventsBuffer(); ImGui::SameLine(); ImGui::Text("Counts");
 			ImGui::Text("Signal frequency"); ImGui::SameLine(); frequency(); ImGui::SameLine(); ImGui::Text("Hz");
 			ImGui::Text("Dark noise rate"); ImGui::SameLine(); dark_noise(); ImGui::SameLine(); ImGui::Text("Hz");
 			ImGui::Text("Gain"); ImGui::SameLine(); gain(); ImGui::SameLine(); ImGui::Text("[counts x ns]");
