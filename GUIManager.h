@@ -14,14 +14,9 @@
 
 #include "TeensyControllerInterface.h"
 #include "CAENDigitizerInterface.h"
-#include "deps/imgui/imgui.h"
 #include "imgui.h"
 #include "imgui_helpers.h"
 #include "implot_helpers.h"
-#include "include/caen_helper.h"
-#include "include/imgui_helpers.h"
-#include "include/implot_helpers.h"
-#include "include/indicators.h"
 #include "indicators.h"
 
 namespace SBCQueens {
@@ -33,6 +28,9 @@ private:
 
 		std::tuple<QueueFuncs&...> _queues;
 		IndicatorReceiver<IndicatorNames> _plotManager;
+
+		std::function<bool(TeensyQueueInType&&)> _teensyQueueF;
+		std::function<bool(CAENQueueType&&)> _caenQueueF;
 
 		// Controls
 		Button connect_btn;
@@ -47,7 +45,7 @@ private:
 		InputFloat pid_one_curr_sp_inpF;
 		InputFloat pid_one_PIDTKP_inpF;
 		InputFloat pid_one_PIDTTI_inpF;
-		InputFloat pid_one_PIDTTd_inpF;
+		InputFloat pid_one_PIDTTD_inpF;
 
 		InputFloat pid_one_PIDAKP_inpF;
 		InputFloat pid_one_PIDATI_inpF;
@@ -59,7 +57,7 @@ private:
 		InputFloat pid_two_curr_sp_inpF;
 		InputFloat pid_two_PIDTKP_inpF;
 		InputFloat pid_two_PIDTTI_inpF;
-		InputFloat pid_two_PIDTTd_inpF;
+		InputFloat pid_two_PIDTTD_inpF;
 
 		InputFloat pid_two_PIDAKP_inpF;
 		InputFloat pid_two_PIDATI_inpF;
@@ -70,6 +68,16 @@ private:
 		Button caen_disconnect_btn;
 		Button send_soft_trig;
 		Button start_processing_btn;
+		std::string ic_conf_model;
+		int ic_maxEventsPerRead;
+		int ic_channel;
+		int ic_offset;
+		int ic_overlapping_rej;
+		int ic_recordLength;
+		int ic_polarity;
+		int ic_range;
+		int ic_postbuffer;
+		int ic_threshold;
 
 		// Indicators
 
@@ -106,73 +114,90 @@ private:
 
 		SiPMPlot sipm_plot;
 
+		std::string i_com_port;
+		std::string i_run_dir;
+		std::string i_run_name;
+		std::string i_sipmRunName;
+
 public:
 		explicit GUIManager(QueueFuncs&... queues) : 
 			_queues(forward_as_tuple(queues...)),
 			_plotManager(std::get<SiPMsPlotQueue&>(_queues)) {
 
+			TeensyInQueue& teensyQueue = std::get<TeensyInQueue&>(_queues);
+			CAENQueue& caenQueue = std::get<CAENQueue&>(_queues);
+
+			_teensyQueueF = [&](TeensyQueueInType&& f) -> bool {
+				return teensyQueue.try_enqueue(f);
+			};
+
+			_caenQueueF = [&](CAENQueueType&& f) -> bool {
+				return caenQueue.try_enqueue(f);
+			};
+
 			// Controls
 			auto config = toml::parse_file("gui_setup.toml");
+			auto t_conf = config["Teensy"];
+			auto CAEN_conf = config["CAEN"];
 
-			auto teensyConf = config["Teensy"];
 			connect_btn = make_button("Connect");
 			disconnect_btn = make_button("Disconnect");
 
 			pid_relay_chkBox = make_checkbox("PID Relay State",
-				teensyConf["PIDRelay"].value_or(false));
+				t_conf["PIDRelay"].value_or(false));
 			gen_relay_chkBox = make_checkbox("General Relay State",
-				teensyConf["GeneralRelay"].value_or(false));
+				t_conf["GeneralRelay"].value_or(false));
 
 			// PID1
 			pid_one_chkBox = make_checkbox("PID1 Enable",
-				teensyConf["PID1Enable"].value_or(false));
+				t_conf["PID1Enable"].value_or(false));
 
 			pid_one_temp_sp_inpF = make_input_float("Temp Setpoint 1",
-				teensyConf["PID1TempSetpoint"].value_or(0.0f));
+				t_conf["PID1TempSetpoint"].value_or(0.0f));
 			pid_one_curr_sp_inpF = make_input_float("Current Setpoint 1",
-				teensyConf["PID1CurrentSetpoint"].value_or(3.0f));
+				t_conf["PID1CurrentSetpoint"].value_or(3.0f));
 
 			pid_one_PIDTKP_inpF = make_input_float("Tkp 1",
-				teensyConf["PID1TKp"].value_or(1000.0f));
+				t_conf["PID1TKp"].value_or(1000.0f));
 			pid_one_PIDTTI_inpF = make_input_float("Tki 1",
-				teensyConf["PID1TTi"].value_or(100.0f));
-			pid_one_PIDTTd_inpF = make_input_float("Tkd 1",
-				teensyConf["PID1TTd"].value_or(0.0f));
+				t_conf["PID1TTi"].value_or(100.0f));
+			pid_one_PIDTTD_inpF = make_input_float("Tkd 1",
+				t_conf["PID1TTd"].value_or(0.0f));
 
 			pid_one_PIDAKP_inpF = make_input_float("Akp 1",
-				teensyConf["PID1AKp"].value_or(200.0f));
+				t_conf["PID1AKp"].value_or(200.0f));
 			pid_one_PIDATI_inpF = make_input_float("Aki 1",
-				teensyConf["PID1ATi"].value_or(100.0f));
+				t_conf["PID1ATi"].value_or(100.0f));
 			pid_one_PIDATD_inpF = make_input_float("Akd 1",
-				teensyConf["PID1ATd"].value_or(0.0f));
+				t_conf["PID1ATd"].value_or(0.0f));
 
 			pid_two_chkBox = make_checkbox("PID2 Enable",
-				teensyConf["PID2Enable"].value_or(false));
+				t_conf["PID2Enable"].value_or(false));
 			pid_two_temp_sp_inpF = make_input_float("Temp Setpoint 2",
-				teensyConf["PID2TempSetpoint"].value_or(0.0f));
+				t_conf["PID2TempSetpoint"].value_or(0.0f));
 			pid_two_curr_sp_inpF = make_input_float("Current Setpoint 2",
-				teensyConf["PID2CurrentSetpoint"].value_or(3.0f));
+				t_conf["PID2CurrentSetpoint"].value_or(3.0f));
 
 			pid_two_PIDTKP_inpF = make_input_float("Tkp 2",
-				teensyConf["PID2TKp"].value_or(1000.0f));
+				t_conf["PID2TKp"].value_or(1000.0f));
 			pid_two_PIDTTI_inpF = make_input_float("Tki 2",
-				teensyConf["PID2TTi"].value_or(100.0f));
-			pid_two_PIDTTd_inpF = make_input_float("Tkd 2",
-				teensyConf["PID2TTd"].value_or(0.0f));
+				t_conf["PID2TTi"].value_or(100.0f));
+			pid_two_PIDTTD_inpF = make_input_float("Tkd 2",
+				t_conf["PID2TTd"].value_or(0.0f));
 
 			pid_two_PIDAKP_inpF = make_input_float("Akp 2",
-				teensyConf["PID2AKp"].value_or(200.0f));
+				t_conf["PID2AKp"].value_or(200.0f));
 			pid_two_PIDATI_inpF = make_input_float("Aki 2",
-				teensyConf["PID2ATi"].value_or(100.0f));
+				t_conf["PID2ATi"].value_or(100.0f));
 			pid_two_PIDATD_inpF = make_input_float("Akd 2",
-				teensyConf["PID2ATd"].value_or(0.0f));
+				t_conf["PID2ATd"].value_or(0.0f));
 			// End Teensy Controls
 
 			// CAEN Controls
-			caen_connect_btn = make_button("Connect");
-			caen_disconnect_btn = make_button("Disconnect");
-			send_soft_trig = make_button("Software Trigger");
-			start_processing_btn = make_button("Start Processing");
+			caen_connect_btn 		= make_button("Connect");
+			caen_disconnect_btn 	= make_button("Disconnect");
+			send_soft_trig 			= make_button("Software Trigger");
+			start_processing_btn 	= make_button("Start Processing");
 
 			// Indicators
 
@@ -197,11 +222,14 @@ public:
 			eventsBuffer = make_indicator(IndicatorNames::CAENBUFFEREVENTS, 4,
 				NumericFormat::Default);
 			_plotManager.add(eventsBuffer);
-			frequency = make_indicator(IndicatorNames::FREQUENCY, 4, NumericFormat::Scientific);
+			frequency = make_indicator(IndicatorNames::FREQUENCY, 4,
+				NumericFormat::Scientific);
 			_plotManager.add(frequency);
-			dark_noise = make_indicator(IndicatorNames::DARK_NOISE_RATE, 3, NumericFormat::Scientific);
+			dark_noise = make_indicator(IndicatorNames::DARK_NOISE_RATE, 3,
+				NumericFormat::Scientific);
 			_plotManager.add(dark_noise);
-			gain = make_indicator(IndicatorNames::GAIN, 3, NumericFormat::Scientific);
+			gain = make_indicator(IndicatorNames::GAIN, 3,
+				NumericFormat::Scientific);
 			_plotManager.add(gain);
 			// End CAEN
 
@@ -231,6 +259,22 @@ public:
 
 			sipm_plot = make_plot(IndicatorNames::SiPM_Plot);
 			_plotManager.add(sipm_plot);
+
+			i_com_port 		= t_conf["Port"].value_or("COM4");
+			i_run_dir 		= config["File"]["RunDir"].value_or("./RUNS");
+			i_run_name 		= config["File"]["RunName"].value_or("Testing");
+			i_sipmRunName 	= config["File"]["SiPMParameters"].value_or("default");
+
+			ic_conf_model 		= CAEN_conf["Model"].value_or("DT5730B");
+			ic_maxEventsPerRead = CAEN_conf["MaxEventsPerRead"].value_or(512u);
+			ic_channel 			= CAEN_conf["Channel"].value_or(0u);
+			ic_offset 			= CAEN_conf["Offset"].value_or(0x8000u);
+			ic_overlapping_rej  = CAEN_conf["OverlappingRejection"].value_or(0u);
+			ic_recordLength 	= CAEN_conf["RecordLength"].value_or(2048u);
+			ic_polarity 		= CAEN_conf["Polarity"].value_or(0u);
+			ic_range 			= CAEN_conf["Range"].value_or(0u);
+			ic_postbuffer 		= CAEN_conf["PostBufferPorcentage"].value_or(50u);
+			ic_threshold 		= CAEN_conf["Threshold"].value_or(0x8000u);
 		}
 
 		// No copying
@@ -239,23 +283,6 @@ public:
 		~GUIManager() { }
 
 		void operator()() {
-			// For std::get, we cannot use auto because it will go straight
-			// to const T& which is not allowed with these non-copyable
-			// types
-			static TeensyInQueue& teensyQueue
-				= std::get<TeensyInQueue&>(_queues);
-			static auto teensyQueueFunc = [&](TeensyQueueInType&& f) -> bool {
-				return teensyQueue.try_enqueue(f);
-			};
-
-			// end CAEN Controls
-
-			static auto config = toml::parse_file("gui_setup.toml");
-			static auto teensyConf = config["Teensy"];
-			static std::string runDir
-				= config["File"]["RunDir"].value_or("./RUNS");
-			static std::string runName
-				= config["File"]["RunName"].value_or("Testing");
 
 			ImGui::Begin("Control Window");  
 
@@ -263,265 +290,57 @@ public:
 
 				if(ImGui::BeginTabItem("Run")) {
 
-					ImGui::InputText("Run Directory", &runDir);
-					ImGui::InputText("Run name", &runName);
-
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Teensy")) {
-
-					// This makes all the items between PushItemWidth & PopItemWidth 80 px (?) wide
-					ImGui::PushItemWidth(80);
-
-					// 1.0 -> 0.5
-					// 0.5 -> 1.0
-					// (1.0 - 0.5) / (0.5 - 1.0) = -1
-					static float connected_mod = 1.5;
-
-					// Com port text input
-					// We do not make this a GUI queue item because
-					// we only need to let the client know when we click Connnect
-					static std::string com_port = teensyConf["Port"].value_or("COM4");
-					ImGui::InputText("Teensy COM port", &com_port);
-
-					// This button starts the teensy communication
-					ImGui::SameLine();
-					// Colors to pop up or shadow it depending on the conditions
-					ImGui::PushStyleColor(ImGuiCol_Button, 
-						static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, connected_mod*0.6f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 
-						static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, connected_mod*0.7f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonActive, 
-						static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, connected_mod*0.8f)));
-					// The operator () carries the ImGUI drawing functions
-					// the function it needs is the callback
-					if(connect_btn(teensyQueueFunc,
-						[=](TeensyControllerState& oldState) {
-							// We capture the com_value with connect on top of the button state
-							// which in this case is not going to be used.
-							oldState.Port = com_port;
-							oldState.RunDir = runDir;
-							oldState.RunName = runName;
-							oldState.CurrentState
-								= TeensyControllerStates::AttemptConnection;
-							return true;
-						}
-					)) {
-						connected_mod = 0.5;
+					ImGui::InputText("Runs Directory", &i_run_dir);
+					if(ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("Directory of where all the run "
+							"files are going to be saved at.\n"
+							"Fixed when the connect buttons are pressed.");
 					}
 
-					ImGui::PopStyleColor(3);
+					ImGui::InputText("Run name", &i_run_name);
+					if(ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("Name of the run.\n"
+							"Fixed when the connect buttons are pressed.");
+					}
 
-					/// Disconnect button
-					float disconnected_mod = 1.5 - connected_mod;
-					ImGui::SameLine();
-					ImGui::PushStyleColor(ImGuiCol_Button, 
-						static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, disconnected_mod*0.6f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 
-						static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, disconnected_mod*0.7f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonActive, 
-						static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
+					ImGui::InputText("SiPM run name", &i_sipmRunName);
+					if(ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("This will appended to the name "
+							"of the SiPM pulse file to denote that the these "
+							"SiPM pulses where taken during this run but "
+							"with different parameters (OV for example).\n"
+							"Fixed when the Start SiPM data taking buttons "
+							"is pressed.");
+					}
 
-					if(disconnect_btn(teensyQueueFunc,
-						// Teensy Stuff
-						[=](TeensyControllerState& oldState) {
-							// No need to disconnect if its not connected
-							if(oldState.CurrentState == TeensyControllerStates::Connected) {
-								oldState.CurrentState
-									= TeensyControllerStates::Disconnected;
+					// This is the only button that does send a task to all
+					// (so far) threads.
+					// TODO(Hector): generalize this in the future
+					if(ImGui::Button("Start SiPM data taking")) {
+						_teensyQueueF([=](TeensyControllerState& oldState) {
+							// There is nothing to do here technically
+							// but I am including it just in case
+							return true;
+						});
+						_caenQueueF([=](CAENInterfaceState& state) {
+							// Only change state if its in a work related
+							// state, i.e oscilloscope mode
+							if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
+								state.CurrentState == CAENInterfaceStates::StatisticsMode) {
+								state.CurrentState = CAENInterfaceStates::RunMode;
+								state.SiPMParameters = i_sipmRunName;
 							}
 							return true;
-						}
-					)) {
-						// Local stuff
-						connected_mod = 1.5;
+						});
 					}
 
-					ImGui::PopStyleColor(3);
-					ImGui::PopItemWidth();
-
-					pid_relay_chkBox(teensyQueueFunc, 
-						ImGui::IsItemEdited,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDRelayState = pid_relay_chkBox.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDRelay, oldState);
-						}
-					);
-
-					gen_relay_chkBox(teensyQueueFunc,
-						ImGui::IsItemEdited,
-						[=](TeensyControllerState& oldState) {
-							oldState.GeneralRelayState = gen_relay_chkBox.Get();
-							return send_teensy_cmd(TeensyCommands::SetGeneralRelay, oldState);
-						}
-					);
-
 					ImGui::EndTabItem();
 				}
 
-				if (ImGui::BeginTabItem("PID1")) {
-
-					pid_one_chkBox(teensyQueueFunc,
-						ImGui::IsItemEdited,
-						[=](TeensyControllerState& oldState) {
-							bool state = pid_one_chkBox.Get();
-							oldState.PIDOneState = state ? SBCQueens::PIDState::Running : SBCQueens::PIDState::Standby;
-							return state ? send_teensy_cmd(TeensyCommands::StartPIDOne, oldState) : send_teensy_cmd(TeensyCommands::StopPIDOne, oldState);
-						}
-					);
-
-					ImGui::Text("PID Setpoints");
-					pid_one_temp_sp_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f °C", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneTempValues.SetPoint = pid_one_temp_sp_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneTempSetpoint, oldState);
-						}
-					);
-
-					pid_one_curr_sp_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f A", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneCurrentValues.SetPoint = pid_one_curr_sp_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneCurrSetpoint, oldState);
-						}
-					);
-
-					ImGui::Text("Temperature PID coefficients.");
-					pid_one_PIDTKP_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneTempValues.Kp = pid_one_PIDTKP_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneTempKp, oldState);
-						}
-					);
-					pid_one_PIDTTI_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneTempValues.Ti = pid_one_PIDTTI_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneTempTi, oldState);
-						}
-					);
-					pid_one_PIDTTd_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneTempValues.Td = pid_one_PIDTTd_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneTempTd, oldState);
-						}
-					);
-	
-					ImGui::Text("Current PID coefficients.");
-					pid_one_PIDAKP_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneCurrentValues.Kp = pid_one_PIDAKP_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneCurrKp, oldState);
-						}
-					);
-					pid_one_PIDATI_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneCurrentValues.Ti = pid_one_PIDATI_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneCurrTi, oldState);
-						}
-					);
-					pid_one_PIDATD_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDOneCurrentValues.Td = pid_one_PIDATD_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDOneCurrTd, oldState);
-						}
-					);
-
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("PID2")) {
-
-					pid_two_chkBox(teensyQueueFunc,
-						ImGui::IsItemEdited,
-						[=](TeensyControllerState& oldState) {
-							bool state = pid_two_chkBox.Get();
-							oldState.PIDTwoState = state ? SBCQueens::PIDState::Running : SBCQueens::PIDState::Standby;
-							return state ? send_teensy_cmd(TeensyCommands::StartPIDTwo, oldState) : send_teensy_cmd(TeensyCommands::StopPIDTwo, oldState);
-						}
-					);
-
-					ImGui::Text("PID Setpoints");
-					pid_two_temp_sp_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f °C", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoTempValues.SetPoint = pid_two_temp_sp_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoTempSetpoint, oldState);
-						}
-					);
-					pid_two_curr_sp_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f A", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoCurrentValues.SetPoint = pid_two_curr_sp_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrSetpoint, oldState);
-						}
-					);
-
-					ImGui::Text("Temperature PID coefficients.");
-					pid_two_PIDTKP_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoTempValues.Kp = pid_two_PIDTKP_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoTempKp, oldState);
-						}
-					);
-					pid_two_PIDTTI_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoTempValues.Ti = pid_two_PIDTTI_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoTempTi, oldState);
-						}
-					);
-					pid_two_PIDTTd_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoTempValues.Td = pid_two_PIDTTd_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoTempTd, oldState);
-						}
-					);
-	
-					ImGui::Text("Current PID coefficients.");
-					pid_two_PIDAKP_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoCurrentValues.Kp = pid_two_PIDAKP_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrKp, oldState);
-						}
-					);
-					pid_two_PIDATI_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoCurrentValues.Ti = pid_two_PIDATI_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrTi, oldState);
-						}
-					);
-					pid_two_PIDATD_inpF(teensyQueueFunc,
-						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-						[=](TeensyControllerState& oldState) {
-							oldState.PIDTwoCurrentValues.Td = pid_two_PIDATD_inpF.Get();
-							return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrTd, oldState);
-						}
-					);
-
-
-					ImGui::EndTabItem();
-				}
+				teensy_tabs();
 
 				if(ImGui::BeginTabItem("CAEN")) {
 
-								// CAEN Controls
-					static CAENQueue& caenQueue = std::get<CAENQueue&>(_queues);
-					static auto caenQueueFunc = [&](CAENQueueType&& f) -> bool {
-						return caenQueue.try_enqueue(f);
-					};
-
 					ImGui::PushItemWidth(80);
 
 					// 1.0 -> 0.5
@@ -529,31 +348,18 @@ public:
 					// (1.0 - 0.5) / (0.5 - 1.0) = -1
 					static float connected_mod = 1.5;
 
-					static auto CAENConf = config["CAEN"];
-					static int maxEventsPerRead
-						= CAENConf["MaxEventsPerRead"].value_or(512u);
-					static int channel
-						= CAENConf["Channel"].value_or(0u);
-					static int offset
-						= CAENConf["Offset"].value_or(0x8000u);;
-					static int recordLength
-						= CAENConf["RecordLength"].value_or(2048u);
-					static int polarity
-						= CAENConf["Polarity"].value_or(0u);
-					static int range
-						= CAENConf["Range"].value_or(0u);
-					static int postbuffer
-						= CAENConf["PostBufferPorcentage"].value_or(50u);
-					static int threshold
-						= CAENConf["Threshold"].value_or(0x8000u);
-
+					static int model = static_cast<int>(
+						CAENDigitizerModels_map.at(ic_conf_model)
+					);
+					ImGui::Combo("Model", &model, "DT5730B\0DT5740\0\0");
 
 					static int caen_port = 0;
 					ImGui::InputInt("CAEN port", &caen_port);
 			        if (ImGui::IsItemHovered()) {
-            			ImGui::SetTooltip("Usually 0 as long as there is no other"
-            			"CAEN digitizers connected. If there is more, the numbers increase "
-            			"as they were connected to the computer.");
+            			ImGui::SetTooltip("Usually 0 as long as there is no "
+            			"other CAEN digitizers connected. If there are more, "
+            			"the port increases as they were connected to the "
+            			"computer.");
 			        }
 
 					
@@ -567,25 +373,35 @@ public:
 						static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, connected_mod*0.8f)));
 
 					// This button starts the CAEN communication
-					if(caen_connect_btn(caenQueueFunc,
+					if(caen_connect_btn(_caenQueueF,
 						[=](CAENInterfaceState& state) {
+							state.Model =
+								static_cast<CAENDigitizerModel>(model);
 							state.PortNum = caen_port;
-							state.Config.Channel =
-								static_cast<uint8_t>(channel);
-							state.Config.MaxEventsPerRead =
-								static_cast<uint32_t>(maxEventsPerRead);
-							state.Config.DCOffset =
-								static_cast<uint32_t>(offset);
-							state.Config.RecordLength =
-								static_cast<uint32_t>(recordLength);
-							state.Config.DCRange =
-								static_cast<uint8_t>(range);
-							state.Config.TriggerThreshold =
-								static_cast<uint32_t>(threshold);
-							state.Config.TriggerPolarity =
-								static_cast<CAEN_DGTZ_TriggerPolarity_t>(polarity);
-							state.Config.PostTriggerPorcentage =
-								static_cast<uint32_t>(postbuffer);
+
+							state.GlobalConfig.MaxEventsPerRead =
+								static_cast<uint32_t>(ic_maxEventsPerRead);
+							state.GlobalConfig.RecordLength =
+								static_cast<uint32_t>(ic_recordLength);
+							state.GlobalConfig.PostTriggerPorcentage =
+								static_cast<uint32_t>(ic_postbuffer);
+							state.GlobalConfig.TriggerOverlappingEn =
+								ic_overlapping_rej > 0;
+
+							// For now only 1 channel is allowed
+							state.ChannelConfig.Channel =
+								static_cast<uint8_t>(ic_channel);
+							state.ChannelConfig.DCOffset =
+								static_cast<uint32_t>(ic_offset);
+							state.ChannelConfig.DCRange =
+								static_cast<uint8_t>(ic_range);
+							state.ChannelConfig.TriggerThreshold =
+								static_cast<uint32_t>(ic_threshold);
+							state.ChannelConfig.TriggerPolarity =
+								static_cast<CAEN_DGTZ_TriggerPolarity_t>(ic_polarity);
+
+							state.RunDir = i_run_dir;
+							state.RunName = i_run_name;
 							state.CurrentState =
 								CAENInterfaceStates::AttemptConnection;
 							return true;
@@ -606,7 +422,7 @@ public:
 					ImGui::PushStyleColor(ImGuiCol_ButtonActive, 
 						static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
 					
-					if(caen_disconnect_btn(caenQueueFunc,
+					if(caen_disconnect_btn(_caenQueueF,
 						[=](CAENInterfaceState& state) {
 
 							// Only change the state if any of these states
@@ -626,7 +442,7 @@ public:
 					ImGui::PopStyleColor(3);
 
 					ImGui::SameLine();
-					send_soft_trig(caenQueueFunc,
+					send_soft_trig(_caenQueueF,
 						[](CAENInterfaceState& state) {
 							software_trigger(state.Port);
 							return true;
@@ -638,21 +454,27 @@ public:
 					ImGui::EndTabItem();
 
 
-					ImGui::InputInt("Channel", &channel);
+					ImGui::InputInt("Channel", &ic_channel);
 
-					ImGui::InputInt("MaxEventsPerRead", &maxEventsPerRead);
-					ImGui::InputInt("Offset", &offset);
+					ImGui::InputInt("MaxEventsPerRead", &ic_maxEventsPerRead);
+					ImGui::InputInt("Offset", &ic_offset);
 					
-					ImGui::InputInt("Record Length", &recordLength);
-        			ImGui::RadioButton("2V", &range, 0); ImGui::SameLine();
-        			ImGui::RadioButton("0.5V", &range, 1);
+					ImGui::InputInt("Record Length", &ic_recordLength);
+        			ImGui::RadioButton("2V", &ic_range, 0); ImGui::SameLine();
+        			ImGui::RadioButton("0.5V", &ic_range, 1);
         			ImGui::Text("Trigger Polarity:"); ImGui::SameLine();
-        			ImGui::RadioButton("Positive", &polarity, 0); ImGui::SameLine();
-        			ImGui::RadioButton("Negative", &polarity, 1);
-        			ImGui::InputInt("Post-Trigger buffer %", &postbuffer);
-        			ImGui::InputInt("Threshold", &threshold);
+        			ImGui::RadioButton("Positive", &ic_polarity, 0); ImGui::SameLine();
+        			ImGui::RadioButton("Negative", &ic_polarity, 1);
 
-        			start_processing_btn(caenQueueFunc,
+        			ImGui::Text("Overlapping Rejection:"); ImGui::SameLine();
+        			ImGui::RadioButton("Allowed",
+        				&ic_overlapping_rej, 1); ImGui::SameLine();
+        			ImGui::RadioButton("Not Allowed",
+        				&ic_overlapping_rej, 0);
+        			ImGui::InputInt("Post-Trigger buffer %", &ic_postbuffer);
+        			ImGui::InputInt("Threshold", &ic_threshold);
+
+        			start_processing_btn(_caenQueueF,
         				[](CAENInterfaceState& state) {
 							if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
 								state.CurrentState == CAENInterfaceStates::RunMode){
@@ -690,22 +512,22 @@ public:
 				if (ImGui::BeginTabItem("Local BME")) {
 					if (ImPlot::BeginPlot("Local BME", ImVec2(-1,0))) {
 
-							// We setup the axis
-							ImPlot::SetupAxes("time [s]", "Humidity [%]", g_axis_flags, g_axis_flags);
-							ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]", g_axis_flags | ImPlotAxisFlags_Opposite);
-							ImPlot::SetupAxis(ImAxis_Y2, "Temperature [degC]", g_axis_flags | ImPlotAxisFlags_Opposite);
+						// We setup the axis
+						ImPlot::SetupAxes("time [s]", "Humidity [%]", g_axis_flags, g_axis_flags);
+						ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]", g_axis_flags | ImPlotAxisFlags_Opposite);
+						ImPlot::SetupAxis(ImAxis_Y2, "Temperature [degC]", g_axis_flags | ImPlotAxisFlags_Opposite);
 
-							// This one does not need an SetAxes as it takes the default
-							// This functor is almost the same as calling ImPlot
-							local_bme_humi_plot("Humidity");
+						// This one does not need an SetAxes as it takes the default
+						// This functor is almost the same as calling ImPlot
+						local_bme_humi_plot("Humidity");
 
-							// We need to call SetAxes before ImPlot::PlotLines to let the API know
-							// the axis of our data
-							ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-							local_bme_temp_plot("Temperature");
+						// We need to call SetAxes before ImPlot::PlotLines to let the API know
+						// the axis of our data
+						ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+						local_bme_temp_plot("Temperature");
 
-							ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
-							local_bme_pres_plot("Pressure");
+						ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
+						local_bme_pres_plot("Pressure");
 
 						ImPlot::EndPlot();
 					}
@@ -816,16 +638,14 @@ public:
 		void closing() {
 			// The only action to take is that we let the 
 			// Teensy Thread to close, too.
-			TeensyInQueue& teensyQueue = std::get<TeensyInQueue&>(_queues);
-		 	teensyQueue.try_enqueue(
+		 	_teensyQueueF(
 		 		[](TeensyControllerState& oldState) {
 					oldState.CurrentState = TeensyControllerStates::Closing;
 					return true;
 				}
 			);
 
-			CAENQueue& caenQueue = std::get<CAENQueue&>(_queues);
-			caenQueue.try_enqueue(
+			_caenQueueF(
 				[](CAENInterfaceState& state) {
 					state.CurrentState = CAENInterfaceStates::Closing;
 					return true;
@@ -833,6 +653,293 @@ public:
 			);
 			
 
+		}
+
+		void teensy_tabs() {
+			if (ImGui::BeginTabItem("Teensy")) {
+
+				// This makes all the items between PushItemWidth
+				// & PopItemWidth 80 px (?) wide
+				ImGui::PushItemWidth(80);
+
+				// 1.0 -> 0.5
+				// 0.5 -> 1.0
+				// (1.0 - 0.5) / (0.5 - 1.0) = -1
+				static float connected_mod = 1.5;
+
+				// Com port text input
+				// We do not make this a GUI queue item because
+				// we only need to let the client know when we click connnect
+				ImGui::InputText("Teensy COM port", &i_com_port);
+
+				ImGui::SameLine();
+				// Colors to pop up or shadow it depending on the conditions
+				ImGui::PushStyleColor(ImGuiCol_Button,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, connected_mod*0.6f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, connected_mod*0.7f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, connected_mod*0.8f)));
+				// The operator () carries the ImGUI drawing functions
+				// and the task it sends to its associated queue/thread
+				// is the lambda (callback) we pass
+				if(connect_btn(_teensyQueueF,
+					// To make things secure, we pass everything by value
+					[=](TeensyControllerState& oldState) {
+						// We capture the com_value with connect on top of
+						// the button state which in this case is not
+						// going to be used.
+						oldState.Port = i_com_port;
+						oldState.RunDir = i_run_dir;
+						oldState.RunName = i_run_name;
+
+						// Send initial states of the PIDs
+						oldState.PIDOneTempValues.SetPoint
+							= pid_one_temp_sp_inpF.Get();
+						oldState.PIDOneTempValues.Kp
+							= pid_one_PIDTKP_inpF.Get();
+						oldState.PIDOneTempValues.Ti
+							= pid_one_PIDTTI_inpF.Get();
+						oldState.PIDOneTempValues.Td
+							= pid_one_PIDTTD_inpF.Get();
+
+						oldState.PIDOneCurrentValues.SetPoint
+							= pid_one_curr_sp_inpF.Get();
+						oldState.PIDOneCurrentValues.Kp
+							= pid_one_PIDAKP_inpF.Get();
+						oldState.PIDOneCurrentValues.Ti
+							= pid_one_PIDATI_inpF.Get();
+						oldState.PIDOneCurrentValues.Td
+							= pid_one_PIDATD_inpF.Get();
+
+						oldState.PIDTwoTempValues.SetPoint
+							= pid_two_temp_sp_inpF.Get();
+						oldState.PIDTwoTempValues.Kp
+							= pid_two_PIDTKP_inpF.Get();
+						oldState.PIDTwoTempValues.Ti
+							= pid_two_PIDTTI_inpF.Get();
+						oldState.PIDTwoTempValues.Td
+							= pid_two_PIDTTD_inpF.Get();
+
+						oldState.PIDTwoCurrentValues.SetPoint
+							= pid_two_curr_sp_inpF.Get();
+						oldState.PIDTwoCurrentValues.Kp
+							= pid_two_PIDAKP_inpF.Get();
+						oldState.PIDTwoCurrentValues.Ti
+							= pid_two_PIDATI_inpF.Get();
+						oldState.PIDTwoCurrentValues.Td
+							= pid_two_PIDATD_inpF.Get();
+
+						oldState.CurrentState
+							= TeensyControllerStates::AttemptConnection;
+						return true;
+					}
+				// This is code that is run locally to this thread
+				// when the button is pressed
+				)) {
+					connected_mod = 0.5;
+				}
+
+				ImGui::PopStyleColor(3);
+
+				/// Disconnect button
+				float disconnected_mod = 1.5 - connected_mod;
+				ImGui::SameLine();
+				ImGui::PushStyleColor(ImGuiCol_Button,
+					static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, disconnected_mod*0.6f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+					static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, disconnected_mod*0.7f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+					static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
+
+				if(disconnect_btn(_teensyQueueF,
+					[=](TeensyControllerState& oldState) {
+						// No need to disconnect if its not connected
+						if(oldState.CurrentState == TeensyControllerStates::Connected) {
+							oldState.CurrentState
+								= TeensyControllerStates::Disconnected;
+						}
+						return true;
+					}
+				)) {
+					connected_mod = 1.5;
+				}
+
+				ImGui::PopStyleColor(3);
+				ImGui::PopItemWidth();
+
+				pid_relay_chkBox(_teensyQueueF,
+					ImGui::IsItemEdited,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDRelayState = pid_relay_chkBox.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDRelay, oldState);
+					}
+				);
+
+				gen_relay_chkBox(_teensyQueueF,
+					ImGui::IsItemEdited,
+					[=](TeensyControllerState& oldState) {
+						oldState.GeneralRelayState = gen_relay_chkBox.Get();
+						return send_teensy_cmd(TeensyCommands::SetGeneralRelay, oldState);
+					}
+				);
+
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("PID1")) {
+
+				pid_one_chkBox(_teensyQueueF,
+					ImGui::IsItemEdited,
+					[=](TeensyControllerState& oldState) {
+						bool state = pid_one_chkBox.Get();
+						oldState.PIDOneState = state ? SBCQueens::PIDState::Running : SBCQueens::PIDState::Standby;
+						return state ? send_teensy_cmd(TeensyCommands::StartPIDOne, oldState) : send_teensy_cmd(TeensyCommands::StopPIDOne, oldState);
+					}
+				);
+
+				ImGui::Text("PID Setpoints");
+				pid_one_temp_sp_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f °C", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneTempValues.SetPoint = pid_one_temp_sp_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneTempSetpoint, oldState);
+					}
+				);
+
+				pid_one_curr_sp_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f A", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneCurrentValues.SetPoint = pid_one_curr_sp_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneCurrSetpoint, oldState);
+					}
+				);
+
+				ImGui::Text("Temperature PID coefficients.");
+				pid_one_PIDTKP_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneTempValues.Kp = pid_one_PIDTKP_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneTempKp, oldState);
+					}
+				);
+				pid_one_PIDTTI_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneTempValues.Ti = pid_one_PIDTTI_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneTempTi, oldState);
+					}
+				);
+				pid_one_PIDTTD_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneTempValues.Td = pid_one_PIDTTD_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneTempTd, oldState);
+					}
+				);
+
+				ImGui::Text("Current PID coefficients.");
+				pid_one_PIDAKP_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneCurrentValues.Kp = pid_one_PIDAKP_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneCurrKp, oldState);
+					}
+				);
+				pid_one_PIDATI_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneCurrentValues.Ti = pid_one_PIDATI_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneCurrTi, oldState);
+					}
+				);
+				pid_one_PIDATD_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDOneCurrentValues.Td = pid_one_PIDATD_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDOneCurrTd, oldState);
+					}
+				);
+
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("PID2")) {
+
+				pid_two_chkBox(_teensyQueueF,
+					ImGui::IsItemEdited,
+					[=](TeensyControllerState& oldState) {
+						bool state = pid_two_chkBox.Get();
+						oldState.PIDTwoState = state ? SBCQueens::PIDState::Running : SBCQueens::PIDState::Standby;
+						return state ? send_teensy_cmd(TeensyCommands::StartPIDTwo, oldState) : send_teensy_cmd(TeensyCommands::StopPIDTwo, oldState);
+					}
+				);
+
+				ImGui::Text("PID Setpoints");
+				pid_two_temp_sp_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f °C", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoTempValues.SetPoint = pid_two_temp_sp_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoTempSetpoint, oldState);
+					}
+				);
+				pid_two_curr_sp_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f A", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoCurrentValues.SetPoint = pid_two_curr_sp_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrSetpoint, oldState);
+					}
+				);
+
+				ImGui::Text("Temperature PID coefficients.");
+				pid_two_PIDTKP_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoTempValues.Kp = pid_two_PIDTKP_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoTempKp, oldState);
+					}
+				);
+				pid_two_PIDTTI_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoTempValues.Ti = pid_two_PIDTTI_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoTempTi, oldState);
+					}
+				);
+				pid_two_PIDTTD_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoTempValues.Td = pid_two_PIDTTD_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoTempTd, oldState);
+					}
+				);
+
+				ImGui::Text("Current PID coefficients.");
+				pid_two_PIDAKP_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoCurrentValues.Kp = pid_two_PIDAKP_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrKp, oldState);
+					}
+				);
+				pid_two_PIDATI_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoCurrentValues.Ti = pid_two_PIDATI_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrTi, oldState);
+					}
+				);
+				pid_two_PIDATD_inpF(_teensyQueueF,
+					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.PIDTwoCurrentValues.Td = pid_two_PIDATD_inpF.Get();
+						return send_teensy_cmd(TeensyCommands::SetPIDTwoCurrTd, oldState);
+					}
+				);
+
+
+				ImGui::EndTabItem();
+			}
 		}
 
 	};

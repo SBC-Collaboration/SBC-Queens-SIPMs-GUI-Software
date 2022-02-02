@@ -9,13 +9,13 @@ PIDRelay = false
 GeneralRelay = false
 
 PID1Enable = false
-PID1TempSetpoint = 0
-PID1CurrentSetpoint = 3
-PID1TKp = -2000
-PID1TTi = 10e3
+PID1TempSetpoint = -18
+PID1CurrentSetpoint = 5
+PID1TKp = -3e3
+PID1TTi = 50e3
 PID1TTd = 0
 PID1AKp = 200
-PID1ATi = 500
+PID1ATi = 100
 PID1ATd = 0
 
 PID2Enable = false
@@ -29,8 +29,16 @@ PID2ATi = 100
 PID2ATd = 0
 
 [CAEN]
+# DT5730B or DT5740
+Model = "DT5730B"
+# 0 = not allowed
+OverlappingRejection = 0
+MaxEventsPerRead = 512
 Channel = 0
 Offset = 0x8000
-RecordLength = 2048
+RecordLength = 180
+# 0 = rising edge, 1 = falling edge
+Polarity = 1
 Range = 1
-Threshold = 0x2000
+PostBufferPorcentage = 50
+Threshold = 7500

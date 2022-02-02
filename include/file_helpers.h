@@ -23,7 +23,7 @@ namespace SBCQueens {
 	// this file is going to be used to write the data files
 	// No reading allowed
 	template <typename T>
-	struct DataFile {
+	struct dataFile {
 private:
 		// Path to the file
 		bool _open;
@@ -37,38 +37,31 @@ private:
 
 public:
 		using type = T;
-		// Const variblae to indicate this is will only append
-		//const std::ios_base::openmode Mode = std::ofstream::app;
 
-		DataFile() : _open(false) { }
+		dataFile() : _open(false) { }
 
 		// FileName: is the relative or absolute file dir
-		explicit DataFile(const std::string& fileName) {
+		explicit dataFile(const std::string& fileName) {
 
 			_fullFileDir = fileName;
-
 			_stream.open(_fullFileDir, std::ofstream::app);
-
-			if(!_stream.is_open()) {
-				throw std::runtime_error("Failed to open the file");
-			}
 
 			_current_data = std::make_shared<std::deque<T>>(_data);
 			_backup_data = std::make_shared<std::deque<T>>(_other_data);
-			_open = true;
+
+			if(_stream.is_open()) {
+				_open = true;
+			}
 			
 		}
 
-		// Allow moving
-		DataFile(DataFile&&) = default;
-		DataFile& operator=(DataFile&&) = default;
-
-		// No copying
-		DataFile(const DataFile&) = delete;
+		// No copying nor moving
+		dataFile(dataFile&&) = delete;
+		dataFile(const dataFile&) = delete;
 
 		// It is very likely these two things are happening anyways when
 		// the Datafile is out of the scope but I want to make sure.
-		~DataFile() {
+		~dataFile() {
 			_stream.close();
 			_data.clear();
 			_other_data.clear();
@@ -89,11 +82,11 @@ public:
 
 		// Adds element as a copy to current buffer
 		void Add(const T& element) {
-			_backup_data->push_back(element);
+			_backup_data->emplace_back(element);
 		}
 
 		// Adds list as a copy to current buffer
-		void Add(std::initializer_list<T>& list) {
+		void Add(const std::initializer_list<T>& list) {
 			_backup_data->insert(_data.end(), list);
 		}
 
@@ -108,15 +101,14 @@ public:
 		}
 
 		// Adds list as a copy to current buffer
-		void operator()(std::initializer_list<T>& list) {
+		void operator()(const std::initializer_list<T>& list) {
 			Add(list);
 		}
 
 		// Saves string to the file
-		void operator<<(const std::string& fmt) {
-
+		template <typename DATA>
+		void operator<<(const DATA& fmt) {
 			_stream << fmt;
-
 		}
 
 		template <typename FormatFunc>
@@ -126,39 +118,39 @@ public:
 
 	};
 
+	template<typename T>
+	using DataFile = std::unique_ptr<dataFile<T>>;
+
 	template <typename T>
-	bool open(DataFile<T>& f,const std::string& fileName) {
-		// This should close the file and release any resources
-		try{
-			f = DataFile<T>(fileName);
-			return true;
-		} catch (...) {
-			return false;
-		}
+	void open(DataFile<T>& f, const std::string& fileName) {
+		f = std::make_unique<dataFile<T>>(fileName);
 	}
 
 	template<typename T, typename FormatFunc>
-	// Saves the contents of DataFile
+	// Saves the contents of DataFile using the format function f
+	// that takes T as an argument, or
+	// takes std::deque<T>& as argument which then uses all the information
+	// at once to generate the string that is saved to the file
 	void save(DataFile<T>& file, FormatFunc&& f) noexcept {
 
 		// If FormatFunc takes the single item as an argument
 		// We will call f for every item in TempData
 		if constexpr (std::is_invocable_v<FormatFunc, T>) {
-			if(file.IsOpen()) {
-				for(auto item : file.GetWritingData()) {
+			if(file->IsOpen()) {
+				for(auto item : file->GetWritingData()) {
 					std::string fmt_item = f(item);
-					file << fmt_item;
+					(*file) << fmt_item;
 				}
 
-				file.Clear();
+				file->Clear();
 			}
 
 		// If it takes the entire format, then apply it to all.
-		} else if constexpr (std::is_invocable_v<FormatFunc, const DataFile<T>&>) {
+		} else if constexpr (std::is_invocable_v<FormatFunc, std::deque<T>&>) {
 
-			if(file.IsOpen()) {
-				std::string str = file | f;
-				file << str;
+			if(file->IsOpen()) {
+				std::string str = (*file) | f;
+				(*file) << str;
 			}
 
 		}
@@ -171,11 +163,26 @@ public:
 		// Here is where ToggleDataBuffer() is important.
 		// During an async there should be two arrays:
 		// One to write to, and another to read from.
-		file.ToggleDataBuffer();
+		file->ToggleDataBuffer();
 		std::packaged_task<void(DataFile<T>&, FormatFunc&&)>
 			_f(save<T, FormatFunc>);
 			
 		_f(file, std::forward<FormatFunc>(f));
+	}
+
+	template<typename T, typename FormatFunc>
+	// Saves the contents of the DataFile asynchronously using packaged tasks
+	void sync_save(DataFile<T>& file, FormatFunc&& f) noexcept {
+		// Here is where ToggleDataBuffer() is important.
+		// During an async there should be two arrays:
+		// One to write to, and another to read from.
+		file->ToggleDataBuffer();
+		save(file, f);
+	}
+
+	template<typename T>
+	std::string sbc_save_func(std::deque<T>& data) {
+		return "";
 	}
 
 } //namespace SBCQueens

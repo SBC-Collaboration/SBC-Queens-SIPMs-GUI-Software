@@ -8,9 +8,9 @@ namespace SBCQueens {
 
 	}
 
-	InputText::InputText(std::string&& label, const std::string& init_val) 
+	InputText::InputText(std::string&& label, const std::string& init_val)
 			: Control(std::forward<std::string>(label)),
-			_in(std::make_unique<std::string>(init_val)) { 
+			_in(std::make_unique<std::string>(init_val)) {
 
 	}
 

@@ -2,7 +2,7 @@
 #  mkdir build
 #  cd build
 #  cmake ../ -G "MinGW Makefiles" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
-
+#  cmake ../ -G "MinGW Makefiles" -DUSE_VULKAN=ON -DCAEN_DIR="X:\\Program Files\\CAEN" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
 cmake_minimum_required(VERSION 3.11)
 
 project(SiPMControlGUI C CXX)
@@ -225,4 +225,6 @@ file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 target_link_libraries(SiPMControlGUI ${LIBRARIES} ${IMGUI_LIBRARIES} 
   glfw imgui implot
   serial atomic spdlog
-  CAENVMElib CAENComm CAENDigitizer)
+  CAENVMElib
+  CAENComm
+  CAENDigitizer)

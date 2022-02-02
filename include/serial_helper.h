@@ -17,6 +17,7 @@ namespace SBCQueens {
 	// It does not release port.
 	void disconnect(serial_ptr& port) noexcept;
 
+	// Flushed in and out buffers
 	void flush(serial_ptr& port) noexcept;
 
 	// Send message to port and if ack_string is not empty, checks if the return

@@ -208,7 +208,7 @@ public:
 			if(event()) {
 
 				callback();
-				
+
 			}
 
 			return u;
@@ -245,7 +245,7 @@ public:
 
 			// The if must come after the ImGUI API call if not, it will not work
 			if(event()) {
-				
+
 				f(callback);
 
 			}
@@ -265,7 +265,7 @@ public:
 			if(event()) {
 
 				callback();
-				
+
 			}
 
 			return u;

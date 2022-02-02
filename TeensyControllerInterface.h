@@ -15,6 +15,7 @@
 */
 
 // STD includes
+#include "include/timing_events.h"
 #include <cstdint>
 #include <inttypes.h>
 #include <string>
@@ -36,6 +37,7 @@ namespace chrono = std::chrono;
 #include <readerwriterqueue.h>
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
+#include <toml.hpp>
 using json = nlohmann::json;
 // #include <boost/sml.hpp>
 // namespace sml = boost::sml;
@@ -147,8 +149,8 @@ namespace SBCQueens {
 	};
 	
 	// BME Compensation functions
-	// Taken directly from the datasheet
-
+	// Taken directly from the datasheet modified by me to optimize for
+	// running time and different BMEs
 	inline double t_fine_to_temp(const int32_t& t_fine);
 
 	template<BME_TYPE T>
@@ -161,7 +163,6 @@ namespace SBCQueens {
 	double BME280_compensate_H_double(const int32_t& adc_H, const int32_t& t_fine);
 
 	// These functions are required for json to convert to our types.
-
 	// Turns PIDs type to Json. 
     void to_json(json& j, const PIDs& p);
     // Turns a JSON to PIDs
@@ -400,15 +401,17 @@ namespace SBCQueens {
 								_init_time = get_current_time_epoch();
 
 								// Open files to start saving!
-								bool s = open(_PIDsFile,
+								open(_PIDsFile,
 									state_of_everything.RunDir
 									+ "/" + state_of_everything.RunName
 									+ "/PIDs.txt");
+						 		bool s = _PIDsFile > 0;
 
-								s &= open(_BMEsFile,
+								open(_BMEsFile,
 									state_of_everything.RunDir
 									+ "/" + state_of_everything.RunName
 									+ "/BMEs.txt");
+								s &= _BMEsFile > 0;
 
 								if(!s) {
 									spdlog::error("Failed to open files.");
@@ -418,6 +421,9 @@ namespace SBCQueens {
 									spdlog::info(
 										"Connected to Teensy with port {}",
 									state_of_everything.Port);
+
+									send_initial_config();
+
 									state_of_everything.CurrentState =
 										TeensyControllerStates::Connected;
 								}
@@ -464,10 +470,60 @@ namespace SBCQueens {
 
 		} // here port should get deleted
 
+private:
+		void send_initial_config() {
+
+			auto send_ts_cmd_b = make_blocking_total_timed_event(
+				std::chrono::milliseconds(10),
+					send_teensy_cmd
+				);
+
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempSetpoint,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempKp,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempTd,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempTi,
+				state_of_everything);
+
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrSetpoint,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrKp,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrTd,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrTi,
+				state_of_everything);
+
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempSetpoint,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempKp,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempTd,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempTi,
+				state_of_everything);
+
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrSetpoint,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrKp,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrTd,
+				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrTi,
+				state_of_everything);
+
+			// Flush so there is nothing in the buffer
+			// making everything annoying
+			flush(state_of_everything.teensy_serial);
+		}
+
 		void retrieve_pids(TeensyControllerState& teensyState) {
 
 			if(!send_teensy_cmd(TeensyCommands::GetPIDs, teensyState)) {
 				spdlog::warn("Failed to send retrieve_pids to Teensy.");
+				flush(state_of_everything.teensy_serial);
 				return;
 			}
 				
@@ -475,6 +531,7 @@ namespace SBCQueens {
 
 			if(!msg_opt.has_value()) {
 				spdlog::warn("Failed to retrieve latest Teensy PID values.");
+				flush(state_of_everything.teensy_serial);
 				return;
 			}
 			
@@ -483,6 +540,7 @@ namespace SBCQueens {
 			if(json_parse.is_discarded()) {
 				spdlog::warn("Invalid json string. "
 							"Message received from Teensy: {0}", msg_opt.value());
+				flush(state_of_everything.teensy_serial);
 				return;
 			}
 
@@ -514,7 +572,7 @@ namespace SBCQueens {
 				_plotSender(IndicatorNames::LATEST_PID2_CURR,
 					pids.PID2.Current);
 
-				_PIDsFile(pids);
+				_PIDsFile->Add(pids);
 
 			} catch (... ) {
 				spdlog::warn("Failed to parse lastest Teensy PID values. "
@@ -532,6 +590,7 @@ namespace SBCQueens {
 			// Same as above but for now, not implemented
 			if(!send_teensy_cmd(TeensyCommands::GetBMEs, teensyState)) {
 				spdlog::warn("Failed to send retrieve_bmes to Teensy.");
+				flush(state_of_everything.teensy_serial);
 				return;
 			}
 				
@@ -539,6 +598,7 @@ namespace SBCQueens {
 
 			if(!msg_opt.has_value()) { 
 				spdlog::warn("Failed to retrieve latest Teensy BME values.");
+				flush(state_of_everything.teensy_serial);
 				return; 
 			}
 
@@ -577,7 +637,7 @@ namespace SBCQueens {
 				_plotSender(IndicatorNames::LATEST_BOX_BME_TEMP,
 					bmes.BoxBME.Temperature);
 
-				_BMEsFile(bmes);
+				_BMEsFile->Add(bmes);
 
 			} catch (... ) {
 				spdlog::warn("Failed to parse lastest Teensy PID values. "

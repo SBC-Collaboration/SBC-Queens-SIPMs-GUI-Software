@@ -2,6 +2,7 @@ If compiling this for windows make sure you have downloaded and installed:
 
 * MSYS2 (with CMAKE, build-essentials, clang-tools-extra PREFERRED). See below for further instructions
 * (optional) Git for windows (to git clone the dependencies if not included)
+* VULKAN-SDK (if using the vulkan backend)
 
 These are all the dependencies so far:
 
@@ -22,8 +23,6 @@ mkdir build
 cd build
 cmake ../ -G "MinGW Makefiles" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 mingw32-make -j8
-
-
 
 You will need to install mingw64 using MSYS2 first and install the toolchain and extras (for clang-tidy and clangd)
 

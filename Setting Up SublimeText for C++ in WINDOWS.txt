@@ -8,7 +8,6 @@ To install everything for clang-tidy and clangd follow:
 
 	https://packages.msys2.org/package/mingw-w64-x86_64-clang-tools-extra
 
-
 Then follow this link to install LSP
 
 https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/sublime_ide.md#Setup
