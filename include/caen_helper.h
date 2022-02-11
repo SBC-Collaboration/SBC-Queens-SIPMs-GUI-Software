@@ -22,7 +22,7 @@ namespace SBCQueens {
 
 	enum class CAENDigitizerModel {
 		DT5730B = 0,
-		DT5740S = 1
+		DT5740D = 1
 	};
 
 	// All the constants that never change between digitizers
@@ -47,7 +47,7 @@ namespace SBCQueens {
 	const std::unordered_map<std::string, CAENDigitizerModel>
 		CAENDigitizerModels_map {
 			{"DT5730B", CAENDigitizerModel::DT5730B},
-			{"DT5740S", CAENDigitizerModel::DT5740S}
+			{"DT5740D", CAENDigitizerModel::DT5740D}
 	};
 
 	// These links all the enums with their constants or properties that
@@ -61,7 +61,7 @@ namespace SBCQueens {
 				.NumChannels = 8,
 				.VoltageRanges = {0.5, 2.0}
 			}},
-			{CAENDigitizerModel::DT5740S, CAENDigitizerModelConstants{
+			{CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants{
 				.ADCResolution = 12,
 				.AcquisitionRate = 62.5e6,
 				.MemoryPerChannel = static_cast<uint32_t>(192e3),
@@ -103,7 +103,7 @@ namespace SBCQueens {
 
 		// This feature is for X730
 		// True = disabled, False = enabled
-		bool TriggerOverlappingEn = false;
+		bool TriggerOverlappingEn = true;
 
 		// 0 = normal, the board is full whenever all buffers are full
 		// 1 = One buffer free. The board is full whenever Nb-1 buffers
@@ -346,7 +346,7 @@ private:
 	// found under the vector<CAENChannelConfigs> in res
 	// Does not setup if resource is null or there are errors.
 	void setup(CAEN&, CAENGlobalConfig,
-		std::initializer_list<CAENChannelConfig>) noexcept;
+		std::initializer_list<CAENChannelConfig>, CAENDigitizerModel) noexcept;
 
 	// Enables the acquisition and allocates the memory for the acquired data.
 	// Does not enable acquisitoin if resource is null or there are errors.

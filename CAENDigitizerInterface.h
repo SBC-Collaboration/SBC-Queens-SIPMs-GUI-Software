@@ -10,6 +10,7 @@
 #include <thread>
 #include <chrono>
 #include <random>
+#include <iostream>
 
 // 3rd party includes
 #include <readerwriterqueue.h>
@@ -203,7 +204,6 @@ private:
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
-					// spdlog::info("Not enough events in buffer");
 					return;
 				}
 
@@ -365,7 +365,8 @@ private:
 			reset(port);
 			setup(port,
 				state_of_everything.GlobalConfig,
-				{state_of_everything.ChannelConfig});
+				{state_of_everything.ChannelConfig}, 
+				state_of_everything.Model);
 
 
 			enable_acquisition(port);
@@ -403,7 +404,7 @@ private:
 		// as a mode in where the user can see what is happening.
 		// Similar to an oscilloscope
 		bool oscilloscope() {
-
+			//spdlog::info("Oscilloscope mode.");
 			CAEN& port = state_of_everything.Port;
 
 			auto events = get_events_in_buffer(port);
@@ -464,14 +465,15 @@ private:
 		// is done. Serves more for the user to know
 		// how things are changing.
 		bool statistics_mode() {
+			//spdlog::info("Statistics mode.");
 			processing();
 			change_state();
 			return true;
 		}
 
 		bool run_mode() {
+			//spdlog::info("Run mode.");
 			static bool isFileOpen = false;
-
 
 			if(isFileOpen) {
 				// spdlog::info("Saving SIPM data");

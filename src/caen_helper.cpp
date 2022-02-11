@@ -111,7 +111,8 @@ namespace SBCQueens {
 	}
 
 	void setup(CAEN& res, CAENGlobalConfig g_config,
-		std::initializer_list<CAENChannelConfig> ch_configs) noexcept {
+		std::initializer_list<CAENChannelConfig> ch_configs, 
+		CAENDigitizerModel model) noexcept {
 
 		if(!res) {
 			return;
@@ -150,7 +151,6 @@ namespace SBCQueens {
 		// 	total_err |= err;
 		// 	err_msg += "CAEN_DGTZ_SetMaxNumEventsBLT Failed. ";
 		// }
-
 
 		error_wrap("CAEN_DGTZ_SetRecordLength Failed. ",
 			CAEN_DGTZ_SetRecordLength,
@@ -210,61 +210,133 @@ namespace SBCQueens {
 			((res->GlobalConfig.MemoryFullModeSelection & 0x0001) << 5));
 
 		// Channel stuff
-		// First, we make the channel mask (if applicable)
-		uint32_t channel_mask = 0;
-		for(auto ch_config : ch_configs) {
-			channel_mask |= 1 << ch_config.Channel;
-		}
+		if (model == CAENDigitizerModel::DT5730B){
+			// For DT5730B
+			res->ChannelConfigs = ch_configs;
 
-		// Then enable those channels
-		error_wrap("CAEN_DGTZ_SetChannelEnableMask Failed. ",
-			CAEN_DGTZ_SetChannelEnableMask,
-			handle, channel_mask);
-
-		// then enable their self trigger
-		error_wrap("CAEN_DGTZ_SetChannelSelfTrigger Failed. ",
-			CAEN_DGTZ_SetChannelSelfTrigger,
-			handle, res->GlobalConfig.CHTriggerMode, channel_mask);
-
-		// Let's clear the channel map to allow for new channels properties
-		res->ChannelConfigs.clear();
-		for(auto ch_config : ch_configs) {
-
-			// Before we set any parameters for each channel, we add the
-			// new channel to the map. try_emplace(...) will make sure we do
-			// not add duplicates
-			auto ins = res->ChannelConfigs.try_emplace(
-				ch_config.Channel, ch_config);
-
-			// if false, it was already inserted and we move to the next
-			// channel
-			if(!ins.second) {
-				continue;
+			// First, we make the channel mask (if applicable)
+			uint32_t channel_mask = 0;
+			for(auto ch_config : res->ChannelConfigs) {
+				channel_mask |= 1 << ch_config.Channel;
 			}
 
-	    	// Trigger stuff
-	    	// Self Channel trigger
-			error_wrap("CAEN_DGTZ_SetChannelTriggerThreshold Failed. ",
-				CAEN_DGTZ_SetChannelTriggerThreshold,
-				handle, ch_config.Channel, ch_config.TriggerThreshold);
+			// Then enable those channels
+			error_wrap("CAEN_DGTZ_SetChannelEnableMask Failed. ",
+				CAEN_DGTZ_SetChannelEnableMask,
+				handle, channel_mask);
 
-			// DC Offset
-			error_wrap("CAEN_DGTZ_SetChannelDCOffset Failed. ",
-				CAEN_DGTZ_SetChannelDCOffset,
-				handle, ch_config.Channel, ch_config.DCOffset);
+			// then enable their self trigger
+			error_wrap("CAEN_DGTZ_SetChannelSelfTrigger Failed. ",
+				CAEN_DGTZ_SetChannelSelfTrigger,
+				handle, res->GlobalConfig.CHTriggerMode, channel_mask);
 
-        	// Writes to the registers that holds the DC range
-        	// For 5730 it is the register 0x1n28
-			error_wrap("write_register to reg 0x1n28 Failed (DC Range). " ,
-				CAEN_DGTZ_WriteRegister,
-				handle, 0x1028 | (ch_config.Channel & 0x0F) << 8,
-				ch_config.DCRange & 0x0001);
+			// Let's clear the channel map to allow for new channels properties
+			res->ChannelConfigs.clear();
+			for(auto ch_config : res->ChannelConfigs) {
 
-			// Channel trigger polarity
-			error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
-				CAEN_DGTZ_SetTriggerPolarity,
-				handle, ch_config.Channel, ch_config.TriggerPolarity);
+				// Before we set any parameters for each channel, we add the
+				// new channel to the map. try_emplace(...) will make sure we do
+				// not add duplicates
+				auto ins = res->ChannelConfigs.try_emplace(
+					ch_config.Channel, ch_config);
 
+				// if false, it was already inserted and we move to the next
+				// channel
+				if(!ins.second) {
+					continue;
+				}
+
+		    	// Trigger stuff
+		    	// Self Channel trigger
+				error_wrap("CAEN_DGTZ_SetChannelTriggerThreshold Failed. ",
+					CAEN_DGTZ_SetChannelTriggerThreshold,
+					handle, ch_config.Channel, ch_config.TriggerThreshold);
+
+				error_wrap("CAEN_DGTZ_SetChannelDCOffset Failed. ",
+					CAEN_DGTZ_SetChannelDCOffset,
+					handle, ch_config.Channel, ch_config.DCOffset);
+
+	        	// Writes to the registers that holds the DC range
+	        	// For 5730 it is the register 0x1n28
+				error_wrap("write_register to reg 0x1n28 Failed (DC Range). " ,
+					CAEN_DGTZ_WriteRegister,
+					handle, 0x1028 | (ch_config.Channel & 0x0F) << 8,
+					ch_config.DCRange & 0x0001);
+
+				// Channel trigger polarity
+				error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
+					CAEN_DGTZ_SetTriggerPolarity,
+					handle, ch_config.Channel, ch_config.TriggerPolarity);
+
+			}
+		} else if (model==CAENDigitizerModel::DT5740D) {
+			// For DT5740D
+			res->ChannelConfigs = ch_configs;
+			uint32_t group_mask = 0;
+			for(auto ch_config : res->ChannelConfigs) {
+				group_mask |= 1 << ch_config.Channel;
+			}
+
+			error_wrap("CAEN_DGTZ_SetGroupEnableMask Failed. ",
+				CAEN_DGTZ_SetGroupEnableMask,
+				handle, group_mask);
+
+			error_wrap("CAEN_DGTZ_SetGroupSelfTrigger Failed. ",
+				CAEN_DGTZ_SetGroupSelfTrigger,
+				handle, res->GlobalConfig.CHTriggerMode, group_mask);
+
+			res->ChannelConfigs.clear();
+			for(auto ch_config : res->ChannelConfigs) {
+
+				// Before we set any parameters for each channel, we add the
+				// new channel to the map. try_emplace(...) will make sure we do
+				// not add duplicates
+				auto ins = res->ChannelConfigs.try_emplace(
+					ch_config.Channel, ch_config);
+
+				// if false, it was already inserted and we move to the next
+				// channel
+				if(!ins.second) {
+					continue;
+				}
+
+		    	// Trigger stuff
+				error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
+					CAEN_DGTZ_SetGroupTriggerThreshold,
+					handle, ch_config.Channel, ch_config.TriggerThreshold);
+
+				error_wrap("CAEN_DGTZ_SetGroupDCOffset Failed. ",
+					CAEN_DGTZ_SetGroupDCOffset,
+					handle, ch_config.Channel, ch_config.DCOffset);
+
+				// For DT5740, all groups and all channels share the same polarity
+				error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
+					CAEN_DGTZ_SetTriggerPolarity,
+					handle, ch_config.Channel, ch_config.TriggerPolarity);
+			}
+
+			// For 740, to use TRG-IN as Gate / anti-veto
+			uint32_t word = 0;
+			read_register(res, 0x810C, word);
+			word |= 1 << 27; //TRG-IN AND internal trigger, to serve as gate
+			write_register(res, 0x810C, word);
+			read_register(res, 0x811C, word);
+			word |= 1 << 10; // TRG-IN as gate
+			word |= 1 << 1; // TRG-OUT enable
+			word |= 0 << 15; // TRG-OUT based on internal signal
+			word &= ~(0b11 << 16); // GPO propagates internal trigger
+			write_register(res, 0x811C, word);
+			read_register(res, 0x811C, word);
+			read_register(res, 0x8110, word);
+			word |= 1; // enable group 0 to participate in GPO
+			write_register(res, 0x8110, word);
+			read_register(res, 0x8000, word);
+			std::cout<<"overlap: "<<word<<std::endl;
+
+		} else {
+			// custom error message if not above models
+			latest_err = -1;
+			err_msg += "Model not supported.";
 		}
 
 		if(latest_err < 0) {
