@@ -351,7 +351,7 @@ public:
 					static int model = static_cast<int>(
 						CAENDigitizerModels_map.at(ic_conf_model)
 					);
-					ImGui::Combo("Model", &model, "DT5730B\0DT5740\0\0");
+					ImGui::Combo("Model", &model, "DT5730B\0DT5740D\0\0");
 
 					static int caen_port = 0;
 					ImGui::InputInt("CAEN port", &caen_port);

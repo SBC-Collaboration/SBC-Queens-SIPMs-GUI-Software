@@ -29,8 +29,8 @@ PID2ATi = 100
 PID2ATd = 0
 
 [CAEN]
-# DT5730B or DT5740
-Model = "DT5730B"
+# DT5730B or DT5740D
+Model = "DT5740D"
 # 0 = not allowed
 OverlappingRejection = 0
 MaxEventsPerRead = 512
@@ -41,4 +41,4 @@ RecordLength = 180
 Polarity = 1
 Range = 1
 PostBufferPorcentage = 50
-Threshold = 7500
+Threshold = 2075
