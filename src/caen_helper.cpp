@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <spdlog/spdlog.h>
+
 namespace SBCQueens {
 
 	std::string translate_caen_code(const CAENComm_ErrorCode& err) noexcept {
@@ -212,11 +214,9 @@ namespace SBCQueens {
 		// Channel stuff
 		if (model == CAENDigitizerModel::DT5730B){
 			// For DT5730B
-			res->ChannelConfigs = ch_configs;
-
 			// First, we make the channel mask (if applicable)
 			uint32_t channel_mask = 0;
-			for(auto ch_config : res->ChannelConfigs) {
+			for(auto ch_config : ch_configs) {
 				channel_mask |= 1 << ch_config.Channel;
 			}
 
@@ -232,8 +232,7 @@ namespace SBCQueens {
 
 			// Let's clear the channel map to allow for new channels properties
 			res->ChannelConfigs.clear();
-			for(auto ch_config : res->ChannelConfigs) {
-
+			for(auto ch_config : ch_configs) {
 				// Before we set any parameters for each channel, we add the
 				// new channel to the map. try_emplace(...) will make sure we do
 				// not add duplicates
@@ -271,9 +270,9 @@ namespace SBCQueens {
 			}
 		} else if (model==CAENDigitizerModel::DT5740D) {
 			// For DT5740D
-			res->ChannelConfigs = ch_configs;
+
 			uint32_t group_mask = 0;
-			for(auto ch_config : res->ChannelConfigs) {
+			for(auto ch_config : ch_configs) {
 				group_mask |= 1 << ch_config.Channel;
 			}
 
@@ -286,7 +285,7 @@ namespace SBCQueens {
 				handle, res->GlobalConfig.CHTriggerMode, group_mask);
 
 			res->ChannelConfigs.clear();
-			for(auto ch_config : res->ChannelConfigs) {
+			for(auto ch_config: ch_configs) {
 
 				// Before we set any parameters for each channel, we add the
 				// new channel to the map. try_emplace(...) will make sure we do
@@ -331,7 +330,7 @@ namespace SBCQueens {
 			word |= 1; // enable group 0 to participate in GPO
 			write_register(res, 0x8110, word);
 			read_register(res, 0x8000, word);
-			std::cout<<"overlap: "<<word<<std::endl;
+			// std::cout<<"overlap: "<< word<<std::endl;
 
 		} else {
 			// custom error message if not above models

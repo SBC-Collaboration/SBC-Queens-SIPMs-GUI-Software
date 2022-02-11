@@ -190,7 +190,7 @@ private:
 					y_values[i] = static_cast<double>(buf[i]);
 				}
 
-				_plotSender(IndicatorNames::SiPM_Plot,
+				_plotSender(IndicatorNames::SiPM_Plot_ZERO,
 					x_values,
 					y_values,
 					size);
@@ -426,6 +426,8 @@ private:
 				auto buf = osc_event->Data->DataChannel[0];
 				auto size = osc_event->Data->ChSize[0];
 
+				//spdlog::info("Event size size: {0}", size);
+
 				x_values = new double[size];
 				y_values = new double[size];
 
@@ -434,7 +436,7 @@ private:
 					y_values[i] = static_cast<double>(buf[i]);
 				}
 
-				_plotSender(IndicatorNames::SiPM_Plot,
+				_plotSender(IndicatorNames::SiPM_Plot_ZERO,
 					x_values,
 					y_values,
 					size);

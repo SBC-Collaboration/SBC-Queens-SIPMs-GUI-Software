@@ -103,7 +103,7 @@ namespace SBCQueens {
 
 		// This feature is for X730
 		// True = disabled, False = enabled
-		bool TriggerOverlappingEn = true;
+		bool TriggerOverlappingEn = false;
 
 		// 0 = normal, the board is full whenever all buffers are full
 		// 1 = One buffer free. The board is full whenever Nb-1 buffers

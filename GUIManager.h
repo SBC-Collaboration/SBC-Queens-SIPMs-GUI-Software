@@ -112,7 +112,10 @@ private:
 		SiPMPlot box_bme_pres_plot;
 		SiPMPlot box_bme_humi_plot;
 
-		SiPMPlot sipm_plot;
+		SiPMPlot sipm_plot_zero;
+		SiPMPlot sipm_plot_one;
+		SiPMPlot sipm_plot_two;
+		SiPMPlot sipm_plot_three;
 
 		std::string i_com_port;
 		std::string i_run_dir;
@@ -257,8 +260,17 @@ public:
 			box_bme_humi_plot = make_plot(IndicatorNames::BOX_BME_Humidity);
 			_plotManager.add(box_bme_humi_plot);
 
-			sipm_plot = make_plot(IndicatorNames::SiPM_Plot);
-			_plotManager.add(sipm_plot);
+			sipm_plot_zero = make_plot(IndicatorNames::SiPM_Plot_ZERO);
+			_plotManager.add(sipm_plot_zero);
+
+			sipm_plot_one = make_plot(IndicatorNames::SiPM_Plot_ONE);
+			_plotManager.add(sipm_plot_one);
+
+			sipm_plot_two = make_plot(IndicatorNames::SiPM_Plot_TWO);
+			_plotManager.add(sipm_plot_two);
+
+			sipm_plot_three = make_plot(IndicatorNames::SiPM_Plot_THREE);
+			_plotManager.add(sipm_plot_three);
 
 			i_com_port 		= t_conf["Port"].value_or("COM4");
 			i_run_dir 		= config["File"]["RunDir"].value_or("./RUNS");
@@ -348,9 +360,18 @@ public:
 					// (1.0 - 0.5) / (0.5 - 1.0) = -1
 					static float connected_mod = 1.5;
 
-					static int model = static_cast<int>(
-						CAENDigitizerModels_map.at(ic_conf_model)
-					);
+					static int model = 0;
+
+					try {
+						model = static_cast<int>(
+							CAENDigitizerModels_map.at(ic_conf_model)
+						);
+					} catch (...) {
+						model = static_cast<int>(
+							CAENDigitizerModels_map.at("DT5730B")
+						);
+					}
+
 					ImGui::Combo("Model", &model, "DT5730B\0DT5740D\0\0");
 
 					static int caen_port = 0;
@@ -597,13 +618,16 @@ public:
 			////
 			/// SiPM Plots
 
-			sipm_plot.ClearOnNewData = true;
+			sipm_plot_zero.ClearOnNewData = true;
 			ImGui::Begin("SiPM Plot");  
 			if (ImPlot::BeginPlot("SiPM Trace", ImVec2(-1,0))) {
 
 				ImPlot::SetupAxes("time [ns]", "Counts", g_axis_flags, g_axis_flags);
 
-				sipm_plot("SiPM");
+				sipm_plot_zero("Plot 1");
+				sipm_plot_one("Plot 2");
+				sipm_plot_two("Plot 3");
+				sipm_plot_three("Plot 4");
 
 				ImPlot::EndPlot();
 			}

@@ -16,7 +16,11 @@ namespace SBCQueens {
 		BOX_BME_Temps,
 		BOX_BME_Pressure,
 		BOX_BME_Humidity,
-		SiPM_Plot,
+
+		SiPM_Plot_ZERO,
+		SiPM_Plot_ONE,
+		SiPM_Plot_TWO,
+		SiPM_Plot_THREE,
 
 		// For indicators:
 		// Teeensy Indicators
