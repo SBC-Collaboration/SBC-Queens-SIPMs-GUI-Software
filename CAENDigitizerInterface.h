@@ -203,7 +203,7 @@ private:
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
-					spdlog::info("Not enough events in buffer");
+					// spdlog::info("Not enough events in buffer");
 					return;
 				}
 
@@ -372,8 +372,9 @@ private:
 
 			// Allocate memory for events
 			osc_event = std::make_shared<caenEvent>(port->Handle);
+
 			for(CAENEvent& evt : processing_evts) {
-				evt = osc_event = std::make_shared<caenEvent>(port->Handle);
+				evt = std::make_shared<caenEvent>(port->Handle);
 			}
 
 			auto failed = lec();
@@ -412,18 +413,17 @@ private:
 
 			if(port->Data.DataSize > 0 && port->Data.NumEvents > 0) {
 
-				spdlog::info("Total size buffer: {0}",  port->Data.TotalSizeBuffer);
-				spdlog::info("Data size: {0}", port->Data.DataSize);
-				spdlog::info("Num events: {0}",  port->Data.NumEvents);
+				// spdlog::info("Total size buffer: {0}",  port->Data.TotalSizeBuffer);
+				// spdlog::info("Data size: {0}", port->Data.DataSize);
+				// spdlog::info("Num events: {0}",  port->Data.NumEvents);
 
 				extract_event(port, 0, osc_event);
-				spdlog::info("Event size: {0}", osc_event->Info.EventSize);
-				spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
-				spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
+				// spdlog::info("Event size: {0}", osc_event->Info.EventSize);
+				// spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
+				// spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
 
 				auto buf = osc_event->Data->DataChannel[0];
 				auto size = osc_event->Data->ChSize[0];
-				spdlog::info("Other Event size: {0}", size);
 
 				x_values = new double[size];
 				y_values = new double[size];
@@ -471,46 +471,22 @@ private:
 
 		bool run_mode() {
 			static bool isFileOpen = false;
-			// static auto save_files = make_total_timed_event(
-			// 	std::chrono::seconds(30),
-			// 	[&]() {
-			// 		async_save(_pulseFile,
-			// 			[](CAENEvent& evt) -> std::string {
-
-			// 				std::string out_str = "";
-			// 				auto buf = evt->Data->DataChannel[0];
-			// 				for(uint32_t i = 0; i < evt->Data->ChSize[0];
-			// 					i++) {
-			// 					out_str += std::to_string(buf[i]) + ",";
-			// 				}
-			// 				out_str += "\n";
-			// 				return "";
-			// 			}
-			// 		);
-			// 	}
-			// );
 
 
 			if(isFileOpen) {
-				spdlog::info("Saving SIPM data");
-				sync_save(_pulseFile,
-						[](const CAENEvent& evt) -> std::string {
-							std::string out_str = "";
-							auto buf = evt->Data->DataChannel[0];
-							for(uint32_t i = 0; i < evt->Data->ChSize[0];
-								i++) {
-								out_str += std::to_string(buf[i]) + ",";
-								out_str += (i < evt->Data->ChSize[0] - 1) ? "," : "";
-							}
-							out_str += "\n";
-							return out_str;
-						}
-					);
+				// spdlog::info("Saving SIPM data");
+				save(_pulseFile, sbc_save_func);
 			} else {
 				open(_pulseFile,
 					state_of_everything.RunDir
 					+ "/" + state_of_everything.RunName
-					+ "/" + state_of_everything.SiPMParameters + ".txt");
+					+ "/" + state_of_everything.SiPMParameters + ".txt",
+
+					// sbc_init_file is a function that saves the header
+					// of the sbc data format as a function of record length
+					// and number of channels
+					sbc_init_file,
+					state_of_everything.Port);
 				isFileOpen = _pulseFile > 0;
 			}
 

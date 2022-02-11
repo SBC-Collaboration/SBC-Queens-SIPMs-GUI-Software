@@ -9,13 +9,11 @@
 #include <memory>
 #include <string>
 #include <type_traits>
-#include <utility>
-#include <deque>
-#include <stdexcept>
-#include <optional>
+#include <filesystem>
 
 // 3rd party includes
 #include <spdlog/spdlog.h>
+#include <concurrentqueue.h>
 
 namespace SBCQueens {
 
@@ -30,10 +28,7 @@ private:
 		std::string _fullFileDir;
 		std::ofstream _stream;
 
-		std::deque<T> _data;
-		std::deque<T> _other_data;
-		std::shared_ptr<std::deque<T>> _current_data;
-		std::shared_ptr<std::deque<T>> _backup_data;
+		moodycamel::ConcurrentQueue<T> _queue;
 
 public:
 		using type = T;
@@ -44,15 +39,35 @@ public:
 		explicit dataFile(const std::string& fileName) {
 
 			_fullFileDir = fileName;
-			_stream.open(_fullFileDir, std::ofstream::app);
-
-			_current_data = std::make_shared<std::deque<T>>(_data);
-			_backup_data = std::make_shared<std::deque<T>>(_other_data);
+			_stream.open(_fullFileDir,
+				std::ofstream::app | std::ofstream::binary);
 
 			if(_stream.is_open()) {
 				_open = true;
 			}
 			
+		}
+
+		template<typename InitWriteFunc, typename... Args>
+		// FileName: is the relative or absolute file dir
+		// f -> function that takes args and returns string
+		// that is written at the start of the file only if
+		// the file did not exist before
+		dataFile(const std::string& fileName, InitWriteFunc&& f, Args&&... args) {
+
+			_fullFileDir = fileName;
+			_stream.open(_fullFileDir,
+				std::ofstream::app | std::ofstream::binary);
+
+			if(_stream.is_open()) {
+				_open = true;
+
+				if(std::filesystem::is_empty(fileName)) {
+					_stream << f(std::forward<Args>(args)...);
+				}
+
+			}
+
 		}
 
 		// No copying nor moving
@@ -63,36 +78,28 @@ public:
 		// the Datafile is out of the scope but I want to make sure.
 		~dataFile() {
 			_stream.close();
-			_data.clear();
-			_other_data.clear();
 		}
 
 		bool IsOpen() const {
 			return _open;
 		}
 
-		auto GetWritingData() {
-			return *_current_data;
-		}
+		auto GetData() {
+			auto approx_length = _queue.size_approx();
+			auto data = std::vector< T >(approx_length);
+			_queue.try_dequeue_bulk(data.data(), approx_length);
 
-		// Toggles the internal buffers
-		void ToggleDataBuffer() {
-			_current_data.swap(_backup_data);
+			return data;
 		}
 
 		// Adds element as a copy to current buffer
 		void Add(const T& element) {
-			_backup_data->emplace_back(element);
+			_queue.enqueue(element);
 		}
 
 		// Adds list as a copy to current buffer
 		void Add(const std::initializer_list<T>& list) {
-			_backup_data->insert(_data.end(), list);
-		}
-
-		// Clears the buffer that is not in use
-		void Clear() {
-			_current_data->clear();
+			_queue.enqueue_bulk(list.begin(), list.size());
 		}
 
 		// Adds element as a copy to current buffer
@@ -111,19 +118,21 @@ public:
 			_stream << fmt;
 		}
 
-		template <typename FormatFunc>
-		std::string operator|(FormatFunc f) {
-			return f(_current_data.get());
-		}
-
 	};
 
 	template<typename T>
 	using DataFile = std::unique_ptr<dataFile<T>>;
 
 	template <typename T>
-	void open(DataFile<T>& f, const std::string& fileName) {
-		f = std::make_unique<dataFile<T>>(fileName);
+	void open(DataFile<T>& res, const std::string& fileName) {
+		res = std::make_unique<dataFile<T>>(fileName);
+	}
+
+	template <typename T, typename InitWriteFunc, typename... Args>
+	void open(DataFile<T>& res,
+		const std::string& fileName, InitWriteFunc&& f,  Args&&... args) {
+		res = std::make_unique<dataFile<T>>(fileName,
+			std::forward<InitWriteFunc>(f), std::forward<Args>(args)...);
 	}
 
 	template<typename T, typename FormatFunc>
@@ -133,26 +142,32 @@ public:
 	// at once to generate the string that is saved to the file
 	void save(DataFile<T>& file, FormatFunc&& f) noexcept {
 
-		// If FormatFunc takes the single item as an argument
-		// We will call f for every item in TempData
-		if constexpr (std::is_invocable_v<FormatFunc, T>) {
-			if(file->IsOpen()) {
-				for(auto item : file->GetWritingData()) {
-					std::string fmt_item = f(item);
-					(*file) << fmt_item;
+		if(file->IsOpen()) {
+			// GetData becomes a thread-safe operation
+			// because of the concurrent queue
+			// for the async version this data is locked into the
+			// thread that is saving and is cleared by the end
+			auto data = file->GetData();
+			// If FormatFunc takes the single item as an argument
+			// We will call f for every item in TempData
+			if constexpr (std::is_invocable_v<FormatFunc, T> ||
+				std::is_invocable_v<FormatFunc, const T&> ||
+				std::is_invocable_v<FormatFunc, T&>) {
+
+				for(auto item : data) {
+					(*file) << f(item);
 				}
 
-				file->Clear();
+			// If it takes the entire format, then apply it to all.
+			} else if constexpr (std::is_invocable_v<FormatFunc,
+				std::vector<T>&>) {
+
+				(*file) << f(data);
+
+			// if not, just save what f returns
+			} else {
+				(*file) << f();
 			}
-
-		// If it takes the entire format, then apply it to all.
-		} else if constexpr (std::is_invocable_v<FormatFunc, std::deque<T>&>) {
-
-			if(file->IsOpen()) {
-				std::string str = (*file) | f;
-				(*file) << str;
-			}
-
 		}
 
 	}
@@ -163,26 +178,12 @@ public:
 		// Here is where ToggleDataBuffer() is important.
 		// During an async there should be two arrays:
 		// One to write to, and another to read from.
-		file->ToggleDataBuffer();
 		std::packaged_task<void(DataFile<T>&, FormatFunc&&)>
 			_f(save<T, FormatFunc>);
 			
 		_f(file, std::forward<FormatFunc>(f));
 	}
 
-	template<typename T, typename FormatFunc>
-	// Saves the contents of the DataFile asynchronously using packaged tasks
-	void sync_save(DataFile<T>& file, FormatFunc&& f) noexcept {
-		// Here is where ToggleDataBuffer() is important.
-		// During an async there should be two arrays:
-		// One to write to, and another to read from.
-		file->ToggleDataBuffer();
-		save(file, f);
-	}
 
-	template<typename T>
-	std::string sbc_save_func(std::deque<T>& data) {
-		return "";
-	}
 
 } //namespace SBCQueens

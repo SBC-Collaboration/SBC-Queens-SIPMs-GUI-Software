@@ -129,8 +129,6 @@ else()
   message(FATAL_ERROR "Serial library not found. Make sure to run git submodules init first")
 endif()
 
-
-
 # Use vulkan/opengl32 headers from glfw:
 # include_directories(${GLFW_DIR}/deps)
 

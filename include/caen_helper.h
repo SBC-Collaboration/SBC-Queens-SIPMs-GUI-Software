@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <map>
+#include <cmath>
 
 // 3rd party includes
 #include <CAENDigitizer.h>
@@ -27,14 +29,16 @@ namespace SBCQueens {
 	struct CAENDigitizerModelConstants {
 		// ADC resolution in bits
 		uint32_t ADCResolution;
-		// In MS/s
+		// In S/s
 		double AcquisitionRate;
-		// In MS/s
+		// In S/ch
 		uint32_t MemoryPerChannel;
-		// In MS/s
+		// In S/s
 		uint32_t USBTransferRate = 15e6;
 
 		uint32_t NumChannels = 1;
+
+		uint32_t MaxNumBuffers = 1024;
 
 		std::vector<double> VoltageRanges;
 	};
@@ -83,6 +87,10 @@ namespace SBCQueens {
 
 		// In %
 		uint32_t PostTriggerPorcentage = 50;
+
+		// see caen_helper.cpp setup(...) to see a description of this
+		CAEN_DGTZ_TriggerMode_t EXTTriggerMode
+			= CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY;
 
 		CAEN_DGTZ_TriggerMode_t SWTriggerMode
 			= CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY;
@@ -138,7 +146,7 @@ namespace SBCQueens {
 	// and the pointer to the point in the original buffer. No copying
 	// or moving allowed as the data structure is inside a C (insecure) pointer
 	// that is allocated by CAEN functions
-	// cAENEvent can be called normally and its constructors and destructors
+	// caenEvent can be called normally and its constructors and destructors
 	// will make sure the memory is freed
 	struct caenEvent {
 		// Treat this like a shared pointer
@@ -154,7 +162,7 @@ namespace SBCQueens {
 		}
 
 		// If *handle is released before this event is freed,
-		// it will cause a memory leak
+		// it will cause a memory leak, maybe?
 		~caenEvent() {
 			CAEN_DGTZ_FreeEvent(_handle,
 				reinterpret_cast<void**>(&Data) );
@@ -168,11 +176,13 @@ namespace SBCQueens {
 				reinterpret_cast<void**>(&this->Data));
 		 	*this->Data = *other.Data;
 		 	this->Info = other.Info;
+
 		}
 
 		caenEvent operator=(const caenEvent& other) {
 			return caenEvent(other);
 		}
+
 
 private:
 		int _handle;
@@ -186,7 +196,7 @@ private:
 			const CAEN_DGTZ_ConnectionType& ct, const int& ln, const int& cn,
 			const uint32_t& addr, const int& h,
 			const CAENError& err) :
-			Model(model), ChannelConfigs(1),
+			Model(model),
 			ConnectionType(ct), LinkNum(ln), ConetNode(cn),
 			VMEBaseAddress(addr), Handle(h), LatestError(err) {
 
@@ -203,9 +213,11 @@ private:
 		caen(caen&&) = delete;
 		caen(const caen&) = delete;
 
+		// Public members
 		CAENDigitizerModel Model;
 		CAENGlobalConfig GlobalConfig;
-		std::vector<CAENChannelConfig> ChannelConfigs;
+		std::map<uint8_t, CAENChannelConfig> ChannelConfigs;
+		uint32_t CurrentMaxBuffers;
 
 		CAEN_DGTZ_ConnectionType ConnectionType;
 		int LinkNum;
@@ -215,6 +227,7 @@ private:
 		int Handle;
 		CAENError LatestError;
 
+		// This holds the latest raw CAEN data
 		CAENData Data;
 
 		double GetSampleRate() const {
@@ -225,12 +238,28 @@ private:
 			return ModelConstants.MemoryPerChannel;
 		}
 
+		uint32_t GetMaxNumberOfBuffers() const {
+			return ModelConstants.MaxNumBuffers;
+		}
+
 		uint32_t GetNumChannels() const {
 			return ModelConstants.NumChannels;
 		}
 
 		uint32_t GetCommTransferRate() const {
 			return ModelConstants.USBTransferRate;
+		}
+
+		// Returns the channel voltage range. If channel does not exist
+		// returns 0
+		double GetVoltageRange(int ch) const {
+			try {
+				auto config = ChannelConfigs.at(ch);
+				return ModelConstants.VoltageRanges[config.DCRange];
+			} catch(...) {
+				return 0.0;
+			}
+			return 0.0;
 		}
 
 private:
@@ -355,6 +384,7 @@ private:
 	// Returns true if data was read successfully
 	// Does not retrieve data if resource is null, there are errors,
 	// or events in buffer are less than n.
+	// n cannot be bigger than the max number of buffers allowed
 	bool retrieve_data_until_n_events(CAEN&, uint32_t&& n) noexcept;
 
 	// Extracts event i from the data retrieved by retrieve_data(...)
@@ -390,5 +420,11 @@ private:
 
 	// Turns a voltage (V) into count offset
 	uint32_t v_offset_to_count_offset(CAEN&, double) noexcept;
+
+	// Calculates the max number of buffers for a given record length
+	uint32_t calculate_max_buffers(CAEN&) noexcept;
+
+	std::string sbc_init_file(CAEN&) noexcept;
+	std::string sbc_save_func(CAENEvent& evt) noexcept;
 
 } // namespace SBCQueens
