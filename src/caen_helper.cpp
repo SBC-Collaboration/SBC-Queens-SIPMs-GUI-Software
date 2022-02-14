@@ -112,9 +112,10 @@ namespace SBCQueens {
 
 	}
 
-	void setup(CAEN& res, CAENGlobalConfig g_config,
-		std::initializer_list<CAENChannelConfig> ch_configs, 
-		CAENDigitizerModel model) noexcept {
+	void setup(CAEN& res,
+		CAENDigitizerModel model,
+		CAENGlobalConfig g_config,
+		std::vector<CAENChannelConfig> ch_configs) noexcept {
 
 		if(!res) {
 			return;
@@ -178,13 +179,13 @@ namespace SBCQueens {
 			CAEN_DGTZ_SetSWTriggerMode,
 			handle, res->GlobalConfig.SWTriggerMode);
 
-		error_wrap("GetExtTriggerInputMode Failed. ",
+		error_wrap("CAEN_DGTZ_SetExtTriggerInputMode Failed. ",
 			CAEN_DGTZ_SetExtTriggerInputMode,
 			handle, res->GlobalConfig.EXTTriggerMode);
 
     	// Acquisition mode comes in four flavors:
     	// CAEN_DGTZ_SW_CONTROLLED
-    	// 		Start/stop of the runt akes place on software
+    	// 		Start/stop of the run takes place on software
     	// 		command (by calling CAEN_DGTZ_SWStartAcquisition )
     	// CAEN_DGTZ_FIRST_TRG_CONTROLLED
     	// 		Run starts on the first trigger pulse (rising edge on TRG-IN)
@@ -225,7 +226,7 @@ namespace SBCQueens {
 				CAEN_DGTZ_SetChannelEnableMask,
 				handle, channel_mask);
 
-			// then enable their self trigger
+			// Then enable their self trigger
 			error_wrap("CAEN_DGTZ_SetChannelSelfTrigger Failed. ",
 				CAEN_DGTZ_SetChannelSelfTrigger,
 				handle, res->GlobalConfig.CHTriggerMode, channel_mask);
@@ -268,7 +269,7 @@ namespace SBCQueens {
 					handle, ch_config.Channel, ch_config.TriggerPolarity);
 
 			}
-		} else if (model==CAENDigitizerModel::DT5740D) {
+		} else if (model == CAENDigitizerModel::DT5740D) {
 			// For DT5740D
 
 			uint32_t group_mask = 0;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include <string>
 #include <utility>
 #include <vector>
 #include <iostream>
@@ -14,10 +15,13 @@
 
 #include "TeensyControllerInterface.h"
 #include "CAENDigitizerInterface.h"
+#include "caen_helper.h"
 #include "imgui.h"
 #include "imgui_helpers.h"
 #include "implot_helpers.h"
 #include "indicators.h"
+
+#define MAX_CHANNELS 4
 
 namespace SBCQueens {
 
@@ -68,16 +72,21 @@ private:
 		Button caen_disconnect_btn;
 		Button send_soft_trig;
 		Button start_processing_btn;
+
 		std::string ic_conf_model;
 		int ic_maxEventsPerRead;
-		int ic_channel;
-		int ic_offset;
 		int ic_overlapping_rej;
 		int ic_recordLength;
-		int ic_polarity;
-		int ic_range;
 		int ic_postbuffer;
-		int ic_threshold;
+		int ic_ext_trigger;
+		int ic_soft_trigger;
+
+		std::array<int, MAX_CHANNELS> 	ic_ch_number;
+		std::array<bool, MAX_CHANNELS> 	ic_ch_enabled;
+		std::array<int, MAX_CHANNELS> 	ic_ch_offsets;
+		std::array<int, MAX_CHANNELS> 	ic_ch_thresholds;
+		std::array<int, MAX_CHANNELS> 	ic_ch_ranges;
+		std::array<int, MAX_CHANNELS> 	ic_ch_polarities;
 
 		// Indicators
 
@@ -279,14 +288,22 @@ public:
 
 			ic_conf_model 		= CAEN_conf["Model"].value_or("DT5730B");
 			ic_maxEventsPerRead = CAEN_conf["MaxEventsPerRead"].value_or(512u);
-			ic_channel 			= CAEN_conf["Channel"].value_or(0u);
-			ic_offset 			= CAEN_conf["Offset"].value_or(0x8000u);
-			ic_overlapping_rej  = CAEN_conf["OverlappingRejection"].value_or(0u);
 			ic_recordLength 	= CAEN_conf["RecordLength"].value_or(2048u);
-			ic_polarity 		= CAEN_conf["Polarity"].value_or(0u);
-			ic_range 			= CAEN_conf["Range"].value_or(0u);
 			ic_postbuffer 		= CAEN_conf["PostBufferPorcentage"].value_or(50u);
-			ic_threshold 		= CAEN_conf["Threshold"].value_or(0x8000u);
+			ic_overlapping_rej  = CAEN_conf["OverlappingRejection"].value_or(0u);
+			ic_ext_trigger 		= CAEN_conf["ExternalTrigger"].value_or(0);
+			ic_soft_trigger 	= CAEN_conf["SoftwareTrigger"].value_or(0);
+
+			for(int i = 0; i < MAX_CHANNELS; i++) {
+				std::string ch_toml = "ch" + std::to_string(i);
+				ic_ch_number[i] 	= CAEN_conf[ch_toml]["Channel"].value_or(0u);
+				ic_ch_enabled[i] 	= CAEN_conf[ch_toml]["Enabled"].value_or(false);
+				ic_ch_ranges[i]		= CAEN_conf[ch_toml]["Range"].value_or(0u);
+
+				ic_ch_thresholds[i] = CAEN_conf[ch_toml]["Threshold"].value_or(0x8000u);
+				ic_ch_polarities[i] = CAEN_conf[ch_toml]["Polarity"].value_or(0u);
+				ic_ch_offsets[i] 	= CAEN_conf[ch_toml]["Offset"].value_or(0x8000u);
+			}
 		}
 
 		// No copying
@@ -350,165 +367,7 @@ public:
 				}
 
 				teensy_tabs();
-
-				if(ImGui::BeginTabItem("CAEN")) {
-
-					ImGui::PushItemWidth(80);
-
-					// 1.0 -> 0.5
-					// 0.5 -> 1.0
-					// (1.0 - 0.5) / (0.5 - 1.0) = -1
-					static float connected_mod = 1.5;
-
-					static int model = 0;
-
-					try {
-						model = static_cast<int>(
-							CAENDigitizerModels_map.at(ic_conf_model)
-						);
-					} catch (...) {
-						model = static_cast<int>(
-							CAENDigitizerModels_map.at("DT5730B")
-						);
-					}
-
-					ImGui::Combo("Model", &model, "DT5730B\0DT5740D\0\0");
-
-					static int caen_port = 0;
-					ImGui::InputInt("CAEN port", &caen_port);
-			        if (ImGui::IsItemHovered()) {
-            			ImGui::SetTooltip("Usually 0 as long as there is no "
-            			"other CAEN digitizers connected. If there are more, "
-            			"the port increases as they were connected to the "
-            			"computer.");
-			        }
-
-					
-					ImGui::SameLine();
-					// Colors to pop up or shadow it depending on the conditions
-					ImGui::PushStyleColor(ImGuiCol_Button, 
-						static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, connected_mod*0.6f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 
-						static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, connected_mod*0.7f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonActive, 
-						static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, connected_mod*0.8f)));
-
-					// This button starts the CAEN communication
-					if(caen_connect_btn(_caenQueueF,
-						[=](CAENInterfaceState& state) {
-							state.Model =
-								static_cast<CAENDigitizerModel>(model);
-							state.PortNum = caen_port;
-
-							state.GlobalConfig.MaxEventsPerRead =
-								static_cast<uint32_t>(ic_maxEventsPerRead);
-							state.GlobalConfig.RecordLength =
-								static_cast<uint32_t>(ic_recordLength);
-							state.GlobalConfig.PostTriggerPorcentage =
-								static_cast<uint32_t>(ic_postbuffer);
-							state.GlobalConfig.TriggerOverlappingEn =
-								ic_overlapping_rej > 0;
-
-							// For now only 1 channel is allowed
-							state.ChannelConfig.Channel =
-								static_cast<uint8_t>(ic_channel);
-							state.ChannelConfig.DCOffset =
-								static_cast<uint32_t>(ic_offset);
-							state.ChannelConfig.DCRange =
-								static_cast<uint8_t>(ic_range);
-							state.ChannelConfig.TriggerThreshold =
-								static_cast<uint32_t>(ic_threshold);
-							state.ChannelConfig.TriggerPolarity =
-								static_cast<CAEN_DGTZ_TriggerPolarity_t>(ic_polarity);
-
-							state.RunDir = i_run_dir;
-							state.RunName = i_run_name;
-							state.CurrentState =
-								CAENInterfaceStates::AttemptConnection;
-							return true;
-						}
-					)) {
-						connected_mod = 0.5;
-					}
-
-					ImGui::PopStyleColor(3);
-
-					/// Disconnect button
-					float disconnected_mod = 1.5 - connected_mod;
-					ImGui::SameLine();
-					ImGui::PushStyleColor(ImGuiCol_Button, 
-						static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, disconnected_mod*0.6f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 
-						static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, disconnected_mod*0.7f)));
-					ImGui::PushStyleColor(ImGuiCol_ButtonActive, 
-						static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
-					
-					if(caen_disconnect_btn(_caenQueueF,
-						[=](CAENInterfaceState& state) {
-
-							// Only change the state if any of these states
-							if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-								state.CurrentState == CAENInterfaceStates::StatisticsMode ||
-								state.CurrentState == CAENInterfaceStates::RunMode){
-									spdlog::info("Going to disconnect the CAEN");
-									state.CurrentState = CAENInterfaceStates::Disconnected;
-							}
-							return true;
-						}
-					)) {
-						// Local stuff
-						connected_mod = 1.5;
-					}
-
-					ImGui::PopStyleColor(3);
-
-					ImGui::SameLine();
-					send_soft_trig(_caenQueueF,
-						[](CAENInterfaceState& state) {
-							software_trigger(state.Port);
-							return true;
-						}
-					);
-
-					ImGui::PopItemWidth();
-
-					ImGui::EndTabItem();
-
-
-					ImGui::InputInt("Channel", &ic_channel);
-
-					ImGui::InputInt("MaxEventsPerRead", &ic_maxEventsPerRead);
-					ImGui::InputInt("Offset", &ic_offset);
-					
-					ImGui::InputInt("Record Length", &ic_recordLength);
-        			ImGui::RadioButton("2V", &ic_range, 0); ImGui::SameLine();
-        			ImGui::RadioButton("0.5V", &ic_range, 1);
-        			ImGui::Text("Trigger Polarity:"); ImGui::SameLine();
-        			ImGui::RadioButton("Positive", &ic_polarity, 0); ImGui::SameLine();
-        			ImGui::RadioButton("Negative", &ic_polarity, 1);
-
-        			ImGui::Text("Overlapping Rejection:"); ImGui::SameLine();
-        			ImGui::RadioButton("Allowed",
-        				&ic_overlapping_rej, 1); ImGui::SameLine();
-        			ImGui::RadioButton("Not Allowed",
-        				&ic_overlapping_rej, 0);
-        			ImGui::InputInt("Post-Trigger buffer %", &ic_postbuffer);
-        			ImGui::InputInt("Threshold", &ic_threshold);
-
-        			start_processing_btn(_caenQueueF,
-        				[](CAENInterfaceState& state) {
-							if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-								state.CurrentState == CAENInterfaceStates::RunMode){
-								state.CurrentState = CAENInterfaceStates::StatisticsMode;
-							}
-							return true;
-						}
-					);
-
-					// (TODO: Hector) What other things do I need for CAEN?
-
-		}
-
+				caen_tabs();
 				ImGui::EndTabBar();
 			} 
 
@@ -519,6 +378,7 @@ public:
 
 			// This functor updates the plots values from the queue.
 			_plotManager();
+
 			const auto g_axis_flags = ImPlotAxisFlags_AutoFit;
 			// /// Teensy-BME280 Plots
 			if(ImGui::Button("Clear")) {
@@ -552,6 +412,7 @@ public:
 
 						ImPlot::EndPlot();
 					}
+
 					ImGui::EndTabItem();
 				}
 
@@ -675,22 +536,219 @@ public:
 					return true;
 				}
 			);
-			
-
 		}
 
-		void teensy_tabs() {
-			if (ImGui::BeginTabItem("Teensy")) {
+		void caen_tabs() {
+			if(ImGui::BeginTabItem("CAEN Global")) {
 
-				// This makes all the items between PushItemWidth
-				// & PopItemWidth 80 px (?) wide
 				ImGui::PushItemWidth(80);
 
 				// 1.0 -> 0.5
 				// 0.5 -> 1.0
 				// (1.0 - 0.5) / (0.5 - 1.0) = -1
 				static float connected_mod = 1.5;
+				static int model = 0;
+				try {
+					model = static_cast<int>(
+						CAENDigitizerModels_map.at(ic_conf_model)
+					);
+				} catch (...) {
+					model = static_cast<int>(
+						CAENDigitizerModels_map.at("DT5730B")
+					);
+				}
 
+				ImGui::Combo("Model", &model, "DT5730B\0DT5740D\0\0");
+
+				static int caen_port = 0;
+				ImGui::InputInt("CAEN port", &caen_port);
+		        if (ImGui::IsItemHovered()) {
+        			ImGui::SetTooltip("Usually 0 as long as there is no "
+        			"other CAEN digitizers connected. If there are more, "
+        			"the port increases as they were connected to the "
+        			"computer.");
+		        }
+
+
+				ImGui::SameLine();
+				// Colors to pop up or shadow it depending on the conditions
+				ImGui::PushStyleColor(ImGuiCol_Button,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, connected_mod*0.6f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, connected_mod*0.7f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, connected_mod*0.8f)));
+
+				// This button starts the CAEN communication and sends all
+				// the setup configuration
+				if(caen_connect_btn(_caenQueueF,
+					[=](CAENInterfaceState& state) {
+						state.Model =
+							static_cast<CAENDigitizerModel>(model);
+						state.PortNum = caen_port;
+
+						state.GlobalConfig.MaxEventsPerRead =
+							static_cast<uint32_t>(ic_maxEventsPerRead);
+						state.GlobalConfig.RecordLength =
+							static_cast<uint32_t>(ic_recordLength);
+						state.GlobalConfig.PostTriggerPorcentage =
+							static_cast<uint32_t>(ic_postbuffer);
+						state.GlobalConfig.TriggerOverlappingEn =
+							ic_overlapping_rej > 0;
+
+						state.GlobalConfig.EXTTriggerMode =
+							static_cast<CAEN_DGTZ_TriggerMode_t>(ic_ext_trigger);
+
+						// For now only 4 channels are allowed
+						std::vector<CAENChannelConfig> new_ch_configs;
+
+						for(int i= 0; i < MAX_CHANNELS; i++) {
+
+							// If channel is disabled, do not add to the list
+							if(!ic_ch_enabled[i]) {
+								continue;
+							}
+
+							new_ch_configs.emplace_back(CAENChannelConfig {
+
+								.Channel
+									= static_cast<uint8_t>(ic_ch_number[i]),
+								.DCOffset
+									= static_cast<uint32_t>(ic_ch_offsets[i]),
+								.DCRange
+									= static_cast<uint8_t>(ic_ch_ranges[i]),
+								.TriggerThreshold
+									= static_cast<uint32_t>(ic_ch_thresholds[i]),
+								.TriggerPolarity
+									= static_cast<CAEN_DGTZ_TriggerPolarity_t>(ic_ch_polarities[i])
+
+							});
+						}
+
+						state.RunDir = i_run_dir;
+						state.RunName = i_run_name;
+						state.CurrentState =
+							CAENInterfaceStates::AttemptConnection;
+						return true;
+					}
+				)) {
+					connected_mod = 0.5;
+				}
+
+				ImGui::PopStyleColor(3);
+
+				/// Disconnect button
+				float disconnected_mod = 1.5 - connected_mod;
+				ImGui::SameLine();
+				ImGui::PushStyleColor(ImGuiCol_Button,
+					static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, disconnected_mod*0.6f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+					static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, disconnected_mod*0.7f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+					static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
+
+				if(caen_disconnect_btn(_caenQueueF,
+					[=](CAENInterfaceState& state) {
+
+						// Only change the state if any of these states
+						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
+							state.CurrentState == CAENInterfaceStates::StatisticsMode ||
+							state.CurrentState == CAENInterfaceStates::RunMode){
+								spdlog::info("Going to disconnect the CAEN digitizer");
+								state.CurrentState = CAENInterfaceStates::Disconnected;
+						}
+						return true;
+					}
+				)) {
+					// Local stuff
+					connected_mod = 1.5;
+				}
+
+				ImGui::PopStyleColor(3);
+
+				ImGui::PopItemWidth();
+
+				ImGui::InputInt("Max Events Per Read", &ic_maxEventsPerRead);
+
+				ImGui::InputInt("Record Length [counts]", &ic_recordLength);
+				ImGui::InputInt("Post-Trigger buffer %", &ic_postbuffer);
+
+    			ImGui::Text("Overlapping Rejection:"); ImGui::SameLine();
+    			ImGui::RadioButton("Allowed",
+    				&ic_overlapping_rej, 1); ImGui::SameLine();
+    			ImGui::RadioButton("Not Allowed",
+    				&ic_overlapping_rej, 0);
+
+    			ImGui::Combo("External Trigger Mode", &ic_ext_trigger,
+    				"Disabled\0Acq Only\0Ext Only\0Both\0\0");
+    			ImGui::Combo("Software Trigger Mode", &ic_soft_trigger,
+    				"Disabled\0Acq Only\0Ext Only\0Both\0\0");
+
+				send_soft_trig(_caenQueueF,
+					[](CAENInterfaceState& state) {
+						software_trigger(state.Port);
+						return true;
+					}
+				);
+				if(ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Forces a trigger in the digitizer if "
+						"the feature is enabled");
+				}
+
+    			start_processing_btn(_caenQueueF,
+    				[](CAENInterfaceState& state) {
+						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
+							state.CurrentState == CAENInterfaceStates::RunMode){
+							state.CurrentState = CAENInterfaceStates::StatisticsMode;
+						}
+						return true;
+					}
+				);
+				if(ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Starts measuring pulses and processing "
+						"them without saving to file. Intended for diagnostics.");
+				}
+
+    			ImGui::EndTabItem();
+			}
+
+			// Channel tabs
+			for(int i = 0; i < MAX_CHANNELS; i++) {
+				std::string tab_name = "CAEN CH " + std::to_string(i);
+				if(ImGui::BeginTabItem(tab_name.c_str())) {
+					ImGui::PushItemWidth(120);
+					ImGui::Checkbox("Enabled", &ic_ch_enabled[i]);
+					ImGui::InputInt("CH #", &ic_ch_number[i]);
+					ImGui::InputInt("DC Offset [counts]", &ic_ch_offsets[i]);
+
+					// TODO(Hector): change this to get the actual
+					// ranges of the digitizer used, maybe change it to a dropbox?
+	    			ImGui::RadioButton("2V", &ic_ch_ranges[i], 0); ImGui::SameLine();
+	    			ImGui::RadioButton("0.5V", &ic_ch_ranges[i], 1);
+
+	    			ImGui::Text("Trigger Polarity:"); ImGui::SameLine();
+	    			ImGui::RadioButton("Positive", &ic_ch_polarities[i], 0); ImGui::SameLine();
+	    			ImGui::RadioButton("Negative", &ic_ch_polarities[i], 1);
+
+	    			ImGui::InputInt("Threshold [counts]", &ic_ch_thresholds[i]);
+
+	    			ImGui::EndTabItem();
+				}
+
+			}
+
+		}
+
+		void teensy_tabs() {
+			if (ImGui::BeginTabItem("Teensy")) {
+
+				// 1.0 -> 0.5
+				// 0.5 -> 1.0
+				// (1.0 - 0.5) / (0.5 - 1.0) = -1
+				static float connected_mod = 1.5;
+				// This makes all the items between PushItemWidth
+				// & PopItemWidth 80 px (?) wide
+				ImGui::PushItemWidth(80);
 				// Com port text input
 				// We do not make this a GUI queue item because
 				// we only need to let the client know when we click connnect
@@ -812,7 +870,7 @@ public:
 			}
 
 			if (ImGui::BeginTabItem("PID1")) {
-
+				ImGui::PushItemWidth(180);
 				pid_one_chkBox(_teensyQueueF,
 					ImGui::IsItemEdited,
 					[=](TeensyControllerState& oldState) {
@@ -889,7 +947,7 @@ public:
 			}
 
 			if (ImGui::BeginTabItem("PID2")) {
-
+				ImGui::PushItemWidth(180);
 				pid_two_chkBox(_teensyQueueF,
 					ImGui::IsItemEdited,
 					[=](TeensyControllerState& oldState) {

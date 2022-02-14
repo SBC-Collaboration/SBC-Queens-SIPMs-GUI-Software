@@ -58,20 +58,29 @@ namespace SBCQueens {
 		= moodycamel::ConcurrentQueue< IndicatorVector<T, DATA> >;
 
 	struct PlotFlags {
-
 		bool ClearOnNewData;
-
 	};
 
 	enum class NumericFormat {
 		Default, Scientific, HexFloat, Fixed
 	};
 
+	// An indicator is a ImGUI button that has been modified to act
+	// like an indicator.
+	// As for now, this indicator has some parameters such as
+	// precision of the number to display, and format of the number
 	template<typename T>
 	class Indicator {
 
+		// _imgui_stack exists to give this button an unique id
+		// for the ImGUI API. If this were not there, it would share
+		// an ID with all the empty or same indicators.
 		std::string _imgui_stack;
+
+		// Actual string that gets displayed
 		std::string _display;
+
+		// Format parameters
 		unsigned int _precision;
 		NumericFormat _format;
 
@@ -150,10 +159,11 @@ public:
 	};
 
 	template<typename T>
-	// A plot indicator. It inherits from indicator but it is really to keep
-	// the code tight and clear but it was really not necessary.
-	// Data is the type of the internal arrays but ImPlot turns everything
-	// into a double internally. x and y have to be the same type.
+	// A plot indicator. It inherits from indicator, but more out of necessity.
+	// It keeps the code clean, but it was really not necessary.
+	// Originally, a plot could be any type that was not double but
+	// ImPlot only shows double numbers or transforms them to doubles
+	// internally. Also, x and y have to be the same type.
 	class Plot : public Indicator<T> {
 
 		std::vector< double > _x;
@@ -234,7 +244,8 @@ public:
 
 	};
 
-
+	// This class is meant to be called once in the receiver/consumer thread
+	// It will update all of the indicators values once information is sent
 	template<typename T, typename DATA>
 	class IndicatorReceiver  {
 
@@ -249,13 +260,6 @@ public:
 
 		// No copying
 		IndicatorReceiver(const IndicatorReceiver&) = delete;
-
-		// Add the plot, p, by reference
-		// void add(Indicator<T>& p) {
-		// 	_indicators.insert({p.GetID(), 
-		// 		std::make_unique<Indicator<T>>(p)
-		// 	});
-		// }
 
 		void add(Indicator<T>& p) {
 			_indicators.insert({p.GetID(), p});
@@ -296,7 +300,11 @@ public:
 
 	};
 
-
+	// The IndicatorSender class is meant to be run in the producer threads
+	// The producer thread can add a new IndicatorVector to this class
+	// and this will send it forward.
+	// It uses enums so the producer threads do not need to know if the
+	// indicator/plot associated with that enum exists.
 	template<typename T, typename DATA>
 	class IndicatorSender  {
 
@@ -347,10 +355,10 @@ public:
 			_q.enqueue_bulk(items.begin(), items.size());
 		}
 
-		template<typename OFFDATA>
 		// Sends a list of pairs (x,y) to plot/indicator of type T
 		// Note if an indicator is selected, only the latest value
 		// will be shown and the list y will be ignored
+		template<typename OFFDATA>
 		void operator()(const T& type,
 			OFFDATA* x_data,
 			OFFDATA* y_data,

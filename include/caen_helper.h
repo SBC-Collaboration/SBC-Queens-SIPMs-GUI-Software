@@ -345,8 +345,8 @@ private:
 	// Calls a bunch of setup functions for each channel configuration
 	// found under the vector<CAENChannelConfigs> in res
 	// Does not setup if resource is null or there are errors.
-	void setup(CAEN&, CAENGlobalConfig,
-		std::initializer_list<CAENChannelConfig>, CAENDigitizerModel) noexcept;
+	void setup(CAEN&, CAENDigitizerModel, CAENGlobalConfig,
+		std::vector<CAENChannelConfig>) noexcept;
 
 	// Enables the acquisition and allocates the memory for the acquired data.
 	// Does not enable acquisitoin if resource is null or there are errors.

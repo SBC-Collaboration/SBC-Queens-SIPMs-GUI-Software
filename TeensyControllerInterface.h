@@ -301,7 +301,7 @@ namespace SBCQueens {
 		std::map<std::string, std::string> _crc_cmds;
 
 		TeensyControllerState state_of_everything;
-		IndicatorSender<IndicatorNames> _plotSender;
+		IndicatorSender<IndicatorNames> IndicatorSender;
 
 		double _init_time;
 
@@ -312,7 +312,7 @@ namespace SBCQueens {
 
 		explicit TeensyControllerInterface(Queues&... queues) 
 			: _queues(forward_as_tuple(queues...)),
-			_plotSender(std::get<SiPMsPlotQueue&>(_queues)) { }
+			IndicatorSender(std::get<SiPMsPlotQueue&>(_queues)) { }
 
 		// No copying
 		TeensyControllerInterface(const TeensyControllerInterface&) = delete;
@@ -554,22 +554,22 @@ private:
 				double dt = (pids.time - _init_time) / 1000.0;
 
 				// Send them to GUI to draw them
-				_plotSender(IndicatorNames::PID1_Temps,
+				IndicatorSender(IndicatorNames::PID1_Temps,
 					dt, pids.PID1.Temperature);
-				_plotSender(IndicatorNames::PID1_Currs,
+				IndicatorSender(IndicatorNames::PID1_Currs,
 					dt, pids.PID1.Current);
-				_plotSender(IndicatorNames::PID2_Temps,
+				IndicatorSender(IndicatorNames::PID2_Temps,
 					dt, pids.PID2.Temperature);
-				_plotSender(IndicatorNames::PID2_Currs,
+				IndicatorSender(IndicatorNames::PID2_Currs,
 					dt, pids.PID2.Current);
 
-				_plotSender(IndicatorNames::LATEST_PID1_TEMP,
+				IndicatorSender(IndicatorNames::LATEST_PID1_TEMP,
 					pids.PID1.Temperature);
-				_plotSender(IndicatorNames::LATEST_PID1_CURR,
+				IndicatorSender(IndicatorNames::LATEST_PID1_CURR,
 					pids.PID1.Current);
-				_plotSender(IndicatorNames::LATEST_PID2_TEMP,
+				IndicatorSender(IndicatorNames::LATEST_PID2_TEMP,
 					pids.PID2.Temperature);
-				_plotSender(IndicatorNames::LATEST_PID2_CURR,
+				IndicatorSender(IndicatorNames::LATEST_PID2_CURR,
 					pids.PID2.Current);
 
 				_PIDsFile->Add(pids);
@@ -618,23 +618,23 @@ private:
 				// Time since communication with the Teensy
 				double dt = (bmes.time - _init_time) / 1000.0;
 
-				_plotSender(IndicatorNames::LOCAL_BME_Temps,
+				IndicatorSender(IndicatorNames::LOCAL_BME_Temps,
 					dt, bmes.LocalBME.Temperature);
-				_plotSender(IndicatorNames::LOCAL_BME_Pressure,
+				IndicatorSender(IndicatorNames::LOCAL_BME_Pressure,
 					dt, bmes.LocalBME.Pressure);
-				_plotSender(IndicatorNames::LOCAL_BME_Humidity,
+				IndicatorSender(IndicatorNames::LOCAL_BME_Humidity,
 					dt, bmes.LocalBME.Humidity);
 
-				_plotSender(IndicatorNames::BOX_BME_Temps,
+				IndicatorSender(IndicatorNames::BOX_BME_Temps,
 					dt, bmes.BoxBME.Temperature);
-				_plotSender(IndicatorNames::BOX_BME_Pressure,
+				IndicatorSender(IndicatorNames::BOX_BME_Pressure,
 					dt, bmes.BoxBME.Pressure);
-				_plotSender(IndicatorNames::BOX_BME_Humidity,
+				IndicatorSender(IndicatorNames::BOX_BME_Humidity,
 					dt, bmes.BoxBME.Humidity);
 
-				_plotSender(IndicatorNames::LATEST_BOX_BME_HUM,
+				IndicatorSender(IndicatorNames::LATEST_BOX_BME_HUM,
 					bmes.BoxBME.Humidity);
-				_plotSender(IndicatorNames::LATEST_BOX_BME_TEMP,
+				IndicatorSender(IndicatorNames::LATEST_BOX_BME_TEMP,
 					bmes.BoxBME.Temperature);
 
 				_BMEsFile->Add(bmes);

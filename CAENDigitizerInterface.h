@@ -46,7 +46,7 @@ namespace SBCQueens {
 
 		CAENDigitizerModel Model;
 		CAENGlobalConfig GlobalConfig;
-		CAENChannelConfig ChannelConfig;
+		std::vector<CAENChannelConfig> ChannelConfigs;
 
 		int PortNum = 0;
 
@@ -364,10 +364,9 @@ private:
 
 			reset(port);
 			setup(port,
+				state_of_everything.Model,
 				state_of_everything.GlobalConfig,
-				{state_of_everything.ChannelConfig}, 
-				state_of_everything.Model);
-
+				state_of_everything.ChannelConfigs);
 
 			enable_acquisition(port);
 

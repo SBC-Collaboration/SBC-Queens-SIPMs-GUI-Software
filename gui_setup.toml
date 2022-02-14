@@ -32,13 +32,29 @@ PID2ATd = 0
 # DT5730B or DT5740D
 Model = "DT5740D"
 # 0 = not allowed
-OverlappingRejection = 0
+RecordLength = 180
 MaxEventsPerRead = 512
+PostBufferPorcentage = 50
+OverlappingRejection = 0
+# 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
+ExternalTrigger = 1
+SoftwareTrigger = 1
+
+# Individual Channel settings
+[CAEN.ch0]
+Enabled = 1
 Channel = 0
 Offset = 0x8000
-RecordLength = 180
 # 0 = rising edge, 1 = falling edge
 Polarity = 1
 Range = 1
-PostBufferPorcentage = 50
+Threshold = 2075
+
+[CAEN.ch1]
+Enabled = 0
+Channel = 0
+Offset = 0x8000
+# 0 = rising edge, 1 = falling edge
+Polarity = 1
+Range = 1
 Threshold = 2075
