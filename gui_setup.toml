@@ -52,7 +52,7 @@ Threshold = 2075
 
 [CAEN.ch1]
 Enabled = 0
-Channel = 0
+Channel = 1
 Offset = 0x8000
 # 0 = rising edge, 1 = falling edge
 Polarity = 1

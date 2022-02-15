@@ -179,24 +179,50 @@ private:
 
 				extract_event(port, rdm_num, osc_event);
 
-				auto buf = osc_event->Data->DataChannel[0];
-				auto size = osc_event->Data->ChSize[0];
+				for(int i = 0; i < 4; i++) {
+					auto buf = osc_event->Data->DataChannel[i];
+					auto size = osc_event->Data->ChSize[i];
 
-				x_values = new double[size];
-				y_values = new double[size];
+					//spdlog::info("Event size size: {0}", size);
+					if(size <= 0) {
+						continue;
+					}
 
-				for(uint32_t i = 0; i < size; i++) {
-					x_values[i] = i*(1.0/port->GetSampleRate())*(1e9);
-					y_values[i] = static_cast<double>(buf[i]);
+					x_values = new double[size];
+					y_values = new double[size];
+
+					for(uint32_t i = 0; i < size; i++) {
+						x_values[i] = i*(1.0/port->GetSampleRate())*(1e9);
+						y_values[i] = static_cast<double>(buf[i]);
+					}
+
+					IndicatorNames plotToSend;
+					switch(i) {
+
+						case 1:
+							plotToSend = IndicatorNames::SiPM_Plot_ONE;
+						break;
+
+						case 2:
+							plotToSend = IndicatorNames::SiPM_Plot_TWO;
+						break;
+
+						case 3:
+							plotToSend = IndicatorNames::SiPM_Plot_THREE;
+						break;
+
+						case 0:
+						default:
+							plotToSend = IndicatorNames::SiPM_Plot_ZERO;
+					}
+					_plotSender(plotToSend,
+						x_values,
+						y_values,
+						size);
+
+					delete x_values;
+					delete y_values;
 				}
-
-				_plotSender(IndicatorNames::SiPM_Plot_ZERO,
-					x_values,
-					y_values,
-					size);
-
-				delete x_values;
-				delete y_values;
 			};
 
 			static auto process_events = [&]() {
@@ -422,26 +448,51 @@ private:
 				// spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
 				// spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
 
-				auto buf = osc_event->Data->DataChannel[0];
-				auto size = osc_event->Data->ChSize[0];
+				for(int i = 0; i < 4; i++) {
+					auto buf = osc_event->Data->DataChannel[i];
+					auto size = osc_event->Data->ChSize[i];
 
-				//spdlog::info("Event size size: {0}", size);
+					//spdlog::info("Event size size: {0}", size);
+					if(size <= 0) {
+						continue;
+					}
 
-				x_values = new double[size];
-				y_values = new double[size];
+					x_values = new double[size];
+					y_values = new double[size];
 
-				for(uint32_t i = 0; i < size; i++) {
-					x_values[i] = i*(1.0/port->GetSampleRate())*(1e9);
-					y_values[i] = static_cast<double>(buf[i]);
+					for(uint32_t i = 0; i < size; i++) {
+						x_values[i] = i*(1.0/port->GetSampleRate())*(1e9);
+						y_values[i] = static_cast<double>(buf[i]);
+					}
+
+					IndicatorNames plotToSend;
+					switch(i) {
+
+						case 1:
+							plotToSend = IndicatorNames::SiPM_Plot_ONE;
+						break;
+
+						case 2:
+							plotToSend = IndicatorNames::SiPM_Plot_TWO;
+						break;
+
+						case 3:
+							plotToSend = IndicatorNames::SiPM_Plot_THREE;
+						break;
+
+						case 0:
+						default:
+							plotToSend = IndicatorNames::SiPM_Plot_ZERO;
+					}
+					_plotSender(plotToSend,
+						x_values,
+						y_values,
+						size);
+
+					delete x_values;
+					delete y_values;
 				}
 
-				_plotSender(IndicatorNames::SiPM_Plot_ZERO,
-					x_values,
-					y_values,
-					size);
-
-				delete x_values;
-				delete y_values;
 
 				// if(port->Data.NumEvents >= 2) {
 				// 	extract_event(port, 1, adj_osc_event);

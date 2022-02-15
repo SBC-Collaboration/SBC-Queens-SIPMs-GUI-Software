@@ -625,6 +625,8 @@ public:
 							});
 						}
 
+						state.ChannelConfigs = new_ch_configs;
+
 						state.RunDir = i_run_dir;
 						state.RunName = i_run_name;
 						state.CurrentState =
