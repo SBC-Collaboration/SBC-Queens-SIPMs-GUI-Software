@@ -179,9 +179,11 @@ private:
 
 				extract_event(port, rdm_num, osc_event);
 
-				for(int i = 0; i < 4; i++) {
-					auto buf = osc_event->Data->DataChannel[i];
-					auto size = osc_event->Data->ChSize[i];
+				int j = 0;
+				for(auto ch : port->ChannelConfigs) {
+					auto& ch_num = ch.second.Channel;
+					auto buf = osc_event->Data->DataChannel[ch_num];
+					auto size = osc_event->Data->ChSize[ch_num];
 
 					//spdlog::info("Event size size: {0}", size);
 					if(size <= 0) {
@@ -197,7 +199,7 @@ private:
 					}
 
 					IndicatorNames plotToSend;
-					switch(i) {
+					switch(j) {
 
 						case 1:
 							plotToSend = IndicatorNames::SiPM_Plot_ONE;
@@ -215,6 +217,7 @@ private:
 						default:
 							plotToSend = IndicatorNames::SiPM_Plot_ZERO;
 					}
+
 					_plotSender(plotToSend,
 						x_values,
 						y_values,
@@ -222,6 +225,8 @@ private:
 
 					delete x_values;
 					delete y_values;
+
+					j++;
 				}
 			};
 
@@ -390,7 +395,6 @@ private:
 
 			reset(port);
 			setup(port,
-				state_of_everything.Model,
 				state_of_everything.GlobalConfig,
 				state_of_everything.ChannelConfigs);
 
@@ -448,9 +452,11 @@ private:
 				// spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
 				// spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
 
-				for(int i = 0; i < 4; i++) {
-					auto buf = osc_event->Data->DataChannel[i];
-					auto size = osc_event->Data->ChSize[i];
+				int j = 0;
+				for(auto ch : port->ChannelConfigs) {
+					auto& ch_num = ch.second.Channel;
+					auto buf = osc_event->Data->DataChannel[ch_num];
+					auto size = osc_event->Data->ChSize[ch_num];
 
 					//spdlog::info("Event size size: {0}", size);
 					if(size <= 0) {
@@ -466,7 +472,7 @@ private:
 					}
 
 					IndicatorNames plotToSend;
-					switch(i) {
+					switch(j) {
 
 						case 1:
 							plotToSend = IndicatorNames::SiPM_Plot_ONE;
@@ -484,6 +490,7 @@ private:
 						default:
 							plotToSend = IndicatorNames::SiPM_Plot_ZERO;
 					}
+
 					_plotSender(plotToSend,
 						x_values,
 						y_values,
@@ -491,6 +498,8 @@ private:
 
 					delete x_values;
 					delete y_values;
+
+					j++;
 				}
 
 
@@ -529,7 +538,7 @@ private:
 
 			if(isFileOpen) {
 				// spdlog::info("Saving SIPM data");
-				save(_pulseFile, sbc_save_func);
+				save(_pulseFile, sbc_save_func, state_of_everything.Port);
 			} else {
 				open(_pulseFile,
 					state_of_everything.RunDir
@@ -545,7 +554,10 @@ private:
 			}
 
 			processing();
-			change_state();
+			if(change_state()) {
+				isFileOpen = false;
+			}
+
 			return true;
 		}
 

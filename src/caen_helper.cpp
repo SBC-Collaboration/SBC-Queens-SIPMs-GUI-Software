@@ -6,8 +6,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <spdlog/spdlog.h>
-
 namespace SBCQueens {
 
 	std::string translate_caen_code(const CAENComm_ErrorCode& err) noexcept {
@@ -112,9 +110,7 @@ namespace SBCQueens {
 
 	}
 
-	void setup(CAEN& res,
-		CAENDigitizerModel model,
-		CAENGlobalConfig g_config,
+	void setup(CAEN& res, CAENGlobalConfig g_config,
 		std::vector<CAENChannelConfig> ch_configs) noexcept {
 
 		if(!res) {
@@ -161,6 +157,13 @@ namespace SBCQueens {
 
 		// This will calculate what is the max current max buffers
 		res->CurrentMaxBuffers = calculate_max_buffers(res);
+
+		// This will get the ACTUAL record length as calculated by
+		// CAEN_DGTZ_SetRecordLength
+		uint32_t rl = 0;
+		error_wrap("Failed to read NLOC. ",
+			CAEN_DGTZ_ReadRegister, handle, 0x8020, &rl);
+		res->GlobalConfig.RecordLength = rl;
 
 		error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
 			CAEN_DGTZ_SetPostTriggerSize,
@@ -213,7 +216,7 @@ namespace SBCQueens {
 			((res->GlobalConfig.MemoryFullModeSelection & 0x0001) << 5));
 
 		// Channel stuff
-		if (model == CAENDigitizerModel::DT5730B){
+		if (res->Model == CAENDigitizerModel::DT5730B){
 			// For DT5730B
 			// First, we make the channel mask (if applicable)
 			uint32_t channel_mask = 0;
@@ -269,7 +272,7 @@ namespace SBCQueens {
 					handle, ch_config.Channel, ch_config.TriggerPolarity);
 
 			}
-		} else if (model == CAENDigitizerModel::DT5740D) {
+		} else if (res->Model == CAENDigitizerModel::DT5740D) {
 			// For DT5740D
 
 			uint32_t group_mask = 0;
@@ -618,46 +621,39 @@ namespace SBCQueens {
 		return 0;
 	}
 
-	// Returns the max number of buffers for the given
-	// record length in globalconfig, and memory per channels
+	// Calculates the number of buffers that are going to be used
+	// given current settings.
 	uint32_t calculate_max_buffers(CAEN& res) noexcept {
-		// This calculation is trickier than it seems actually
-		// first, naively it can be calculated as such
-		// 		Buffers = Memory per channel / Record length
-		// but internally record length can only be a power of 2
-		// or multiples of 10 so we need to check for those cases
-		uint32_t rl = res->GlobalConfig.RecordLength;
+
+		// Instead of using the stored RecordLength
+		// We will let CAEN functions do all the hard work for us
+		// uint32_t rl = res->GlobalConfig.RecordLength;
+		uint32_t rl = 0;
 
 		// Cannot be higher than the memory per channel
 		auto mem_per_ch = res->GetMemoryPerChannel();
-		if(rl >= mem_per_ch) {
-			rl = mem_per_ch;
-		}
+		uint32_t nloc = 0;
 
-		//
-		uint32_t fake_num_buffs = mem_per_ch / rl;
-		// if fake_num_buffs is a power of 2 then we can use it as is
-		// https://stackoverflow.com/questions/108318/how-can-i-test-whether-a-number-is-a-power-of-2
-		// otherwise the minimum it can be is 10
-		// and only be multiple of 10s
-		if((fake_num_buffs & (fake_num_buffs - 1)) != 0) {
-			if(rl > 10.0) {
-				double tmp_rl_double = rl / 10.0;
-				rl = 10*round(tmp_rl_double);
-			} else {
-				rl = 10;
-			}
+		// This contains nloc which if multiplied by the correct
+		// constant, will give us the record length exactly
+		read_register(res, 0x8020, nloc);
+
+		try {
+			rl =  res->GetNLOCTORecordLength()*nloc;
+		} catch (...) {
+			return 0;
 		}
 
 		// Then we calculate the actual num buffs but...
 		auto max_num_buffs = mem_per_ch / rl;
 
-		// It cannot  be higher than the max buffers
+		// It cannot be higher than the max buffers
 		max_num_buffs = max_num_buffs >= res->GetMaxNumberOfBuffers() ?
 			res->GetMaxNumberOfBuffers() : max_num_buffs;
 
 		// It can only be a power of 2
-		uint32_t real_max_buffs = static_cast<uint32_t>(exp2(floor(log2(max_num_buffs))));
+		uint32_t real_max_buffs
+			= static_cast<uint32_t>(exp2(floor(log2(max_num_buffs))));
 
 		// Unless this is enabled, then it is always that number minus one.
 		// Except when the buffers is 1
@@ -677,9 +673,18 @@ namespace SBCQueens {
 		// header string = name;type;x,y,z...;
 		auto g_config = res->GlobalConfig;
 		auto ch_configs = res->ChannelConfigs;
-		auto sample_rate = res->GetSampleRate();
 
-		std::string total = "";
+		enum class Types { CHAR, INT8, INT16, INT32, INT64, UINT8, UINT16,
+		UINT32, UINT64, SINGLE, FLOAT, DOUBLE, FLOAT128 };
+
+		const std::unordered_map<Types, std::string> type_to_string = {
+			{Types::CHAR, "char"},
+			{Types::INT8, "int8"}, {Types::INT16, "int16"},
+			{Types::INT32, "int32"}, {Types::UINT8, "uint8"},
+			{Types::UINT16, "uint16"}, {Types::UINT32, "uint32"},
+			{Types::SINGLE, "single"}, {Types::FLOAT, "single"},
+			{Types::DOUBLE, "double"}, {Types::FLOAT128, "float128"}
+		};
 
 		auto NumToBinString = [] (auto num) -> std::string {
 			char* tmpstr = reinterpret_cast<char*>(&num);
@@ -688,91 +693,64 @@ namespace SBCQueens {
 
 		// Lambda to help to save a single number to the binary format
 		// file. The numbers are always converted to double
-		auto SingleNumToBinary = [&] (std::string name, auto num)
+		auto SingleDimToBinaryHeader = [&] (std::string name, Types type,
+			uint32_t length)
 			-> std::string {
 
-			auto data = NumToBinString(static_cast<double>(num));
-			auto header = name + ";double;1;";
+			auto type_s = type_to_string.at(type);
+			auto header = name + ";" + type_s + ";" + std::to_string(length) + ";";
 
-			uint16_t s = header.length();
-			auto header_length = NumToBinString(s);
-
-			int32_t lines = 1;
-			auto num_lines = NumToBinString(lines);
-
-			return header_length + header + num_lines + data;
-
-		};
-
-		// Same as above but for arrays
-		auto ArrayToBinary = [&] (std::string name, auto nums)
-			-> std::string {
-
-			// auto data = NumToBinString(num);
-			auto header = name + ";double;"
-				+ std::to_string(nums.size()) + ";";
-
-			uint16_t s = header.length();
-			auto header_length = NumToBinString(s);
-
-			int32_t lines = 1;
-			auto num_lines = NumToBinString(lines);
-
-			std::string data = "";
-			for(auto num : nums) {
-				data += NumToBinString(static_cast<double>(num));
-			}
-
-			return header_length + header + num_lines + data;
-
+			return header;
 		};
 
 		uint32_t l = 0x01020304;
-		std::string endianess = NumToBinString(l);
+		auto endianness_s = NumToBinString(l);
 
-		total = endianess;
-		total += SingleNumToBinary("sample_rate", sample_rate);
+		std::string total = SingleDimToBinaryHeader("sample_rate", Types::DOUBLE, 1);
 
-		std::vector<double> channels;
-		std::vector<double> thresholds;
-		std::vector<double> dc_offset;
-		std::vector<double> dc_range;
-		for(auto config : ch_configs) {
+		total += SingleDimToBinaryHeader(
+			"en_chs", Types::UINT8, ch_configs.size()
+		);
 
-			auto ch = config.first;
+		total += SingleDimToBinaryHeader(
+			"thresholds", Types::UINT32, ch_configs.size()
+		);
 
-			channels.emplace_back(ch);
-			thresholds.emplace_back(config.second.TriggerThreshold);
-			dc_offset.emplace_back(config.second.DCOffset);
-			dc_range.emplace_back(res->GetVoltageRange(ch));
+		total += SingleDimToBinaryHeader(
+			"dc_offset", Types::UINT32, ch_configs.size()
+		);
 
-		}
+		total += SingleDimToBinaryHeader(
+			"dc_range", Types::SINGLE, ch_configs.size()
+		);
 
-		total += ArrayToBinary("Channels", channels);
-		total += ArrayToBinary("Thresholds", thresholds);
-		total += ArrayToBinary("DCOffset", dc_offset);
-		total += ArrayToBinary("DCRange", dc_range);
+		total += SingleDimToBinaryHeader(
+			"time_stamp", Types::UINT32, 1
+		);
+
+		total += SingleDimToBinaryHeader(
+			"trg_options", Types::UINT32, 1
+		);
 
 		// This part is the header for the SiPM pulses
 		// The pulses are saved as raw counts, so uint16 is enough
 		const std::string c_type = "uint16";
 		// Name of this block
-		const std::string c_sipm_name = "SIPM_traces";
+		const std::string c_sipm_name = "sipm_traces";
 
 		// These are all the data line dimensions
-		// 1xRecordLengthxNumChannels
-		std::string time_stamp = std::to_string(1);
+		// RecordLengthxNumChannels
 		std::string record_length = std::to_string(g_config.RecordLength);
 		std::string num_channels = std::to_string(ch_configs.size());
 
 		std::string data_header = c_sipm_name + ";";	// name
 		data_header += c_type + ";";					// type
-		data_header += time_stamp + ",";				// dim 1
-		data_header += record_length + ",";				// dim 2
-		data_header += num_channels + ",";				// dim 3
+		data_header += record_length + ",";				// dim 1
+		data_header += num_channels + ";";					// dim 2
+
 
 		// uint16_t is required as the format requires it to be 16 unsigned max
-		uint16_t s = data_header.length();
+		uint16_t s = (total + data_header).length();
 		std::string data_header_size = NumToBinString(s);
 
 		// 0 means that it will be calculated by the number of lines
@@ -780,7 +758,7 @@ namespace SBCQueens {
 		int32_t j = 0x00000000;
 		std::string num_data_lines = NumToBinString(j);
 
-		return total + data_header_size + data_header + num_data_lines;
+		return endianness_s  + data_header_size + total+  data_header + num_data_lines;
 	}
 
 	// std::string sbc_init_file(CAENEvent& evt) noexcept {
@@ -801,41 +779,77 @@ namespace SBCQueens {
 	// }
 
 
-	std::string sbc_save_func(CAENEvent& evt) noexcept {
+	std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
 
-		char* ptr = nullptr;
-		std::string out_data = "";
-		// This is how it works:
-		// the SBC saving format (AKA binary recon data format) works like
-		// the next:
-		// 1.- 	There is an endianness indicator. That is why sbc_init_file
-		// 		exists.
-		// 2.- 	then a header string length, which is how long in # of chars
-		// 		the entire header string is
-		// 3.-	The header string. This holds the name of the block, the length
-		//		of each dimension of the array and its type
-		// 4.- 	The number of lines of vectors in each array
+		// order of header:
+		// double, uint8, uint32, uint32, single, uint32, uint32, uint16
+		// sample_rate, en_chs, thresholds, dc_offset, dc_range, time_stamp, trg_options, data
+		// 8*1, 1*ch_size, 4*ch_size, 4*ch_size, 4*ch_size, 4*1, 4*1, 2*recordlength*ch_size
+		// = 16 + ch_size*(1+4+4+4+2*recordlength) = 16 + ch_size(13 + 2*recordlength)
+		const auto num_ch = res->ChannelConfigs.size();
+		const auto rl = res->GlobalConfig.RecordLength;
+
+		char out_str[16 + (2*rl + 13)*num_ch];
+
+		// double
+		uint64_t offset = 0;
+		auto append_cstr = [](auto num, uint64_t& offset, char* str) {
+			char* ptr = reinterpret_cast<char*>(&num);
+			for(size_t i = 0; i < sizeof(num) / sizeof(char); i++) {
+				str[offset + i] = ptr[i];
+			}
+			offset += sizeof(num) / sizeof(char);
+		};
+
+		// sample_rate
+		append_cstr(res->GetSampleRate(), offset, &out_str[0]);
+
+		// en_chs
+		for(auto ch_pair : res->ChannelConfigs) {
+			append_cstr(ch_pair.second.Channel, offset, &out_str[0]);
+		}
+
+		// thresholds
+		for(auto ch_pair : res->ChannelConfigs) {
+			append_cstr(ch_pair.second.TriggerThreshold, offset, &out_str[0]);
+		}
+
+		// dc_offset
+		for(auto ch_pair : res->ChannelConfigs) {
+			append_cstr(ch_pair.second.DCOffset, offset, &out_str[0]);
+		}
+
+		// dc_range
+		for(auto ch_pair : res->ChannelConfigs) {
+			float val = res->GetVoltageRange(ch_pair.second.Channel);
+			append_cstr(val, offset, &out_str[0]);
+		}
+
+		// time_stamp
+		append_cstr(evt->Info.TriggerTimeTag, offset, &out_str[0]);
+
+		// tgr_options
+		append_cstr(evt->Info.Pattern, offset, &out_str[0]);
+
 
 		// For CAEN data, each line is an Event which contains a 2-D array
 		// where the x-axis is the record length and the y-axis are the
 		// number of channels that are activated
 
 		auto& evtdata = evt->Data;
-		for(int ch = 0; ch < MAX_UINT16_CHANNEL_SIZE; ch++){
+		for(auto ch_pair : res->ChannelConfigs){
+			auto& ch = ch_pair.second.Channel;
 			if(evtdata->ChSize[ch] > 0) {
-
-				out_data += std::string();
 
 				for(uint32_t xp = 0; xp < evtdata->ChSize[ch]; xp++) {
 
-					ptr = reinterpret_cast<char*>(&evtdata->DataChannel[ch][xp]);
-					out_data += std::string(ptr, 2);
+					append_cstr(evtdata->DataChannel[ch][xp], offset, &out_str[0]);
 
 				}
 			}
 		}
 
-		return out_data;
+		return std::string(out_str, 16 + (2*rl + 13)*num_ch);
 	}
 
 } // namespace SBCQueens

@@ -12,7 +12,6 @@
 #include <filesystem>
 
 // 3rd party includes
-#include <spdlog/spdlog.h>
 #include <concurrentqueue.h>
 
 namespace SBCQueens {
@@ -125,22 +124,33 @@ public:
 
 	template <typename T>
 	void open(DataFile<T>& res, const std::string& fileName) {
+
+		if(res) {
+			res.release();
+		}
+
 		res = std::make_unique<dataFile<T>>(fileName);
+
 	}
 
 	template <typename T, typename InitWriteFunc, typename... Args>
 	void open(DataFile<T>& res,
 		const std::string& fileName, InitWriteFunc&& f,  Args&&... args) {
+
+		if(res) {
+			res.release();
+		}
+
 		res = std::make_unique<dataFile<T>>(fileName,
 			std::forward<InitWriteFunc>(f), std::forward<Args>(args)...);
 	}
 
-	template<typename T, typename FormatFunc>
+	template<typename T, typename FormatFunc, typename... Args>
 	// Saves the contents of DataFile using the format function f
 	// that takes T as an argument, or
 	// takes std::deque<T>& as argument which then uses all the information
 	// at once to generate the string that is saved to the file
-	void save(DataFile<T>& file, FormatFunc&& f) noexcept {
+	void save(DataFile<T>& file, FormatFunc&& f,  Args&&... args) noexcept {
 
 		if(file->IsOpen()) {
 			// GetData becomes a thread-safe operation
@@ -150,38 +160,39 @@ public:
 			auto data = file->GetData();
 			// If FormatFunc takes the single item as an argument
 			// We will call f for every item in TempData
-			if constexpr (std::is_invocable_v<FormatFunc, T> ||
-				std::is_invocable_v<FormatFunc, const T&> ||
-				std::is_invocable_v<FormatFunc, T&>) {
+			if constexpr (
+				std::is_invocable_v<FormatFunc, T, Args...> 		||
+				std::is_invocable_v<FormatFunc, const T&, Args...> 	||
+				std::is_invocable_v<FormatFunc, T&, Args...>) {
 
 				for(auto item : data) {
-					(*file) << f(item);
+					(*file) << f(item, std::forward<Args>(args)...);
 				}
 
 			// If it takes the entire format, then apply it to all.
 			} else if constexpr (std::is_invocable_v<FormatFunc,
-				std::vector<T>&>) {
+				std::vector<T>&, Args...>) {
 
-				(*file) << f(data);
+				(*file) << f(data, std::forward<Args>(args)...);
 
 			// if not, just save what f returns
 			} else {
-				(*file) << f();
+				(*file) << f(std::forward<Args>(args)...);
 			}
 		}
 
 	}
 
-	template<typename T, typename FormatFunc>
+	template<typename T, typename FormatFunc, typename... Args>
 	// Saves the contents of the DataFile asynchronously using packaged tasks
-	void async_save(DataFile<T>& file, FormatFunc&& f) noexcept {
+	void async_save(DataFile<T>& file, FormatFunc&& f, Args&&... args) noexcept {
 		// Here is where ToggleDataBuffer() is important.
 		// During an async there should be two arrays:
 		// One to write to, and another to read from.
 		std::packaged_task<void(DataFile<T>&, FormatFunc&&)>
-			_f(save<T, FormatFunc>);
+			_pt(save<T, FormatFunc>);
 			
-		_f(file, std::forward<FormatFunc>(f));
+		_pt(file, std::forward<FormatFunc>(f), std::forward<Args>(args)...);
 	}
 
 

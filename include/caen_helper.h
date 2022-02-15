@@ -40,6 +40,8 @@ namespace SBCQueens {
 
 		uint32_t MaxNumBuffers = 1024;
 
+		float NLOCToRecordLength = 1;
+
 		std::vector<double> VoltageRanges;
 	};
 
@@ -59,6 +61,7 @@ namespace SBCQueens {
 				.AcquisitionRate = 500e6,
 				.MemoryPerChannel = static_cast<uint32_t>(5.12e6),
 				.NumChannels = 8,
+				.NLOCToRecordLength = 10,
 				.VoltageRanges = {0.5, 2.0}
 			}},
 			{CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants{
@@ -66,6 +69,7 @@ namespace SBCQueens {
 				.AcquisitionRate = 62.5e6,
 				.MemoryPerChannel = static_cast<uint32_t>(192e3),
 				.NumChannels = 32,
+				.NLOCToRecordLength = 1.5,
 				.VoltageRanges = {2.0, 10.0}
 			}}
 	};
@@ -250,6 +254,10 @@ private:
 			return ModelConstants.USBTransferRate;
 		}
 
+		double GetNLOCTORecordLength() const {
+			return ModelConstants.NLOCToRecordLength;
+		}
+
 		// Returns the channel voltage range. If channel does not exist
 		// returns 0
 		double GetVoltageRange(int ch) const {
@@ -345,8 +353,7 @@ private:
 	// Calls a bunch of setup functions for each channel configuration
 	// found under the vector<CAENChannelConfigs> in res
 	// Does not setup if resource is null or there are errors.
-	void setup(CAEN&, CAENDigitizerModel, CAENGlobalConfig,
-		std::vector<CAENChannelConfig>) noexcept;
+	void setup(CAEN&, CAENGlobalConfig, std::vector<CAENChannelConfig>) noexcept;
 
 	// Enables the acquisition and allocates the memory for the acquired data.
 	// Does not enable acquisitoin if resource is null or there are errors.
@@ -425,6 +432,6 @@ private:
 	uint32_t calculate_max_buffers(CAEN&) noexcept;
 
 	std::string sbc_init_file(CAEN&) noexcept;
-	std::string sbc_save_func(CAENEvent& evt) noexcept;
+	std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept;
 
 } // namespace SBCQueens
