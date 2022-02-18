@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <math.h>
 #include <string>
 #include <utility>
@@ -16,6 +17,7 @@
 #include "TeensyControllerInterface.h"
 #include "CAENDigitizerInterface.h"
 #include "caen_helper.h"
+#include "deps/imgui/imgui.h"
 #include "imgui.h"
 #include "imgui_helpers.h"
 #include "implot_helpers.h"
@@ -78,15 +80,19 @@ private:
 		int ic_overlapping_rej;
 		int ic_recordLength;
 		int ic_postbuffer;
+		bool ic_ext_as_gate;
 		int ic_ext_trigger;
 		int ic_soft_trigger;
+		int	ic_ch_polaritiy;
 
 		std::array<int, MAX_CHANNELS> 	ic_ch_number;
 		std::array<bool, MAX_CHANNELS> 	ic_ch_enabled;
+		std::array<int, MAX_CHANNELS>   ic_ch_mask;
 		std::array<int, MAX_CHANNELS> 	ic_ch_offsets;
+		std::array<std::array<int, 8>, MAX_CHANNELS> 	ic_ch_corrections;
 		std::array<int, MAX_CHANNELS> 	ic_ch_thresholds;
 		std::array<int, MAX_CHANNELS> 	ic_ch_ranges;
-		std::array<int, MAX_CHANNELS> 	ic_ch_polarities;
+
 
 		// Indicators
 
@@ -270,15 +276,19 @@ public:
 			_plotManager.add(box_bme_humi_plot);
 
 			sipm_plot_zero = make_plot(IndicatorNames::SiPM_Plot_ZERO);
+			sipm_plot_zero.ClearOnNewData = true;
 			_plotManager.add(sipm_plot_zero);
 
 			sipm_plot_one = make_plot(IndicatorNames::SiPM_Plot_ONE);
+			sipm_plot_one.ClearOnNewData = true;
 			_plotManager.add(sipm_plot_one);
 
 			sipm_plot_two = make_plot(IndicatorNames::SiPM_Plot_TWO);
+			sipm_plot_two.ClearOnNewData = true;
 			_plotManager.add(sipm_plot_two);
 
 			sipm_plot_three = make_plot(IndicatorNames::SiPM_Plot_THREE);
+			sipm_plot_three.ClearOnNewData = true;
 			_plotManager.add(sipm_plot_three);
 
 			i_com_port 		= t_conf["Port"].value_or("COM4");
@@ -291,18 +301,36 @@ public:
 			ic_recordLength 	= CAEN_conf["RecordLength"].value_or(2048u);
 			ic_postbuffer 		= CAEN_conf["PostBufferPorcentage"].value_or(50u);
 			ic_overlapping_rej  = CAEN_conf["OverlappingRejection"].value_or(0u);
+			ic_ext_as_gate 		= CAEN_conf["TRGINasGate"].value_or(false);
 			ic_ext_trigger 		= CAEN_conf["ExternalTrigger"].value_or(0);
 			ic_soft_trigger 	= CAEN_conf["SoftwareTrigger"].value_or(0);
+			ic_ch_polaritiy 	= CAEN_conf["Polarity"].value_or(0u);
+
+			for(auto& group : ic_ch_corrections) {
+				group.fill(0);
+			}
 
 			for(int i = 0; i < MAX_CHANNELS; i++) {
-				std::string ch_toml = "ch" + std::to_string(i);
-				ic_ch_number[i] 	= CAEN_conf[ch_toml]["Channel"].value_or(0u);
+				std::string ch_toml = "group" + std::to_string(i);
+				ic_ch_number[i] 	= CAEN_conf[ch_toml]["Number"].value_or(0u);
 				ic_ch_enabled[i] 	= CAEN_conf[ch_toml]["Enabled"].value_or(false);
-				ic_ch_ranges[i]		= CAEN_conf[ch_toml]["Range"].value_or(0u);
+
+				ic_ch_mask[i] 		= CAEN_conf[ch_toml]["Mask"].value_or(0u);
+
+				ic_ch_offsets[i] 	= CAEN_conf[ch_toml]["Offset"].value_or(0x8000u);
+				if(toml::array* arr = CAEN_conf[ch_toml]["Corrections"].as_array()) {
+					spdlog::info("Corrections exist");
+					size_t j = 0;
+					for(toml::node& elem : *arr) {
+						if(j < 8){
+							ic_ch_corrections[i][j] = elem.value_or(0u);
+							j++;
+						}
+					}
+				}
 
 				ic_ch_thresholds[i] = CAEN_conf[ch_toml]["Threshold"].value_or(0x8000u);
-				ic_ch_polarities[i] = CAEN_conf[ch_toml]["Polarity"].value_or(0u);
-				ic_ch_offsets[i] 	= CAEN_conf[ch_toml]["Offset"].value_or(0x8000u);
+				ic_ch_ranges[i]		= CAEN_conf[ch_toml]["Range"].value_or(0u);
 			}
 		}
 
@@ -479,7 +507,7 @@ public:
 			////
 			/// SiPM Plots
 
-			sipm_plot_zero.ClearOnNewData = true;
+
 			ImGui::Begin("SiPM Plot");  
 			if (ImPlot::BeginPlot("SiPM Trace", ImVec2(-1,0))) {
 
@@ -596,11 +624,15 @@ public:
 						state.GlobalConfig.TriggerOverlappingEn =
 							ic_overlapping_rej > 0;
 
+						state.GlobalConfig.EXTasGate = ic_ext_as_gate;
 						state.GlobalConfig.EXTTriggerMode =
 							static_cast<CAEN_DGTZ_TriggerMode_t>(ic_ext_trigger);
 
+						state.GlobalConfig.TriggerPolarity
+							= static_cast<CAEN_DGTZ_TriggerPolarity_t>(ic_ch_polaritiy);
+
 						// For now only 4 channels are allowed
-						std::vector<CAENChannelConfig> new_ch_configs;
+						std::vector<CAENGroupConfig> new_ch_configs;
 
 						for(int i= 0; i < MAX_CHANNELS; i++) {
 
@@ -609,18 +641,22 @@ public:
 								continue;
 							}
 
-							new_ch_configs.emplace_back(CAENChannelConfig {
+							new_ch_configs.emplace_back(CAENGroupConfig {
 
-								.Channel
+								.Number
 									= static_cast<uint8_t>(ic_ch_number[i]),
+								.EnableMask
+									= static_cast<uint8_t>(ic_ch_mask[i]),
 								.DCOffset
 									= static_cast<uint32_t>(ic_ch_offsets[i]),
+								.DCCorrections
+									= std::vector<uint32_t>(
+										ic_ch_corrections[i].cbegin(),
+										ic_ch_corrections[i].cend()),
 								.DCRange
 									= static_cast<uint8_t>(ic_ch_ranges[i]),
 								.TriggerThreshold
 									= static_cast<uint32_t>(ic_ch_thresholds[i]),
-								.TriggerPolarity
-									= static_cast<CAEN_DGTZ_TriggerPolarity_t>(ic_ch_polarities[i])
 
 							});
 						}
@@ -681,10 +717,16 @@ public:
     			ImGui::RadioButton("Not Allowed",
     				&ic_overlapping_rej, 0);
 
+    			ImGui::Checkbox("TRG-IN as Gate", &ic_ext_as_gate);
+
     			ImGui::Combo("External Trigger Mode", &ic_ext_trigger,
     				"Disabled\0Acq Only\0Ext Only\0Both\0\0");
     			ImGui::Combo("Software Trigger Mode", &ic_soft_trigger,
     				"Disabled\0Acq Only\0Ext Only\0Both\0\0");
+
+    			ImGui::Text("Trigger Polarity:"); ImGui::SameLine();
+	    			ImGui::RadioButton("Positive", &ic_ch_polaritiy, 0); ImGui::SameLine();
+	    			ImGui::RadioButton("Negative", &ic_ch_polaritiy, 1);
 
 				send_soft_trig(_caenQueueF,
 					[](CAENInterfaceState& state) {
@@ -716,21 +758,24 @@ public:
 
 			// Channel tabs
 			for(int i = 0; i < MAX_CHANNELS; i++) {
-				std::string tab_name = "CAEN CH " + std::to_string(i);
+				std::string tab_name = "CAEN GROUP " + std::to_string(i);
 				if(ImGui::BeginTabItem(tab_name.c_str())) {
 					ImGui::PushItemWidth(120);
 					ImGui::Checkbox("Enabled", &ic_ch_enabled[i]);
-					ImGui::InputInt("CH #", &ic_ch_number[i]);
+					ImGui::InputInt("Group #", &ic_ch_number[i]);
+					ImGui::InputInt("Mask", &ic_ch_mask[i]);
 					ImGui::InputInt("DC Offset [counts]", &ic_ch_offsets[i]);
+
+
+					for(int j = 0; j < 8; j++) {
+						std::string c_name = "Correction " + std::to_string(j);
+						ImGui::InputInt(c_name.c_str(), &ic_ch_corrections[i][j]);
+					}
 
 					// TODO(Hector): change this to get the actual
 					// ranges of the digitizer used, maybe change it to a dropbox?
 	    			ImGui::RadioButton("2V", &ic_ch_ranges[i], 0); ImGui::SameLine();
 	    			ImGui::RadioButton("0.5V", &ic_ch_ranges[i], 1);
-
-	    			ImGui::Text("Trigger Polarity:"); ImGui::SameLine();
-	    			ImGui::RadioButton("Positive", &ic_ch_polarities[i], 0); ImGui::SameLine();
-	    			ImGui::RadioButton("Negative", &ic_ch_polarities[i], 1);
 
 	    			ImGui::InputInt("Threshold [counts]", &ic_ch_thresholds[i]);
 

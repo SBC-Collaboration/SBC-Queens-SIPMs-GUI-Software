@@ -25,18 +25,22 @@ namespace SBCQueens {
 		DT5740D = 1
 	};
 
-	// All the constants that never change between digitizers
+	// All the constants that never change for a given digitizer
 	struct CAENDigitizerModelConstants {
 		// ADC resolution in bits
-		uint32_t ADCResolution;
+		uint32_t ADCResolution = 8;
 		// In S/s
-		double AcquisitionRate;
+		double AcquisitionRate = 10e6;
 		// In S/ch
-		uint32_t MemoryPerChannel;
+		uint32_t MemoryPerChannel = 0;
 		// In S/s
 		uint32_t USBTransferRate = 15e6;
 
-		uint32_t NumChannels = 1;
+		// Total number of channels
+		uint8_t NumChannels = 1;
+
+		// If 0, digitizer does not deal in groups
+		uint8_t NumberOfGroups = 0;
 
 		uint32_t MaxNumBuffers = 1024;
 
@@ -61,6 +65,7 @@ namespace SBCQueens {
 				.AcquisitionRate = 500e6,
 				.MemoryPerChannel = static_cast<uint32_t>(5.12e6),
 				.NumChannels = 8,
+				.NumberOfGroups = 0,
 				.NLOCToRecordLength = 10,
 				.VoltageRanges = {0.5, 2.0}
 			}},
@@ -69,6 +74,7 @@ namespace SBCQueens {
 				.AcquisitionRate = 62.5e6,
 				.MemoryPerChannel = static_cast<uint32_t>(192e3),
 				.NumChannels = 32,
+				.NumberOfGroups = 4,
 				.NLOCToRecordLength = 1.5,
 				.VoltageRanges = {2.0, 10.0}
 			}}
@@ -92,7 +98,10 @@ namespace SBCQueens {
 		// In %
 		uint32_t PostTriggerPorcentage = 50;
 
-		// see caen_helper.cpp setup(...) to see a description of this
+		// If enabled, the trigger acquisition only happens whenever
+		// EXT or TRG-IN is high.
+		bool EXTasGate = false;
+		// see caen_helper.cpp setup(...) to see a description of these enums
 		CAEN_DGTZ_TriggerMode_t EXTTriggerMode
 			= CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY;
 
@@ -114,31 +123,42 @@ namespace SBCQueens {
 		// are full, where Nb is the overall number of numbers of buffers
 		// in which the channel memory is divided.
 		bool MemoryFullModeSelection = true;
-	};
-
-	struct CAENChannelConfig {
-		// channel #
-		uint8_t Channel = 0;
-
-		// 0x8000 no offset if 16 bit DAC
-		// 0x1000 no offset if 14 bit DAC
-		// 0x400 no offset if 14 bit DAC
-		uint32_t DCOffset = 0x8000;
-
-		// For DT5730
-		// 0 = 2Vpp, 1 = 0.5Vpp
-		uint8_t DCRange = 0;
-
-		// In ADC counts
-		uint32_t TriggerThreshold = 0;
 
 		// 0L = Rising edge, 1L = Falling edge
 		CAEN_DGTZ_TriggerPolarity_t TriggerPolarity =
 			CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge;
 	};
 
+	// As a general case, this holds all the configuration values for a channel
+	// if a digitizer does not support groups, i.e x730, group = channel
+	struct CAENGroupConfig {
+		// channel # or channel group
+		uint8_t Number = 0;
+
+		// Mask of enabled channels within the group
+		uint8_t EnableMask = 0;
+
+		// 0x8000 no offset if 16 bit DAC
+		// 0x1000 no offset if 14 bit DAC
+		// 0x400 no offset if 14 bit DAC
+		// DC offsets of each channel in the group
+		uint32_t DCOffset;
+		std::vector<uint32_t> DCCorrections;
+
+		// For DT5730
+		// 0 = 2Vpp, 1 = 0.5Vpp
+		// DC range of the group or channel
+		uint8_t DCRange = 0;
+
+		// In ADC counts
+		uint32_t TriggerThreshold = 0;
+
+	};
+
 	// Holds the CAEN raw data, the size of the buffer, the size
 	// of the data and number of events
+	// pointer Buffer is meant to be allocated using CAEN functions
+	// after a setup(...) call.
 	struct CAENData {
 		char* Buffer = nullptr;
 		uint32_t TotalSizeBuffer;
@@ -147,25 +167,28 @@ namespace SBCQueens {
 	};
 
 	// Events structure: holds the raw data of the event, the info (timestamp),
-	// and the pointer to the point in the original buffer. No copying
-	// or moving allowed as the data structure is inside a C (insecure) pointer
-	// that is allocated by CAEN functions
-	// caenEvent can be called normally and its constructors and destructors
-	// will make sure the memory is freed
+	// and the pointer to the point in the original buffer.
+	// This uses CAEN functions to allocate memory, so if handle does not
+	// have an associated digitizer to it, it will not work.
+	// Create events only after a setup(...) call has been made for best
+	// results.
 	struct caenEvent {
-		// Treat this like a shared pointer
-		char* DataPtr;
-		// This is a "shared_ptr"
+		// Treat this like a shared pointer.
+		char* DataPtr = nullptr;
+		// Treat this like an unique pointer
 		CAEN_DGTZ_UINT16_EVENT_t* Data = nullptr;
 		CAEN_DGTZ_EventInfo_t Info;
 
 		explicit caenEvent(const int& handle)
 			: _handle(handle) {
+
+			// This will only allocate memory if handle does
+			// has an associated digitizer to it.
 			CAEN_DGTZ_AllocateEvent(_handle,
 				reinterpret_cast<void**>(&Data));
 		}
 
-		// If *handle is released before this event is freed,
+		// If handle is released before this event is freed,
 		// it will cause a memory leak, maybe?
 		~caenEvent() {
 			CAEN_DGTZ_FreeEvent(_handle,
@@ -190,10 +213,12 @@ namespace SBCQueens {
 
 private:
 		int _handle;
-
 	};
+
 	using CAENEvent = std::shared_ptr<caenEvent>;
 
+	// The main CAEN struct. Holds the model, all its parameters
+	// and the raw binary data from the digitizer.
 	struct caen {
 
 		caen(const CAENDigitizerModel model,
@@ -220,7 +245,7 @@ private:
 		// Public members
 		CAENDigitizerModel Model;
 		CAENGlobalConfig GlobalConfig;
-		std::map<uint8_t, CAENChannelConfig> ChannelConfigs;
+		std::map<uint8_t, CAENGroupConfig> GroupConfigs;
 		uint32_t CurrentMaxBuffers;
 
 		CAEN_DGTZ_ConnectionType ConnectionType;
@@ -250,6 +275,10 @@ private:
 			return ModelConstants.NumChannels;
 		}
 
+		uint8_t GetNumberOfGroups() const {
+			return ModelConstants.NumberOfGroups;
+		}
+
 		uint32_t GetCommTransferRate() const {
 			return ModelConstants.USBTransferRate;
 		}
@@ -262,7 +291,7 @@ private:
 		// returns 0
 		double GetVoltageRange(int ch) const {
 			try {
-				auto config = ChannelConfigs.at(ch);
+				auto config = GroupConfigs.at(ch);
 				return ModelConstants.VoltageRanges[config.DCRange];
 			} catch(...) {
 				return 0.0;
@@ -275,6 +304,8 @@ private:
 	};
 
 	using CAEN = std::unique_ptr<caen>;
+
+	/// Error checking functions
 
 	template<typename PrintFunc>
 	// Check if there is an error and prints it out using the lambda/function f
@@ -318,6 +349,10 @@ private:
 		return false;
 	}
 
+	/// End Error checking functions
+	//
+	/// General CAEN functions
+
 	// Opens the resource and returns a handle if successful.
 	// ct -> Physical communication channel. CAEN_DGTZ_USB,
 	//  CAEN_DGTZ_PCI_OpticalLink being the most expected options
@@ -353,7 +388,7 @@ private:
 	// Calls a bunch of setup functions for each channel configuration
 	// found under the vector<CAENChannelConfigs> in res
 	// Does not setup if resource is null or there are errors.
-	void setup(CAEN&, CAENGlobalConfig, std::vector<CAENChannelConfig>) noexcept;
+	void setup(CAEN&, CAENGlobalConfig, std::vector<CAENGroupConfig>) noexcept;
 
 	// Enables the acquisition and allocates the memory for the acquired data.
 	// Does not enable acquisitoin if resource is null or there are errors.
@@ -378,6 +413,10 @@ private:
 	// Forces a software trigger in the digitizer.
 	// Does not trigger if resource is null or there are errors.
 	void software_trigger(CAEN&) noexcept;
+
+	/// End General CAEN functions
+	//
+	/// Data Acquisition functions
 
 	// Asks CAEN how many events are in the buffer
 	// Returns 0 if resource is null or there are errors.
@@ -407,19 +446,14 @@ private:
 	// This is to optimize for speed.
 	void clear_data(CAEN&) noexcept;
 
-	// From CAEN:
-	// Retrieves how many times per second the input pulse crossed the
-	// programmed threshold of the channel n digital discriminator.
-	// Only for 725S 730S models
-	// uint32_t channel_self_trigger_meter(CAEN&, uint8_t channel) noexcept;
-
-
-	// Mathematical functions
+	/// End Data Acquisition functions
+	//
+	/// Mathematical functions
 
 	// Turns a time (in nanoseconds) into counts
-	// Reminder that some digitizers take data in chunks
-	// so some record lengths are not possible.
-	// Ex: x5730 record length can only be multiples of 4
+	// Reminder that some digitizers take data in chunks or only allow
+	// some record lengths, so some record lengths are not possible.
+	// Ex: x5730 record length can only be multiples of 10
 	uint32_t t_to_record_length(CAEN&, double) noexcept;
 
 	// Turns a voltage (V) into trigger counts
@@ -431,7 +465,18 @@ private:
 	// Calculates the max number of buffers for a given record length
 	uint32_t calculate_max_buffers(CAEN&) noexcept;
 
+	/// End Mathematical functions
+	//
+	/// File functions
+
+	// Saves the digitizer data in the Binary format SBC collboration is using
+	// This only writes the header at the beginning of the file.
+	// Meant to be written once.
 	std::string sbc_init_file(CAEN&) noexcept;
+
+	// Saves the digitizer data in the Binary format SBC collboration is using
 	std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept;
+
+	/// End File functions
 
 } // namespace SBCQueens

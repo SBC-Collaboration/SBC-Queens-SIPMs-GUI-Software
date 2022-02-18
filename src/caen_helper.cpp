@@ -111,7 +111,7 @@ namespace SBCQueens {
 	}
 
 	void setup(CAEN& res, CAENGlobalConfig g_config,
-		std::vector<CAENChannelConfig> ch_configs) noexcept {
+		std::vector<CAENGroupConfig> ch_configs) noexcept {
 
 		if(!res) {
 			return;
@@ -144,11 +144,11 @@ namespace SBCQueens {
 			CAEN_DGTZ_SetMaxNumEventsBLT,
 			handle, res->GlobalConfig.MaxEventsPerRead);
 		// Before:
-     	//err = CAEN_DGTZ_SetMaxNumEventsBLT(handle,
+     	// err = CAEN_DGTZ_SetMaxNumEventsBLT(handle,
      	//	res->GlobalConfig.MaxEventsPerRead);
 		// if(err < 0) {
-		// 	total_err |= err;
-		// 	err_msg += "CAEN_DGTZ_SetMaxNumEventsBLT Failed. ";
+		// 		total_err |= err;
+		// 		err_msg += "CAEN_DGTZ_SetMaxNumEventsBLT Failed. ";
 		// }
 
 		error_wrap("CAEN_DGTZ_SetRecordLength Failed. ",
@@ -160,10 +160,10 @@ namespace SBCQueens {
 
 		// This will get the ACTUAL record length as calculated by
 		// CAEN_DGTZ_SetRecordLength
-		uint32_t rl = 0;
+		uint32_t nloc = 0;
 		error_wrap("Failed to read NLOC. ",
-			CAEN_DGTZ_ReadRegister, handle, 0x8020, &rl);
-		res->GlobalConfig.RecordLength = rl;
+			CAEN_DGTZ_ReadRegister, handle, 0x8020, &nloc);
+		res->GlobalConfig.RecordLength = res->GetNLOCTORecordLength()*nloc;
 
 		error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
 			CAEN_DGTZ_SetPostTriggerSize,
@@ -202,6 +202,13 @@ namespace SBCQueens {
 			CAEN_DGTZ_SetAcquisitionMode,
 			handle, res->GlobalConfig.AcqMode);
 
+		// Trigger polarity
+		// These digitizers do not support channel-by-channel trigger pol
+		// so we treat it like a global config, and use 0 as a placeholder.
+		error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
+			CAEN_DGTZ_SetTriggerPolarity,
+			handle, 0, res->GlobalConfig.TriggerPolarity);
+
     	// Board config register
     	// 0 = Trigger overlapping not allowed
     	// 1 = trigger overlapping allowed
@@ -217,11 +224,13 @@ namespace SBCQueens {
 
 		// Channel stuff
 		if (res->Model == CAENDigitizerModel::DT5730B){
-			// For DT5730B
+			// For DT5730B, there are no groups only channels so we take
+			// each configuration as a channel
+
 			// First, we make the channel mask (if applicable)
 			uint32_t channel_mask = 0;
 			for(auto ch_config : ch_configs) {
-				channel_mask |= 1 << ch_config.Channel;
+				channel_mask |= 1 << ch_config.Number;
 			}
 
 			// Then enable those channels
@@ -235,13 +244,13 @@ namespace SBCQueens {
 				handle, res->GlobalConfig.CHTriggerMode, channel_mask);
 
 			// Let's clear the channel map to allow for new channels properties
-			res->ChannelConfigs.clear();
+			res->GroupConfigs.clear();
 			for(auto ch_config : ch_configs) {
 				// Before we set any parameters for each channel, we add the
 				// new channel to the map. try_emplace(...) will make sure we do
 				// not add duplicates
-				auto ins = res->ChannelConfigs.try_emplace(
-					ch_config.Channel, ch_config);
+				auto ins = res->GroupConfigs.try_emplace(
+					ch_config.Number, ch_config);
 
 				// if false, it was already inserted and we move to the next
 				// channel
@@ -253,23 +262,18 @@ namespace SBCQueens {
 		    	// Self Channel trigger
 				error_wrap("CAEN_DGTZ_SetChannelTriggerThreshold Failed. ",
 					CAEN_DGTZ_SetChannelTriggerThreshold,
-					handle, ch_config.Channel, ch_config.TriggerThreshold);
+					handle, ch_config.Number, ch_config.TriggerThreshold);
 
 				error_wrap("CAEN_DGTZ_SetChannelDCOffset Failed. ",
 					CAEN_DGTZ_SetChannelDCOffset,
-					handle, ch_config.Channel, ch_config.DCOffset);
+					handle, ch_config.Number, ch_config.DCOffset);
 
 	        	// Writes to the registers that holds the DC range
 	        	// For 5730 it is the register 0x1n28
 				error_wrap("write_register to reg 0x1n28 Failed (DC Range). " ,
 					CAEN_DGTZ_WriteRegister,
-					handle, 0x1028 | (ch_config.Channel & 0x0F) << 8,
+					handle, 0x1028 | (ch_config.Number & 0x0F) << 8,
 					ch_config.DCRange & 0x0001);
-
-				// Channel trigger polarity
-				error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
-					CAEN_DGTZ_SetTriggerPolarity,
-					handle, ch_config.Channel, ch_config.TriggerPolarity);
 
 			}
 		} else if (res->Model == CAENDigitizerModel::DT5740D) {
@@ -277,7 +281,7 @@ namespace SBCQueens {
 
 			uint32_t group_mask = 0;
 			for(auto ch_config : ch_configs) {
-				group_mask |= 1 << ch_config.Channel;
+				group_mask |= 1 << ch_config.Number;
 			}
 
 			error_wrap("CAEN_DGTZ_SetGroupEnableMask Failed. ",
@@ -288,14 +292,14 @@ namespace SBCQueens {
 				CAEN_DGTZ_SetGroupSelfTrigger,
 				handle, res->GlobalConfig.CHTriggerMode, group_mask);
 
-			res->ChannelConfigs.clear();
+			res->GroupConfigs.clear();
 			for(auto ch_config: ch_configs) {
 
 				// Before we set any parameters for each channel, we add the
 				// new channel to the map. try_emplace(...) will make sure we do
 				// not add duplicates
-				auto ins = res->ChannelConfigs.try_emplace(
-					ch_config.Channel, ch_config);
+				auto ins = res->GroupConfigs.try_emplace(
+					ch_config.Number, ch_config);
 
 				// if false, it was already inserted and we move to the next
 				// channel
@@ -306,16 +310,17 @@ namespace SBCQueens {
 		    	// Trigger stuff
 				error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
 					CAEN_DGTZ_SetGroupTriggerThreshold,
-					handle, ch_config.Channel, ch_config.TriggerThreshold);
+					handle, ch_config.Number, ch_config.TriggerThreshold);
+
 
 				error_wrap("CAEN_DGTZ_SetGroupDCOffset Failed. ",
 					CAEN_DGTZ_SetGroupDCOffset,
-					handle, ch_config.Channel, ch_config.DCOffset);
+					handle, ch_config.Number, ch_config.DCOffset);
 
-				// For DT5740, all groups and all channels share the same polarity
-				error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
-					CAEN_DGTZ_SetTriggerPolarity,
-					handle, ch_config.Channel, ch_config.TriggerPolarity);
+				// TODO(Zhiheng): DCCorrections should be of length
+				// NumberofChannels / NumberofGroups. Include the code
+				// to loop trough all the corrections
+
 			}
 
 			// For 740, to use TRG-IN as Gate / anti-veto
@@ -672,8 +677,10 @@ namespace SBCQueens {
 	std::string sbc_init_file(CAEN& res) noexcept {
 		// header string = name;type;x,y,z...;
 		auto g_config = res->GlobalConfig;
-		auto ch_configs = res->ChannelConfigs;
+		auto group_configs = res->GroupConfigs;
 
+		// The enum and the map is to simplify the code for the lambdas.
+		// and the header could potentially change any moment with any type
 		enum class Types { CHAR, INT8, INT16, INT32, INT64, UINT8, UINT16,
 		UINT32, UINT64, SINGLE, FLOAT, DOUBLE, FLOAT128 };
 
@@ -694,8 +701,7 @@ namespace SBCQueens {
 		// Lambda to help to save a single number to the binary format
 		// file. The numbers are always converted to double
 		auto SingleDimToBinaryHeader = [&] (std::string name, Types type,
-			uint32_t length)
-			-> std::string {
+			uint32_t length) -> std::string {
 
 			auto type_s = type_to_string.at(type);
 			auto header = name + ";" + type_s + ";" + std::to_string(length) + ";";
@@ -706,29 +712,33 @@ namespace SBCQueens {
 		uint32_t l = 0x01020304;
 		auto endianness_s = NumToBinString(l);
 
-		std::string total = SingleDimToBinaryHeader("sample_rate", Types::DOUBLE, 1);
+		std::string header = SingleDimToBinaryHeader("sample_rate", Types::DOUBLE, 1);
 
-		total += SingleDimToBinaryHeader(
-			"en_chs", Types::UINT8, ch_configs.size()
+		// TODO(Zhiheng): ch_configs.size() should not be used for your
+		// case. Calculate the number of channels using the mask and number
+		// of groups
+
+		header += SingleDimToBinaryHeader(
+			"en_chs", Types::UINT8, group_configs.size()
 		);
 
-		total += SingleDimToBinaryHeader(
-			"thresholds", Types::UINT32, ch_configs.size()
+		header += SingleDimToBinaryHeader(
+			"thresholds", Types::UINT32, group_configs.size()
 		);
 
-		total += SingleDimToBinaryHeader(
-			"dc_offset", Types::UINT32, ch_configs.size()
+		header += SingleDimToBinaryHeader(
+			"dc_offset", Types::UINT32, group_configs.size()
 		);
 
-		total += SingleDimToBinaryHeader(
-			"dc_range", Types::SINGLE, ch_configs.size()
+		header += SingleDimToBinaryHeader(
+			"dc_range", Types::SINGLE, group_configs.size()
 		);
 
-		total += SingleDimToBinaryHeader(
+		header += SingleDimToBinaryHeader(
 			"time_stamp", Types::UINT32, 1
 		);
 
-		total += SingleDimToBinaryHeader(
+		header += SingleDimToBinaryHeader(
 			"trg_options", Types::UINT32, 1
 		);
 
@@ -741,7 +751,7 @@ namespace SBCQueens {
 		// These are all the data line dimensions
 		// RecordLengthxNumChannels
 		std::string record_length = std::to_string(g_config.RecordLength);
-		std::string num_channels = std::to_string(ch_configs.size());
+		std::string num_channels = std::to_string(group_configs.size());
 
 		std::string data_header = c_sipm_name + ";";	// name
 		data_header += c_type + ";";					// type
@@ -750,7 +760,7 @@ namespace SBCQueens {
 
 
 		// uint16_t is required as the format requires it to be 16 unsigned max
-		uint16_t s = (total + data_header).length();
+		uint16_t s = (header + data_header).length();
 		std::string data_header_size = NumToBinString(s);
 
 		// 0 means that it will be calculated by the number of lines
@@ -758,7 +768,9 @@ namespace SBCQueens {
 		int32_t j = 0x00000000;
 		std::string num_data_lines = NumToBinString(j);
 
-		return endianness_s  + data_header_size + total+  data_header + num_data_lines;
+		// binary format goes like: endianess, header size, header string
+		// then number of lines (in this case 0)
+		return endianness_s + data_header_size + header + data_header + num_data_lines;
 	}
 
 	// std::string sbc_init_file(CAENEvent& evt) noexcept {
@@ -781,15 +793,35 @@ namespace SBCQueens {
 
 	std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
 
+		// TODO(Hector): so this code could be improved and half of the reason
+		// it is related to the format itself. A bunch of the details
+		// it is saving with each line should not be saved every time. They are
+		// run constants, but that is how it is for now. Maybe in the future
+		// it will change.
+
+		// TODO(Zhiheng): add the code you need to save the channels on
+		// a group by using the mask.
+
 		// order of header:
-		// double, uint8, uint32, uint32, single, uint32, uint32, uint16
-		// sample_rate, en_chs, thresholds, dc_offset, dc_range, time_stamp, trg_options, data
-		// 8*1, 1*ch_size, 4*ch_size, 4*ch_size, 4*ch_size, 4*1, 4*1, 2*recordlength*ch_size
-		// = 16 + ch_size*(1+4+4+4+2*recordlength) = 16 + ch_size(13 + 2*recordlength)
-		const auto num_ch = res->ChannelConfigs.size();
+		// Name			type		length (B) 		is Constant?
+		// sample_rate	double		8 	 			Y
+		// en_chs		uint8		1*ch_size 		Y
+		// thresholds 	uint32 		4*ch_size 		Y
+		// dc_offset 	uint32 		4*ch_size 		Y
+		// dc_range 	single 		4*ch_size 		Y
+		// time_stamp 	uint32 		4 				N
+		// trg_options 	uint32 		4 				N
+		// data 		uint16 		2*rl*ch_size 	N
+		//
+		// Total length 			16 + ch_size(13 + 2*recordlength)
+
+		const auto num_ch = res->GroupConfigs.size();
 		const auto rl = res->GlobalConfig.RecordLength;
 
-		char out_str[16 + (2*rl + 13)*num_ch];
+		const size_t nline = 16 + (2*rl + 13)*num_ch;
+
+		// No strings for this one as this is more efficient
+		char out_str[nline];
 
 		// double
 		uint64_t offset = 0;
@@ -805,23 +837,23 @@ namespace SBCQueens {
 		append_cstr(res->GetSampleRate(), offset, &out_str[0]);
 
 		// en_chs
-		for(auto ch_pair : res->ChannelConfigs) {
-			append_cstr(ch_pair.second.Channel, offset, &out_str[0]);
+		for(auto ch_pair : res->GroupConfigs) {
+			append_cstr(ch_pair.second.Number, offset, &out_str[0]);
 		}
 
 		// thresholds
-		for(auto ch_pair : res->ChannelConfigs) {
+		for(auto ch_pair : res->GroupConfigs) {
 			append_cstr(ch_pair.second.TriggerThreshold, offset, &out_str[0]);
 		}
 
 		// dc_offset
-		for(auto ch_pair : res->ChannelConfigs) {
+		for(auto ch_pair : res->GroupConfigs) {
 			append_cstr(ch_pair.second.DCOffset, offset, &out_str[0]);
 		}
 
 		// dc_range
-		for(auto ch_pair : res->ChannelConfigs) {
-			float val = res->GetVoltageRange(ch_pair.second.Channel);
+		for(auto ch_pair : res->GroupConfigs) {
+			float val = res->GetVoltageRange(ch_pair.second.Number);
 			append_cstr(val, offset, &out_str[0]);
 		}
 
@@ -837,8 +869,8 @@ namespace SBCQueens {
 		// number of channels that are activated
 
 		auto& evtdata = evt->Data;
-		for(auto ch_pair : res->ChannelConfigs){
-			auto& ch = ch_pair.second.Channel;
+		for(auto ch_pair : res->GroupConfigs){
+			auto& ch = ch_pair.second.Number;
 			if(evtdata->ChSize[ch] > 0) {
 
 				for(uint32_t xp = 0; xp < evtdata->ChSize[ch]; xp++) {
@@ -849,7 +881,9 @@ namespace SBCQueens {
 			}
 		}
 
-		return std::string(out_str, 16 + (2*rl + 13)*num_ch);
+		// However, we do convert to string at the end, I wonder if this
+		// is a big performance impact?
+		return std::string(out_str, nline);
 	}
 
 } // namespace SBCQueens

@@ -36,25 +36,32 @@ RecordLength = 180
 MaxEventsPerRead = 512
 PostBufferPorcentage = 50
 OverlappingRejection = 0
+TRGINasGate = false
 # 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
 ExternalTrigger = 1
 SoftwareTrigger = 1
+# 0 = rising edge, 1 = falling edge
+Polarity = 1
 
 # Individual Channel settings
-[CAEN.ch0]
+[CAEN.group0]
 Enabled = 1
-Channel = 0
+# Group or channel number
+Number = 0
+# Group offset
 Offset = 0x8000
-# 0 = rising edge, 1 = falling edge
-Polarity = 1
+# Individual corrections to offset
+Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
+
 Range = 1
 Threshold = 2075
 
-[CAEN.ch1]
-Enabled = 0
-Channel = 1
-Offset = 0x8000
-# 0 = rising edge, 1 = falling edge
-Polarity = 1
-Range = 1
-Threshold = 2075
+
+# [CAEN.ch1]
+# Enabled = 0
+# Channel = 1
+# Offset = 0x8000
+# # 0 = rising edge, 1 = falling edge
+# Polarity = 1
+# Range = 1
+# Threshold = 2075

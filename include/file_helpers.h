@@ -61,6 +61,8 @@ public:
 			if(_stream.is_open()) {
 				_open = true;
 
+				// TODO(Hector): create directories between file and
+				// current directory?
 				if(std::filesystem::is_empty(fileName)) {
 					_stream << f(std::forward<Args>(args)...);
 				}
@@ -122,6 +124,8 @@ public:
 	template<typename T>
 	using DataFile = std::unique_ptr<dataFile<T>>;
 
+	// Opens the file with name fileName.
+	// If file is an already opened file, it is closed and opened again.
 	template <typename T>
 	void open(DataFile<T>& res, const std::string& fileName) {
 
@@ -133,6 +137,10 @@ public:
 
 	}
 
+	// Opens the file with name fileName.
+	// If file is an already opened file, it is closed and opened again.
+	// It will also write to the file whatever f returns with args...
+	// as long as f returns anything that can be saved using the steam << operator.
 	template <typename T, typename InitWriteFunc, typename... Args>
 	void open(DataFile<T>& res,
 		const std::string& fileName, InitWriteFunc&& f,  Args&&... args) {
@@ -145,11 +153,11 @@ public:
 			std::forward<InitWriteFunc>(f), std::forward<Args>(args)...);
 	}
 
-	template<typename T, typename FormatFunc, typename... Args>
 	// Saves the contents of DataFile using the format function f
 	// that takes T as an argument, or
-	// takes std::deque<T>& as argument which then uses all the information
+	// takes std::vector<T>& as argument which then uses all the information
 	// at once to generate the string that is saved to the file
+	template<typename T, typename FormatFunc, typename... Args>
 	void save(DataFile<T>& file, FormatFunc&& f,  Args&&... args) noexcept {
 
 		if(file->IsOpen()) {
@@ -183,12 +191,9 @@ public:
 
 	}
 
-	template<typename T, typename FormatFunc, typename... Args>
 	// Saves the contents of the DataFile asynchronously using packaged tasks
+	template<typename T, typename FormatFunc, typename... Args>
 	void async_save(DataFile<T>& file, FormatFunc&& f, Args&&... args) noexcept {
-		// Here is where ToggleDataBuffer() is important.
-		// During an async there should be two arrays:
-		// One to write to, and another to read from.
 		std::packaged_task<void(DataFile<T>&, FormatFunc&&)>
 			_pt(save<T, FormatFunc>);
 			

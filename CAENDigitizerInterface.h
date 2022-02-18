@@ -46,7 +46,7 @@ namespace SBCQueens {
 
 		CAENDigitizerModel Model;
 		CAENGlobalConfig GlobalConfig;
-		std::vector<CAENChannelConfig> ChannelConfigs;
+		std::vector<CAENGroupConfig> ChannelConfigs;
 
 		int PortNum = 0;
 
@@ -163,115 +163,6 @@ public:
 		}
 
 private:
-		void processing() {
-			CAEN& port = state_of_everything.Port;
-
-			static auto extract_for_gui = [&]() {
-				if(port->Data.DataSize <= 0) {
-					return;
-				}
-
-				// For the GUI
-				std::default_random_engine generator;
-				std::uniform_int_distribution<uint32_t>
-					distribution(0,port->Data.NumEvents);
-				uint32_t rdm_num = distribution(generator);
-
-				extract_event(port, rdm_num, osc_event);
-
-				int j = 0;
-				for(auto ch : port->ChannelConfigs) {
-					auto& ch_num = ch.second.Channel;
-					auto buf = osc_event->Data->DataChannel[ch_num];
-					auto size = osc_event->Data->ChSize[ch_num];
-
-					//spdlog::info("Event size size: {0}", size);
-					if(size <= 0) {
-						continue;
-					}
-
-					x_values = new double[size];
-					y_values = new double[size];
-
-					for(uint32_t i = 0; i < size; i++) {
-						x_values[i] = i*(1.0/port->GetSampleRate())*(1e9);
-						y_values[i] = static_cast<double>(buf[i]);
-					}
-
-					IndicatorNames plotToSend;
-					switch(j) {
-
-						case 1:
-							plotToSend = IndicatorNames::SiPM_Plot_ONE;
-						break;
-
-						case 2:
-							plotToSend = IndicatorNames::SiPM_Plot_TWO;
-						break;
-
-						case 3:
-							plotToSend = IndicatorNames::SiPM_Plot_THREE;
-						break;
-
-						case 0:
-						default:
-							plotToSend = IndicatorNames::SiPM_Plot_ZERO;
-					}
-
-					_plotSender(plotToSend,
-						x_values,
-						y_values,
-						size);
-
-					delete x_values;
-					delete y_values;
-
-					j++;
-				}
-			};
-
-			static auto process_events = [&]() {
-				bool isData = retrieve_data_until_n_events(port, 512);
-
-				// While all of this is happening, the digitizer is taking data
-				if(!isData) {
-					return;
-				}
-
-				//double frequency = 0.0;
-				for(uint32_t i = 0; i < port->Data.NumEvents; i++) {
-
-				// 	// Extract event i
-					extract_event(port, i, processing_evts[i]);
-
-				// 	// Process events!
-				// 	//frequency += extract_frequency(processing_evts[i]);
-					if(_pulseFile){
-						_pulseFile->Add(processing_evts[i]);
-					}
-				}
-
-				//frequency /= port->Data.NumEvents;
-				//_plotSender(IndicatorNames::FREQUENCY, frequency);
-			};
-
-			static auto extract_for_gui_nb = make_total_timed_event(
-				std::chrono::milliseconds(200),
-				extract_for_gui
-			);
-
-			static auto checkerror = make_total_timed_event(
-				std::chrono::seconds(1),
-				std::bind(&CAENDigitizerInterface::lec, this)
-			);
-
-
-			process_events();
-			checkerror();
-			extract_for_gui_nb();
-			//extract_for_gui_nb();
-
-		}
 
 		double extract_frequency(CAENEvent& evt) {
 			auto buf = evt->Data->DataChannel[0];
@@ -279,7 +170,7 @@ private:
 
 			double counter = 0;
 			auto offset =
-				state_of_everything.Port->ChannelConfigs[0].TriggerThreshold;
+				state_of_everything.Port->GroupConfigs[0].TriggerThreshold;
 			for(uint32_t i = 1; i < size; i++) {
 				if((buf[i] > offset) && (buf[i-1] < offset)) {
 					counter++;
@@ -452,55 +343,7 @@ private:
 				// spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
 				// spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
 
-				int j = 0;
-				for(auto ch : port->ChannelConfigs) {
-					auto& ch_num = ch.second.Channel;
-					auto buf = osc_event->Data->DataChannel[ch_num];
-					auto size = osc_event->Data->ChSize[ch_num];
-
-					//spdlog::info("Event size size: {0}", size);
-					if(size <= 0) {
-						continue;
-					}
-
-					x_values = new double[size];
-					y_values = new double[size];
-
-					for(uint32_t i = 0; i < size; i++) {
-						x_values[i] = i*(1.0/port->GetSampleRate())*(1e9);
-						y_values[i] = static_cast<double>(buf[i]);
-					}
-
-					IndicatorNames plotToSend;
-					switch(j) {
-
-						case 1:
-							plotToSend = IndicatorNames::SiPM_Plot_ONE;
-						break;
-
-						case 2:
-							plotToSend = IndicatorNames::SiPM_Plot_TWO;
-						break;
-
-						case 3:
-							plotToSend = IndicatorNames::SiPM_Plot_THREE;
-						break;
-
-						case 0:
-						default:
-							plotToSend = IndicatorNames::SiPM_Plot_ZERO;
-					}
-
-					_plotSender(plotToSend,
-						x_values,
-						y_values,
-						size);
-
-					delete x_values;
-					delete y_values;
-
-					j++;
-				}
+				process_data_for_gui();
 
 
 				// if(port->Data.NumEvents >= 2) {
@@ -527,14 +370,72 @@ private:
 		// how things are changing.
 		bool statistics_mode() {
 			//spdlog::info("Statistics mode.");
-			processing();
+			CAEN& port = state_of_everything.Port;
+
+			static auto process_events = [&]() {
+				bool isData = retrieve_data_until_n_events(port, 512);
+
+				// While all of this is happening, the digitizer is taking data
+				if(!isData) {
+					return;
+				}
+
+				//double frequency = 0.0;
+				for(uint32_t i = 0; i < port->Data.NumEvents; i++) {
+
+					// Extract event i
+					extract_event(port, i, processing_evts[i]);
+				}
+
+			};
+
+			static auto extract_for_gui_nb = make_total_timed_event(
+				std::chrono::milliseconds(200),
+				std::bind(&CAENDigitizerInterface::rdm_extract_for_gui, this)
+			);
+
+			static auto checkerror = make_total_timed_event(
+				std::chrono::seconds(1),
+				std::bind(&CAENDigitizerInterface::lec, this)
+			);
+
+
+			process_events();
+			checkerror();
+			extract_for_gui_nb();
+			//extract_for_gui_nb();
 			change_state();
 			return true;
 		}
 
 		bool run_mode() {
 			//spdlog::info("Run mode.");
+			static CAEN& port = state_of_everything.Port;
 			static bool isFileOpen = false;
+			static auto extract_for_gui_nb = make_total_timed_event(
+				std::chrono::milliseconds(200),
+				std::bind(&CAENDigitizerInterface::rdm_extract_for_gui, this)
+			);
+			static auto process_events = [&]() {
+				bool isData = retrieve_data_until_n_events(port, 512);
+
+				// While all of this is happening, the digitizer is taking data
+				if(!isData) {
+					return;
+				}
+
+				//double frequency = 0.0;
+				for(uint32_t i = 0; i < port->Data.NumEvents; i++) {
+
+					// Extract event i
+					extract_event(port, i, processing_evts[i]);
+
+					if(_pulseFile) {
+						_pulseFile->Add(processing_evts[i]);
+					}
+				}
+
+			};
 
 			if(isFileOpen) {
 				// spdlog::info("Saving SIPM data");
@@ -553,7 +454,7 @@ private:
 				isFileOpen = _pulseFile > 0;
 			}
 
-			processing();
+			extract_for_gui_nb();
 			if(change_state()) {
 				isFileOpen = false;
 			}
@@ -596,6 +497,78 @@ private:
 			});
 
 			return false;
+		}
+
+		void rdm_extract_for_gui() {
+			if(state_of_everything.Port->Data.DataSize <= 0) {
+				return;
+			}
+
+			// For the GUI
+			std::default_random_engine generator;
+			std::uniform_int_distribution<uint32_t>
+				distribution(0,
+					state_of_everything.Port->Data.NumEvents);
+			uint32_t rdm_num = distribution(generator);
+
+			extract_event(state_of_everything.Port, rdm_num, osc_event);
+
+			process_data_for_gui();
+		};
+
+		void process_data_for_gui() {
+			int j = 0;
+
+			//TODO(Zhiheng): change anything you need here, too...
+			for(auto ch : state_of_everything.Port->GroupConfigs) {
+				auto& ch_num = ch.second.Number;
+				auto buf = osc_event->Data->DataChannel[ch_num];
+				auto size = osc_event->Data->ChSize[ch_num];
+
+				//spdlog::info("Event size size: {0}", size);
+				if(size <= 0) {
+					continue;
+				}
+
+				x_values = new double[size];
+				y_values = new double[size];
+
+				for(uint32_t i = 0; i < size; i++) {
+					x_values[i]
+					 = i*(1.0/state_of_everything.Port->GetSampleRate())*(1e9);
+					y_values[i] = static_cast<double>(buf[i]);
+				}
+
+				IndicatorNames plotToSend;
+				switch(j) {
+
+					case 1:
+						plotToSend = IndicatorNames::SiPM_Plot_ONE;
+					break;
+
+					case 2:
+						plotToSend = IndicatorNames::SiPM_Plot_TWO;
+					break;
+
+					case 3:
+						plotToSend = IndicatorNames::SiPM_Plot_THREE;
+					break;
+
+					case 0:
+					default:
+						plotToSend = IndicatorNames::SiPM_Plot_ZERO;
+				}
+
+				_plotSender(plotToSend,
+					x_values,
+					y_values,
+					size);
+
+				delete x_values;
+				delete y_values;
+
+				j++;
+			}
 		}
 	};
 } // namespace SBCQueens
