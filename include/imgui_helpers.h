@@ -7,83 +7,96 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <functional>
+#include <any>
 
 #include <imgui.h>
 #include <misc/cpp/imgui_stdlib.h> // for use with std::string
 #include <implot.h>
 #include <readerwriterqueue.h>
 #include <spdlog/spdlog.h>
+#include <toml.hpp>
 
 namespace SBCQueens {
 
-	// The base control class
+	// This is the interface class of all the controls
+	template<typename QueueFunc>
 	class Control {
-	public:
+public:
+		virtual ~Control() {}
 
-		Control() { }
-		explicit Control(std::string&& label);
-
-		// Moving
-		Control(Control&&) = default;
-		Control& operator=(Control&&) = default;
+		// No moving
+		Control(Control&&) = delete;
 
 		// No copying
 		Control(const Control&&) = delete;
 
-	protected:
+		// Yes referencing
+		Control(Control&) = default;
+		Control& operator=(Control&) = default;
+
+protected:
+
+		Control() {}
+
+		// Default constructor
+		// label is ... the label of the control
+		// text is name or text to show in ImGUI
+		// q is the Queue send function
+		Control(std::string label, std::string text, QueueFunc&& q)
+			: _label(label), _imgui_text(text), _q(q) {}
+
+
+		// toml ini file constructor
+		// Allows for its initial value to be defined using the toml file
+		// not to be used to define the GUI
+		// label is ... the label of the control
+		// text is name or text to show in ImGUI
+		// q is the Queue send function
+		Control(
+			std::string label, std::string text, QueueFunc&& q,
+			toml::node_view<toml::node> toml_node)
+			: _label(label), _imgui_text(text), _q(q) {}
+
 		std::string _label;
-	}; 
+		std::string _imgui_text;
 
-	// Sets the ID of the Control.
-// 	template<typename QueueFunc>
-// 	class CountManager {
-// 	public:
-// 		using type = QueueFunc;
+		QueueFunc _q;
 
-// 		CountManager() {}
-// 		explicit CountManager(CountManager&&) = delete;
-// 		CountManager& operator=(CountManager&&) = delete;
+	};
 
-// 		void operator()(Control<QueueFunc>& control, const std::string& label) { 
-// 			auto pair = Map.insert({label, control});
-// 			if(pair.second) {
-// 				spdlog::info("Created object with label {0}", label);
-// 			} else {
-// 				spdlog::warn("Control already exists with label {0}", label);
-// 			}
-// 		}
-
-// private: 
-// 		static std::unordered_map<std::string, Control<QueueFunc>&> Map;
-// 	};
-
-// 	template<typename QueueFunc>
-// 	std::unordered_map<std::string, Control<QueueFunc>&> CountManager<QueueFunc>::Map;
-	// end count
-
-
-	class InputText : public Control {
-
-		std::unique_ptr<std::string> _in;
-
+	// Queue is the concurrent queue used to communicate between multi-threaded
+	// programs, and QueueType is the function type that sends information around
+	template<typename Queue>
+	class ControlLink {
 public:
+		using QueueType = typename Queue::value_type;
+		using QueueFunc = std::function<bool(QueueType&&)>;
 
-		InputText() { }
-		InputText(std::string&& label, const std::string& init_val);
+		// f -> reference to the concurrent queue
+		// node -> toml node associated with this factory
+		explicit ControlLink(Queue& q)
+			: _q(q)
+		{ }
+
+		// No moving nor copying
+		ControlLink(ControlLink&&) = delete;
+		ControlLink(const ControlLink&) = delete;
+
 
 		// When event is true, callback is added to the queue
-		// If the QueueFunc is not callable (ie does not exist
-		// or not a function) it calls callback
-		template<typename QueueFunc, typename Condition, typename Callback>
-		bool operator()(QueueFunc f, Condition condition, Callback callback) const {
+		// If the Callback cannot be added to the queue, then it calls callback
+		template<typename Condition, typename Callback>
+		bool InputText(const std::string& label, std::string& value,
+			Condition&& condition, Callback&& callback) {
 
 			// First call the ImGUI API
-			bool u = ImGui::InputText(this->_label.c_str(), _in.get());
+			bool u = ImGui::InputText(label.c_str(), &value);
 			// The if must come after the ImGUI API call if not, it will not work
 			if(condition()) {
 				// Checks if QueueFunc is callable with input Callback
 				if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-					f(callback);
+					_q.try_enqueue(std::forward<Callback>(callback));
 				} else {
 					callback();
 				}
@@ -91,193 +104,186 @@ public:
 
 			// Return the ImGUI bool
 			return u;
+
+		}
+
+		template<typename Callback>
+		bool Button(const std::string& label, Callback&& callback) {
+
+			bool state = ImGui::Button(label.c_str());
+
+			// The if must come after the ImGUI API call if not,
+			// it will not work
+			if(state) {
+				// Checks if QueueFunc is callable with input Callback
+				if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
+					_q.try_enqueue(std::forward<Callback>(callback));
+				} else {
+					callback();
+				}
+			}
+
+			return state;
+
 		}
 
 		template<typename Condition, typename Callback>
-		bool operator()(Condition condition, Callback callback) const {
+		bool Checkbox(const std::string& label, bool& value,
+			Condition&& condition, Callback&& callback) {
 
-			// First call the ImGUI API
-			bool u = ImGui::InputText(this->_label.c_str(), _in.get());
+			bool u = ImGui::Checkbox(label.c_str(), &value);
+
+			// The if must come after the ImGUI API call if not,
+			// it will not work
+			if(condition()) {
+				// Checks if QueueFunc is callable with input Callback
+				if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
+					_q.try_enqueue(std::forward<Callback>(callback));
+				} else {
+					callback();
+				}
+			}
+
+			return u;
+
+		}
+
+		template<typename Condition, typename Callback>
+		bool InputFloat(const std::string& label, float& value,
+			const float& step, const float& step_fast,
+			const std::string& format,
+			Condition&& condition, Callback&& callback) {
+
+			bool u = ImGui::InputFloat(label.c_str(),
+				&value, step, step_fast, format.c_str());
+
 			// The if must come after the ImGUI API call if not, it will not work
 			if(condition()) {
-				callback();
+				if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
+					_q.try_enqueue(std::forward<Callback>(callback));
+				} else {
+					callback();
+				}
+
 			}
 
-			// Return the ImGUI bool
 			return u;
+
 		}
 
-		std::string Get() const {
-			return *_in.get();
-		}
+		template<typename T, typename Condition, typename Callback>
+		bool ComboBox(const std::string& label,
+			T& state,
+			const std::unordered_map<T, std::string>& map,
+			Condition&& condition, Callback&& callback) {
 
+			static size_t index = 0;
+			size_t i = 0;
 
-	}; 
+			std::string list = "";
+			std::vector<T> states;
+			std::vector<std::string> s_states;
 
-	InputText make_intput_text(std::string&& label, const std::string& init_val);
-	// struct InputText
+			for(auto pair : map) {
+				states.push_back(pair.first);
+				s_states.push_back(pair.second);
 
-	class Button : public Control {
+				if(state == pair.first) {
+					index = i;
+				}
 
-public:
+				i++;
+			}
 
-		Button() {}
-		explicit Button(std::string&& label);
+			//bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
+		 	if (ImGui::BeginCombo(label.c_str(), s_states[index].c_str())) {
 
-		// When event is true, callback is added to the queue
-		// If the QueueFunc is not callable (ie does not exist
-		// or not a function) it calls callback
-		template<typename QueueFunc, typename Callback>
-		bool operator()(QueueFunc f, Callback callback) {
+		 		for( i = 0; i < s_states.size(); i++ ) {
 
-			bool state = ImGui::Button(this->_label.c_str());
-			
-			// The if must come after the ImGUI API call if not,
-			// it will not work
-			if(state) {
-				// Checks if QueueFunc is callable with input Callback
+		 			const bool is_selected = (index == i);
+					if (ImGui::Selectable(s_states[i].c_str(), is_selected)){
+                    	index = i;
+					}
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                	if (is_selected) {
+                    	ImGui::SetItemDefaultFocus();
+                	}
+		 		}
+
+		 		ImGui::EndCombo();
+			}
+
+			state = states[index];
+
+			if(condition()) {
 				if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-					f(callback);
+					_q.try_enqueue(std::forward<Callback>(callback));
 				} else {
 					callback();
 				}
 			}
 
-			return state;
+			return true;
+
 		}
 
-		template<typename QueueFunc, typename Callback>
-		bool operator()(Callback callback) {
+		template<typename T, typename Condition, typename Callback>
+		bool ComboBox(const std::string& label,
+			T& state,
+			const std::unordered_map<std::string, T>& map,
+			Condition&& condition, Callback&& callback) {
 
-			bool state = ImGui::Button(this->_label.c_str());
-			
-			// The if must come after the ImGUI API call if not,
-			// it will not work
-			if(state) {
+			static size_t index = 0;
+			size_t i = 0;
 
-				callback();
-			
+			std::string list = "";
+			std::vector<T> states;
+			std::vector<std::string> s_states;
+			for(auto pair : map) {
+				states.push_back(pair.second);
+				s_states.push_back(pair.first);
+
+				if(state == pair.second) {
+					index = i;
+				}
+
+				i++;
 			}
 
-			return state;
-		}
-	};
+			//bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
+		 	if (ImGui::BeginCombo(label.c_str(), s_states[index].c_str())) {
 
-	Button make_button(std::string&& label);
-	// struct InputText
-	
-	class Checkbox : public Control {
+		 		for( i = 0; i < s_states.size(); i++ ) {
 
-		std::unique_ptr<bool> _in;
+		 			const bool is_selected = (index == i);
+					if (ImGui::Selectable(s_states[i].c_str(), is_selected)){
+                    	index = i;
+					}
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                	if (is_selected) {
+                    	ImGui::SetItemDefaultFocus();
+                	}
+		 		}
 
-public:
+		 		ImGui::EndCombo();
+			}
 
-		Checkbox() {}
-		Checkbox(std::string&& label, const bool& init_val);
+			state = states[index];
 
-		// When event is true, callback is added to the queue
-		// If the QueueFunc is not callable (ie does not exist
-		// or not a function) it calls callback
-		template<typename QueueFunc, typename Event, typename Callback>
-		bool operator()(QueueFunc f, Event event, Callback callback) const {
-
-			bool u = ImGui::Checkbox(this->_label.c_str(), _in.get());
-
-			// The if must come after the ImGUI API call if not,
-			// it will not work
-			if(event()) {
-				// Checks if QueueFunc is callable with input Callback
+			if(condition()) {
 				if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-					f(callback);
+					_q.try_enqueue(std::forward<Callback>(callback));
 				} else {
 					callback();
 				}
 			}
 
-			return u;
+			return true;
 
 		}
 
-		template<typename Event, typename Callback>
-		bool operator()(Event event, Callback callback) const {
-
-			bool u = ImGui::Checkbox(this->_label.c_str(), _in.get());
-
-			// The if must come after the ImGUI API call if not,
-			// it will not work
-			if(event()) {
-
-				callback();
-
-			}
-
-			return u;
-
-		}
-
-		bool Get() const {
-			return *_in.get();
-		}
-	}; 
-
-	Checkbox make_checkbox(std::string&& label, const bool& init_val);
-	// struct Checkbox
-
-	class InputFloat : public Control {
-
-		std::unique_ptr<float> _in;
-
-public:
-
-		InputFloat() {}
-		InputFloat(std::string&& label, const float& init_val);
-
-		// When event is true, callback is added to the queue
-		// If the QueueFunc is not callable (ie does not exist
-		// or not a function) it calls callback
-		template<typename QueueFunc, typename Event, typename Callback>
-		bool operator()( QueueFunc f,
-			const float& step, const float& step_fast,
-			const std::string& format, Event event, Callback callback) const {
-
-			bool u = ImGui::InputFloat(this->_label.c_str(),
-				_in.get(), step, step_fast, format.c_str());
-
-			// The if must come after the ImGUI API call if not, it will not work
-			if(event()) {
-
-				f(callback);
-
-			}
-
-			return u;
-		}
-
-		template<typename Event, typename Callback>
-		bool operator()(
-			const float& step, const float& step_fast,
-			const std::string& format, Event event, Callback callback) const {
-
-			bool u = ImGui::InputFloat(this->_label.c_str(),
-				_in.get(), step, step_fast, format.c_str());
-
-			// The if must come after the ImGUI API call if not, it will not work
-			if(event()) {
-
-				callback();
-
-			}
-
-			return u;
-		}
-
-		float Get() const {
-			return *_in.get();
-		}
+private:
+		Queue& _q;
 
 	};
-
-	InputFloat make_input_float(std::string&& label, const float& init_val);
-
-
 } // namespace SBCQueens

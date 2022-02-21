@@ -84,22 +84,20 @@ namespace SBCQueens {
 		unsigned int _precision;
 		NumericFormat _format;
 
+		double val;
+
 protected:
 
 		T ID;
 
 public:
 
-		Indicator() {}
-
-		explicit Indicator(T&& id,
-			unsigned int&& precision = 6,
-			NumericFormat&& format = NumericFormat::Default)
+		explicit Indicator(const T& id, const unsigned int& precision = 6,
+			const NumericFormat& format = NumericFormat::Default)
 			: 	_imgui_stack("##" + std::to_string(static_cast<int>(id))),
 				_display(_imgui_stack), _precision(precision), _format(format),
-				ID(id) {
-
-		}
+				val(0.0), ID(id)
+			{ }
 
 		// Moving allowed
 		Indicator(Indicator&&) = default;
@@ -135,11 +133,19 @@ public:
 
 				_display += _imgui_stack;
 
+				val = static_cast<double>(newVal.x);
+
 			}
 		}
 
-		virtual void operator()() {
+		virtual void operator()(const std::string& label, double& out) {
+			ImGui::Text(label.c_str()); ImGui::SameLine();
 			ImGui::Button(_display.c_str());
+			out = val;
+		}
+
+		virtual void Draw(const std::string& label, double& out) {
+			this->operator()(label, out);
 		}
 
 		// For indicators, it does nothing.
@@ -158,28 +164,32 @@ public:
 
 	};
 
-	template<typename T>
+
 	// A plot indicator. It inherits from indicator, but more out of necessity.
 	// It keeps the code clean, but it was really not necessary.
 	// Originally, a plot could be any type that was not double but
 	// ImPlot only shows double numbers or transforms them to doubles
 	// internally. Also, x and y have to be the same type.
+	template<typename T>
 	class Plot : public Indicator<T> {
 
 		std::vector< double > _x;
 		std::vector< double > _y;
 
+		bool Cleared = false;
+		bool ClearOnNewData = false;
+
 public:
 		using type = T;
 		using data_type = double;
 
-		bool ClearOnNewData = false;
-		bool Cleared = false;
+
+
 
 		Plot() { }
 
-		explicit Plot(T&& id)
-			: Indicator<T>(std::forward<T>(id)) {
+		explicit Plot(const T& id, bool clearOnNewData = false)
+			: Indicator<T>(id), ClearOnNewData(clearOnNewData) {
 		}
 
 		// No moving
@@ -242,15 +252,20 @@ public:
 			ImPlot::PlotLine(label.c_str(), &_x.front(), &_y.front(), _x.size());
 		}
 
+		void Draw(const std::string& label) {
+			this->operator()(label);
+		}
+
 	};
 
-	// This class is meant to be called once in the receiver/consumer thread
+	// This class is meant to be created once in the receiver/consumer thread
 	// It will update all of the indicators values once information is sent
 	template<typename T, typename DATA>
 	class IndicatorReceiver  {
 
 		IndicatorsQueue<T, DATA>& _q;
-		std::unordered_map<T, Indicator<T>&> _indicators;
+		std::unordered_map<T, std::unique_ptr<Indicator<T>>> _indicators;
+		//std::unordered_map<T, std::unique_ptr<Plot<T>>> _plots;
 
 public:
 		using type = T;
@@ -261,9 +276,6 @@ public:
 		// No copying
 		IndicatorReceiver(const IndicatorReceiver&) = delete;
 
-		void add(Indicator<T>& p) {
-			_indicators.insert({p.GetID(), p});
-		}
 
 		// This is meant to be run in the single consumer.
 		// Updates all the plots arrays from the queue. 
@@ -275,20 +287,23 @@ public:
 
 			for(IndicatorVector<T, DATA> item : temp_items) {
 
-				Indicator<T>& indicator = _indicators.at(item.ID);
-				indicator.ExecuteAttributes();
+				// If it contains one item, then it is a indicator
+				if(_indicators.count(item.ID)) {
 
-				auto pl = dynamic_cast<Plot<T>*>(&indicator);
-				if(pl) {
-					pl->add(item);
-				} else {
-					indicator.add(item);
+					auto& indicator = _indicators.at(item.ID);
+					indicator->ExecuteAttributes();
+
+					Plot<T>* plt = dynamic_cast<Plot<T>*>(indicator.get());
+					if(plt) {
+						plt->add(item);
+					} else {
+						indicator->add(item);
+					}
 				}
-
 			}
 
-			for(auto indicator : _indicators) {
-				indicator.second.ClearAttributes();
+			for(auto& indicator : _indicators) {
+				indicator.second->ClearAttributes();
 			}
 
 		}
@@ -296,6 +311,63 @@ public:
 		void operator()(const T& type, const DATA& x, const DATA& y) {
 			IndicatorVector<T, DATA> newP(type, x, y);
 			_q.enqueue(newP);
+		}
+
+		auto& indicator(const T& id,
+			const std::string& label,
+			double& out,
+			const unsigned int& precision = 6,
+			const NumericFormat& format = NumericFormat::Default) {
+
+			_indicators.try_emplace(id,
+				std::make_unique<Indicator<T>>(id, precision, format));
+			auto& ind = _indicators.at(id);
+
+			ind->Draw(label, out);
+
+			return ind;
+
+		}
+
+		auto& indicator(const T& id,
+			const std::string& label,
+			const unsigned int& precision = 6,
+			const NumericFormat& format = NumericFormat::Default) {
+
+			_indicators.try_emplace(id,
+				std::make_unique<Indicator<T>>(id, precision, format));
+			auto& ind = _indicators.at(id);
+
+			double tmp;
+			ind->Draw(label, tmp);
+
+			return ind;
+
+		}
+
+		// auto& make_plot(const T& id) {
+		// 	_indicators.try_emplace(id,
+		// 		std::make_unique<Plot<T>>(id));
+
+		// 	return _plots.at(id);
+		// }
+
+		// Adds plot with ID, and draws it at the placed location if exists
+		// It returns a smart pointer to the indicator (not plot)
+		auto& plot(const T& id, const std::string& label, bool clearOnNewData = false) {
+
+			_indicators.try_emplace(id,
+				std::make_unique<Plot<T>>(id, clearOnNewData));
+
+			auto& ind = _indicators.at(id);
+
+			Plot<T>* plt = dynamic_cast<Plot<T>*>(ind.get());
+			if(plt) {
+				plt->Draw(label);
+			}
+
+			return ind;
+
 		}
 
 	};

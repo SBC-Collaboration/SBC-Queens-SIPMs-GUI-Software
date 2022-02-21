@@ -173,42 +173,6 @@ namespace SBCQueens {
     void from_json(const json& j, BMEs& p);
 	// end Sensors structs
 
-	// It holds everything the outside world can modify or use.
-	// So far, I do not like teensy_serial is here.
-	struct TeensyControllerState {
-
-		std::string RunDir = "";
-		std::string RunName = "";
-		
-		std::string Port = "COM4";
-		serial_ptr teensy_serial;
-
-		TeensyControllerStates CurrentState 
-			= TeensyControllerStates::NullState;
-
-		// Relay stuff
-		bool PIDRelayState = false;
-		bool GeneralRelayState = false;
-
-		// PID Stuff
-		PIDState PIDOneState;
-		PIDConfig PIDOneCurrentValues;
-		PIDConfig PIDOneTempValues;
-
-		PIDState PIDTwoState;
-		PIDConfig PIDTwoCurrentValues;
-		PIDConfig PIDTwoTempValues;
-	};
-
-	using TeensyQueueInType 
-		= std::function < bool(TeensyControllerState&) >;
-
-	// single consumer, single sender queue for Tasks of the type
-	// bool(TeensyControllerState&) A.K.A TeensyQueueInType
-	using TeensyInQueue 
-		= moodycamel::ReaderWriterQueue< TeensyQueueInType >;
-
-
 	enum class TeensyCommands {
 		CheckError,
 		GetError,
@@ -243,7 +207,9 @@ namespace SBCQueens {
 		SetGeneralRelay,
 
 		GetPIDs,
-		GetBMEs
+		GetBMEs,
+
+		None = 0
 
 	};
 
@@ -287,10 +253,48 @@ namespace SBCQueens {
 		{TeensyCommands::GetBMEs, 				"GET_BMES"},
 		//// !Getters
 		/// !Hardware specific commands
+
+		{TeensyCommands::None, ""}
 	};
 
-	// Sends an specific command from the available commands
-	bool send_teensy_cmd(const TeensyCommands& cmd, TeensyControllerState& tcs);
+
+
+	// It holds everything the outside world can modify or use.
+	// So far, I do not like teensy_serial is here.
+	struct TeensyControllerState {
+
+		std::string RunDir = "";
+		std::string RunName = "";
+
+		std::string Port = "COM4";
+
+		TeensyControllerStates CurrentState
+			= TeensyControllerStates::NullState;
+
+		TeensyCommands CommandToSend
+			= TeensyCommands::None;
+
+		// Relay stuff
+		bool PIDRelayState = false;
+		bool GeneralRelayState = false;
+
+		// PID Stuff
+		PIDState PIDOneState;
+		PIDConfig PIDOneCurrentValues;
+		PIDConfig PIDOneTempValues;
+
+		PIDState PIDTwoState;
+		PIDConfig PIDTwoCurrentValues;
+		PIDConfig PIDTwoTempValues;
+	};
+
+	using TeensyQueueInType
+		= std::function < bool(TeensyControllerState&) >;
+
+	// single consumer, single sender queue for Tasks of the type
+	// bool(TeensyControllerState&) A.K.A TeensyQueueInType
+	using TeensyInQueue
+		= moodycamel::ReaderWriterQueue< TeensyQueueInType >;
 
 	template<typename... Queues>
 	class TeensyControllerInterface {
@@ -308,6 +312,8 @@ namespace SBCQueens {
 		DataFile<PIDs> _PIDsFile;
 		DataFile<BMEs> _BMEsFile;
 
+		serial_ptr port;
+
 	public:
 
 		explicit TeensyControllerInterface(Queues&... queues) 
@@ -324,8 +330,6 @@ namespace SBCQueens {
 		//	-> Update (every dt or at f) (retrieves info or updates teensy) ->
 		//  -> Update until disconnect, close, or error.
 		void operator()() {
-			
-			serial_ptr& teensy_port = state_of_everything.teensy_serial;
 
 			auto connect_bt = make_blocking_total_timed_event(
 				std::chrono::milliseconds(5000), connect
@@ -360,8 +364,10 @@ namespace SBCQueens {
 				if(!task(state_of_everything)) {
 					spdlog::warn("Something went wrong with a command!");
 				}
-
 				// End Communication with the GUI
+
+				// This will send a command only if its not none
+				send_teensy_cmd(state_of_everything.CommandToSend);
 
 				// This will turn into an SML soon*
 				switch(state_of_everything.CurrentState) {
@@ -378,7 +384,7 @@ namespace SBCQueens {
 						spdlog::warn("Manually losing connection to "
 							"Teensy with port {}", state_of_everything.Port);
 
-						disconnect(teensy_port);
+						disconnect(port);
 
 						// Move to standby
 						state_of_everything.CurrentState 
@@ -392,10 +398,10 @@ namespace SBCQueens {
 
 					case TeensyControllerStates::AttemptConnection:
 						
-						connect_bt(teensy_port, state_of_everything.Port);
+						connect_bt(port, state_of_everything.Port);
 
-						if(teensy_port) {
-							if(teensy_port->isOpen()) {
+						if(port) {
+							if(port->isOpen()) {
 
 								// t0 = time when the communication was 100%
 								_init_time = get_current_time_epoch();
@@ -475,63 +481,49 @@ private:
 
 			auto send_ts_cmd_b = make_blocking_total_timed_event(
 				std::chrono::milliseconds(10),
-					send_teensy_cmd
+					[&](auto cmd){
+						return send_teensy_cmd(cmd);
+					}
 				);
 
-			send_ts_cmd_b(TeensyCommands::SetPIDOneTempSetpoint,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDOneTempKp,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDOneTempTd,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDOneTempTi,
-				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempKp);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempTd);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneTempTi);
 
-			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrSetpoint,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrKp,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrTd,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrTi,
-				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrKp);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrTd);
+			send_ts_cmd_b(TeensyCommands::SetPIDOneCurrTi);
 
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempSetpoint,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempKp,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempTd,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempTi,
-				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempKp);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempTd);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoTempTi);
 
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrSetpoint,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrKp,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrTd,
-				state_of_everything);
-			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrTi,
-				state_of_everything);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrKp);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrTd);
+			send_ts_cmd_b(TeensyCommands::SetPIDTwoCurrTi);
 
 			// Flush so there is nothing in the buffer
 			// making everything annoying
-			flush(state_of_everything.teensy_serial);
+			flush(port);
 		}
 
 		void retrieve_pids(TeensyControllerState& teensyState) {
 
-			if(!send_teensy_cmd(TeensyCommands::GetPIDs, teensyState)) {
+			if(!send_teensy_cmd(TeensyCommands::GetPIDs)) {
 				spdlog::warn("Failed to send retrieve_pids to Teensy.");
-				flush(state_of_everything.teensy_serial);
+				flush(port);
 				return;
 			}
 				
-			auto msg_opt = retrieve_msg<std::string>(teensyState.teensy_serial);
+			auto msg_opt = retrieve_msg<std::string>(port);
 
 			if(!msg_opt.has_value()) {
 				spdlog::warn("Failed to retrieve latest Teensy PID values.");
-				flush(state_of_everything.teensy_serial);
+				flush(port);
 				return;
 			}
 			
@@ -540,7 +532,7 @@ private:
 			if(json_parse.is_discarded()) {
 				spdlog::warn("Invalid json string. "
 							"Message received from Teensy: {0}", msg_opt.value());
-				flush(state_of_everything.teensy_serial);
+				flush(port);
 				return;
 			}
 
@@ -588,17 +580,17 @@ private:
 
 		void retrieve_bmes(TeensyControllerState& teensyState) {
 			// Same as above but for now, not implemented
-			if(!send_teensy_cmd(TeensyCommands::GetBMEs, teensyState)) {
+			if(!send_teensy_cmd(TeensyCommands::GetBMEs)) {
 				spdlog::warn("Failed to send retrieve_bmes to Teensy.");
-				flush(state_of_everything.teensy_serial);
+				flush(port);
 				return;
 			}
 				
-			auto msg_opt = retrieve_msg<std::string>(teensyState.teensy_serial);
+			auto msg_opt = retrieve_msg<std::string>(port);
 
 			if(!msg_opt.has_value()) { 
 				spdlog::warn("Failed to retrieve latest Teensy BME values.");
-				flush(state_of_everything.teensy_serial);
+				flush(port);
 				return; 
 			}
 
@@ -726,6 +718,145 @@ private:
 			// These should be called every 30 seconds
 			save_files();
 
+		}
+
+		// Sends an specific command from the available commands
+		bool send_teensy_cmd(const TeensyCommands& cmd) {
+
+			if(!port) {
+				return false;
+			}
+
+			if(cmd == TeensyCommands::None) {
+				return false;
+			}
+
+			auto tcs = state_of_everything;
+			// This functions essentially wraps the send_msg function with
+			// the map to get the command from the map.
+			auto str_cmd = cTeensyCommands.at(cmd);
+
+			std::ostringstream out;
+			out.precision(6);
+			out << std::defaultfloat;
+
+			switch(cmd) {
+				case TeensyCommands::StartPIDOne:
+				case TeensyCommands::StartPIDTwo:
+					str_cmd += " 1";
+				break;
+
+				case TeensyCommands::SetPIDOneTempSetpoint:
+					out << tcs.PIDOneTempValues.SetPoint;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDOneTempKp:
+					out << tcs.PIDOneTempValues.Kp;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDOneTempTi:
+					out << tcs.PIDOneTempValues.Ti;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDOneTempTd:
+					out << tcs.PIDOneTempValues.Td;
+					str_cmd += " " + out.str();
+				break;
+
+
+				case TeensyCommands::SetPIDOneCurrSetpoint:
+					out << tcs.PIDOneCurrentValues.SetPoint;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDOneCurrKp:
+					out << tcs.PIDOneCurrentValues.Kp;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDOneCurrTi:
+					out << tcs.PIDOneCurrentValues.Ti;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDOneCurrTd:
+					out << tcs.PIDOneCurrentValues.Td;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::StopPIDOne:
+				case TeensyCommands::StopPIDTwo:
+					str_cmd += " 0";
+				break;
+
+				case TeensyCommands::SetPIDTwoTempSetpoint:
+					out << tcs.PIDTwoTempValues.SetPoint;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDTwoTempKp:
+					out << tcs.PIDTwoTempValues.Kp;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDTwoTempTi:
+					out << tcs.PIDTwoTempValues.Ti;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDTwoTempTd:
+					out << tcs.PIDTwoTempValues.Td;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDTwoCurrSetpoint:
+					out << tcs.PIDTwoCurrentValues.SetPoint;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDTwoCurrKp:
+					out << tcs.PIDTwoCurrentValues.Kp;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDTwoCurrTi:
+					out << tcs.PIDTwoCurrentValues.Ti;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDTwoCurrTd:
+					out << tcs.PIDTwoCurrentValues.Td;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetPIDRelay:
+					out << tcs.PIDRelayState;
+					str_cmd += " " + out.str();
+				break;
+
+				case TeensyCommands::SetGeneralRelay:
+					out << tcs.GeneralRelayState;
+					str_cmd += " " + out.str();
+				break;
+
+				// The default case assumes all the commands not mention above
+				// do not have any inputs
+				default:
+				break;
+
+			}
+
+			if(cmd != TeensyCommands::GetBMEs && cmd != TeensyCommands::GetPIDs) {
+				spdlog::info("Sending command {0} to teensy!", str_cmd);
+			}
+
+			// Always add the ;\n at the end!
+			str_cmd += ";\n";
+
+			return send_msg(port, str_cmd);
 		}
 
 	};

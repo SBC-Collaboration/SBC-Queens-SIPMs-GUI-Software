@@ -31,11 +31,12 @@ PID2ATd = 0
 [CAEN]
 # DT5730B or DT5740D
 Model = "DT5740D"
+Port = 0
 # 0 = not allowed
 RecordLength = 180
 MaxEventsPerRead = 512
 PostBufferPorcentage = 50
-OverlappingRejection = 0
+OverlappingRejection = false
 TRGINasGate = false
 # 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
 ExternalTrigger = 1
@@ -44,10 +45,10 @@ SoftwareTrigger = 1
 Polarity = 1
 
 # Individual Channel settings
+# The number after group represents
+# the # of the group (or channel)
 [CAEN.group0]
 Enabled = 1
-# Group or channel number
-Number = 0
 # Group offset
 Offset = 0x8000
 # Individual corrections to offset
@@ -56,12 +57,9 @@ Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
 Range = 1
 Threshold = 2075
 
-
-# [CAEN.ch1]
+# [CAEN.group1]
 # Enabled = 0
-# Channel = 1
 # Offset = 0x8000
-# # 0 = rising edge, 1 = falling edge
-# Polarity = 1
+# Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
 # Range = 1
 # Threshold = 2075

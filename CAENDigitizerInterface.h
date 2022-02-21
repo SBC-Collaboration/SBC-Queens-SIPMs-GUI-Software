@@ -46,11 +46,10 @@ namespace SBCQueens {
 
 		CAENDigitizerModel Model;
 		CAENGlobalConfig GlobalConfig;
-		std::vector<CAENGroupConfig> ChannelConfigs;
+		std::vector<CAENGroupConfig> GroupConfigs;
 
 		int PortNum = 0;
 
-		CAEN Port = nullptr;
 		CAENInterfaceStates CurrentState =
 			CAENInterfaceStates::NullState;
 
@@ -71,6 +70,8 @@ namespace SBCQueens {
 		DataFile<CAENEvent> _pulseFile;
 
 		IndicatorSender<IndicatorNames> _plotSender;
+
+		CAEN Port = nullptr;
 
 		//tmp stuff
 		uint16_t* data;
@@ -170,21 +171,21 @@ private:
 
 			double counter = 0;
 			auto offset =
-				state_of_everything.Port->GroupConfigs[0].TriggerThreshold;
+				Port->GroupConfigs[0].TriggerThreshold;
 			for(uint32_t i = 1; i < size; i++) {
 				if((buf[i] > offset) && (buf[i-1] < offset)) {
 					counter++;
 				}
 			}
 
-			return state_of_everything.Port->GetSampleRate()*counter /
-				(state_of_everything.Port->GlobalConfig.RecordLength);
+			return Port->GetSampleRate()*counter /
+				(Port->GlobalConfig.RecordLength);
 		}
 		
 		// Local error checking. Checks if there was an error and prints it
 		// using spdlog
 		bool lec() {
-			return check_error(state_of_everything.Port,
+			return check_error(Port,
 				[](const std::string& cmd) {
 					spdlog::error(cmd);
 			});
@@ -263,13 +264,12 @@ private:
 		// Attempts a connection to the CAEN digitizer, setups the channels
 		// and starts acquisition
 		bool attempt_connection() {
-			CAEN& port = state_of_everything.Port;
-			auto err = connect_usb(port,
+			auto err = connect_usb(Port,
 				state_of_everything.Model,
 				state_of_everything.PortNum);
 
 			// If port resource was not created, it equals a failure!
-			if(!port) {
+			if(!Port) {
 				// Print what was the error
 				check_error(err, [](const std::string& cmd) {
 					spdlog::error(cmd);
@@ -277,32 +277,32 @@ private:
 
 				// We disconnect because this will free resources (in case
 				// they were created)
-				disconnect(state_of_everything.Port);
+				disconnect(Port);
 				switch_state(CAENInterfaceStates::Standby);
 				return true;
 			}
 
 			spdlog::info("Connected to CAEN Digitizer!");
 
-			reset(port);
-			setup(port,
+			reset(Port);
+			setup(Port,
 				state_of_everything.GlobalConfig,
-				state_of_everything.ChannelConfigs);
+				state_of_everything.GroupConfigs);
 
-			enable_acquisition(port);
+			enable_acquisition(Port);
 
 			// Allocate memory for events
-			osc_event = std::make_shared<caenEvent>(port->Handle);
+			osc_event = std::make_shared<caenEvent>(Port->Handle);
 
 			for(CAENEvent& evt : processing_evts) {
-				evt = std::make_shared<caenEvent>(port->Handle);
+				evt = std::make_shared<caenEvent>(Port->Handle);
 			}
 
 			auto failed = lec();
 
 			if(failed) {
 				spdlog::warn("Failed to setup CAEN");
-				err = disconnect(state_of_everything.Port);
+				err = disconnect(Port);
 				check_error(err, [](const std::string& cmd) {
 					spdlog::error(cmd);
 				});
@@ -324,21 +324,19 @@ private:
 		// as a mode in where the user can see what is happening.
 		// Similar to an oscilloscope
 		bool oscilloscope() {
-			//spdlog::info("Oscilloscope mode.");
-			CAEN& port = state_of_everything.Port;
 
-			auto events = get_events_in_buffer(port);
+			auto events = get_events_in_buffer(Port);
 			_plotSender(IndicatorNames::CAENBUFFEREVENTS, events);
 
-			retrieve_data(port);
+			retrieve_data(Port);
 
-			if(port->Data.DataSize > 0 && port->Data.NumEvents > 0) {
+			if(Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
 
 				// spdlog::info("Total size buffer: {0}",  port->Data.TotalSizeBuffer);
 				// spdlog::info("Data size: {0}", port->Data.DataSize);
 				// spdlog::info("Num events: {0}",  port->Data.NumEvents);
 
-				extract_event(port, 0, osc_event);
+				extract_event(Port, 0, osc_event);
 				// spdlog::info("Event size: {0}", osc_event->Info.EventSize);
 				// spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
 				// spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
@@ -358,7 +356,7 @@ private:
 
 			}
 			// Clear events in buffer
-			clear_data(port);
+			clear_data(Port);
 
 			lec();
 			change_state();
@@ -369,11 +367,9 @@ private:
 		// is done. Serves more for the user to know
 		// how things are changing.
 		bool statistics_mode() {
-			//spdlog::info("Statistics mode.");
-			CAEN& port = state_of_everything.Port;
 
 			static auto process_events = [&]() {
-				bool isData = retrieve_data_until_n_events(port, 512);
+				bool isData = retrieve_data_until_n_events(Port, 512);
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
@@ -381,10 +377,10 @@ private:
 				}
 
 				//double frequency = 0.0;
-				for(uint32_t i = 0; i < port->Data.NumEvents; i++) {
+				for(uint32_t i = 0; i < Port->Data.NumEvents; i++) {
 
 					// Extract event i
-					extract_event(port, i, processing_evts[i]);
+					extract_event(Port, i, processing_evts[i]);
 				}
 
 			};
@@ -410,14 +406,13 @@ private:
 
 		bool run_mode() {
 			//spdlog::info("Run mode.");
-			static CAEN& port = state_of_everything.Port;
 			static bool isFileOpen = false;
 			static auto extract_for_gui_nb = make_total_timed_event(
 				std::chrono::milliseconds(200),
 				std::bind(&CAENDigitizerInterface::rdm_extract_for_gui, this)
 			);
 			static auto process_events = [&]() {
-				bool isData = retrieve_data_until_n_events(port, 512);
+				bool isData = retrieve_data_until_n_events(Port, 512);
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
@@ -425,10 +420,10 @@ private:
 				}
 
 				//double frequency = 0.0;
-				for(uint32_t i = 0; i < port->Data.NumEvents; i++) {
+				for(uint32_t i = 0; i < Port->Data.NumEvents; i++) {
 
 					// Extract event i
-					extract_event(port, i, processing_evts[i]);
+					extract_event(Port, i, processing_evts[i]);
 
 					if(_pulseFile) {
 						_pulseFile->Add(processing_evts[i]);
@@ -439,7 +434,7 @@ private:
 
 			if(isFileOpen) {
 				// spdlog::info("Saving SIPM data");
-				save(_pulseFile, sbc_save_func, state_of_everything.Port);
+				save(_pulseFile, sbc_save_func, Port);
 			} else {
 				open(_pulseFile,
 					state_of_everything.RunDir
@@ -450,7 +445,7 @@ private:
 					// of the sbc data format as a function of record length
 					// and number of channels
 					sbc_init_file,
-					state_of_everything.Port);
+					Port);
 				isFileOpen = _pulseFile > 0;
 			}
 
@@ -473,7 +468,7 @@ private:
 			osc_event.reset();
 			adj_osc_event.reset();
 
-			auto err = disconnect(state_of_everything.Port);
+			auto err = disconnect(Port);
 			check_error(err, [](const std::string& cmd) {
 				spdlog::error(cmd);
 			});
@@ -491,7 +486,7 @@ private:
 			osc_event.reset();
 			adj_osc_event.reset();
 
-			auto err = disconnect(state_of_everything.Port);
+			auto err = disconnect(Port);
 			check_error(err, [](const std::string& cmd) {
 				spdlog::error(cmd);
 			});
@@ -500,18 +495,17 @@ private:
 		}
 
 		void rdm_extract_for_gui() {
-			if(state_of_everything.Port->Data.DataSize <= 0) {
+			if(Port->Data.DataSize <= 0) {
 				return;
 			}
 
 			// For the GUI
 			std::default_random_engine generator;
 			std::uniform_int_distribution<uint32_t>
-				distribution(0,
-					state_of_everything.Port->Data.NumEvents);
+				distribution(0, Port->Data.NumEvents);
 			uint32_t rdm_num = distribution(generator);
 
-			extract_event(state_of_everything.Port, rdm_num, osc_event);
+			extract_event(Port, rdm_num, osc_event);
 
 			process_data_for_gui();
 		};
@@ -520,7 +514,7 @@ private:
 			int j = 0;
 
 			//TODO(Zhiheng): change anything you need here, too...
-			for(auto ch : state_of_everything.Port->GroupConfigs) {
+			for(auto ch : Port->GroupConfigs) {
 				auto& ch_num = ch.second.Number;
 				auto buf = osc_event->Data->DataChannel[ch_num];
 				auto size = osc_event->Data->ChSize[ch_num];
@@ -535,7 +529,7 @@ private:
 
 				for(uint32_t i = 0; i < size; i++) {
 					x_values[i]
-					 = i*(1.0/state_of_everything.Port->GetSampleRate())*(1e9);
+					 = i*(1.0/Port->GetSampleRate())*(1e9);
 					y_values[i] = static_cast<double>(buf[i]);
 				}
 
