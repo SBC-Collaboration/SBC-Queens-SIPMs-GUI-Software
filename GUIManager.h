@@ -41,12 +41,6 @@ private:
 		IndicatorReceiver<IndicatorNames> _indicatorReceiver;
 
 		// Controls
-		ControlLink<TeensyInQueue> TeensyControlFac;
-		TeensyControllerState tgui_state;
-
-		// // CAEN Controls
-		ControlLink<CAENQueue> CAENControlFac;
-		CAENInterfaceState cgui_state;
 
 		std::string i_run_dir;
 		std::string i_run_name;
@@ -140,7 +134,8 @@ public:
 					cgui_state.GroupConfigs.emplace_back(
 						CAENGroupConfig{
 							.Number = ch,
-							.EnableMask = CAEN_conf[ch_toml]["Mask"].value_or<uint8_t>(0),
+							.TriggerMask = CAEN_conf[ch_toml]["TrgMask"].value_or<uint8_t>(0),
+							.AcquisitionMask = CAEN_conf[ch_toml]["AcqMask"].value_or<uint8_t>(0),
 							.DCOffset = CAEN_conf[ch_toml]["Offset"].value_or(0x8000u),
 							.DCRange = CAEN_conf[ch_toml]["Range"].value_or<uint8_t>(0u),
 							.TriggerThreshold = CAEN_conf[ch_toml]["Threshold"].value_or(0x8000u)
@@ -444,7 +439,7 @@ public:
 				if(CAENControlFac.Button("Connect",
 					[=](CAENInterfaceState& state) {
 
-						state = cgui_state;
+
 
 						state.RunDir = i_run_dir;
 						state.RunName = i_run_name;
@@ -559,7 +554,7 @@ public:
 
 			// Channel tabs
 			for(auto& ch : cgui_state.GroupConfigs) {
-				std::string tab_name = "CAEN GROUP " + std::to_string(ch.Number);
+				std::string tab_name = "CAEN GR" + std::to_string(ch.Number);
 
 				if(ImGui::BeginTabItem(tab_name.c_str())) {
 					ImGui::PushItemWidth(120);
@@ -568,6 +563,14 @@ public:
 						&ch.EnableMask);
 					ImGui::InputScalar("DC Offset [counts]", ImGuiDataType_U32,
 						&ch.DCOffset);
+
+    				ImGui::InputScalar("Threshold [counts]", ImGuiDataType_U32,
+	    				&ch.TriggerThreshold);
+
+					ImGui::InputScalar("Trigger Mask", ImGuiDataType_U8, 
+						&ch.TriggerMask);
+					ImGui::InputScalar("Acquisition Mask", ImGuiDataType_U8, 
+						&ch.AcquisitionMask);
 
 					int corr_i = 0;
 					for(auto& corr : ch.DCCorrections) {
@@ -582,9 +585,6 @@ public:
 	    			 	reinterpret_cast<int*>(&ch.DCRange), 0); ImGui::SameLine();
 	    			ImGui::RadioButton("0.5V",
 	    				reinterpret_cast<int*>(&ch.DCRange), 1);
-
-	    			ImGui::InputScalar("Threshold [counts]", ImGuiDataType_U32,
-	    				&ch.TriggerThreshold);
 
 	    			ImGui::EndTabItem();
 				}

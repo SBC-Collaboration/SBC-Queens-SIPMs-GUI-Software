@@ -439,7 +439,7 @@ private:
 				open(_pulseFile,
 					state_of_everything.RunDir
 					+ "/" + state_of_everything.RunName
-					+ "/" + state_of_everything.SiPMParameters + ".txt",
+					+ "/" + state_of_everything.SiPMParameters + ".bin",
 
 					// sbc_init_file is a function that saves the header
 					// of the sbc data format as a function of record length
@@ -448,12 +448,11 @@ private:
 					Port);
 				isFileOpen = _pulseFile > 0;
 			}
-
+			process_events();
 			extract_for_gui_nb();
 			if(change_state()) {
 				isFileOpen = false;
 			}
-
 			return true;
 		}
 
