@@ -791,11 +791,11 @@ namespace SBCQueens {
 		);
 
 		header += SingleDimToBinaryHeader(
-			"thresholds", Types::UINT32, num_ch
+			"thresholds", Types::UINT16, num_ch
 		);
 
 		header += SingleDimToBinaryHeader(
-			"dc_offsets", Types::UINT32, num_ch
+			"dc_offsets", Types::UINT16, num_ch
 		);
 
 		header += SingleDimToBinaryHeader(
@@ -878,15 +878,15 @@ namespace SBCQueens {
 		// sample_rate		double		8 	 			Y
 		// en_chs			uint8		1*ch_size 		Y
 		// trg_mask			uint32		4 		 		Y
-		// thresholds 		uint32 		4*ch_size 		Y
-		// dc_offsets 		uint32 		4*ch_size 		Y
+		// thresholds 		uint16 		2*ch_size 		Y
+		// dc_offsets 		uint16 		2*ch_size 		Y
 		// dc_corrections	uint8 		1*ch_size 		Y
 		// dc_range 		single 		4*ch_size 		Y
 		// time_stamp 		uint32 		4 				N
 		// trg_source 		uint32 		4 				N
 		// data 			uint16 		2*rl*ch_size 	N
 		//
-		// Total length 				20 + ch_size(14 + 2*recordlength)
+		// Total length 				20 + ch_size(10 + 2*recordlength)
 
 		std::function<uint32_t (uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
 			return acq_mask==0 ? 0: (acq_mask & 1) + n_channels_acq(acq_mask>>1);
@@ -897,7 +897,7 @@ namespace SBCQueens {
 		}
 		const auto rl = res->GlobalConfig.RecordLength;
 
-		const size_t nline = 20 + (2*rl + 14)*num_ch;
+		const size_t nline = 20 + (2*rl + 10)*num_ch;
 
 		const uint8_t ch_per_group = res->GetNumberOfChannelsPerGroup();
 

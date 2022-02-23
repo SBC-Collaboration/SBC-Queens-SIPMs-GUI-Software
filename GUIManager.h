@@ -650,7 +650,7 @@ public:
 								.AcquisitionMask
 									= static_cast<uint8_t>(ic_ch_acqmask[i]),
 								.DCOffset
-									= static_cast<uint32_t>(ic_ch_offsets[i]),
+									= static_cast<uint16_t>(ic_ch_offsets[i]),
 								.DCCorrections
 									= std::vector<uint8_t>(
 										ic_ch_corrections[i].cbegin(),
@@ -658,7 +658,7 @@ public:
 								.DCRange
 									= static_cast<uint8_t>(ic_ch_ranges[i]),
 								.TriggerThreshold
-									= static_cast<uint32_t>(ic_ch_thresholds[i]),
+									= static_cast<uint16_t>(ic_ch_thresholds[i]),
 
 							});
 						}

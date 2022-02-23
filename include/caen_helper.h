@@ -151,7 +151,7 @@ namespace SBCQueens {
 		// 0x1000 no offset if 14 bit DAC
 		// 0x400 no offset if 14 bit DAC
 		// DC offsets of each channel in the group
-		uint32_t DCOffset;
+		uint16_t DCOffset;
 		std::vector<uint8_t> DCCorrections;
 
 		// For DT5730
@@ -160,7 +160,7 @@ namespace SBCQueens {
 		uint8_t DCRange = 0;
 
 		// In ADC counts
-		uint32_t TriggerThreshold = 0;
+		uint16_t TriggerThreshold = 0;
 
 	};
 
