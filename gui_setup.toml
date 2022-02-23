@@ -43,6 +43,8 @@ ExternalTrigger = 1
 SoftwareTrigger = 1
 # 0 = rising edge, 1 = falling edge
 Polarity = 1
+# 0 = NIM, 1 = TTL
+IOLevel = 0
 
 # Individual Channel settings
 # The number after group represents

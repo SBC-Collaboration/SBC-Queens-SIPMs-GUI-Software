@@ -19,6 +19,7 @@
 #include "TeensyControllerInterface.h"
 #include "CAENDigitizerInterface.h"
 #include "caen_helper.h"
+#include "deps/imgui/imgui.h"
 #include "imgui.h"
 #include "imgui_helpers.h"
 #include "implot_helpers.h"
@@ -41,6 +42,12 @@ private:
 		IndicatorReceiver<IndicatorNames> _indicatorReceiver;
 
 		// Controls
+		ControlLink<TeensyInQueue> TeensyControlFac;
+		TeensyControllerState tgui_state;
+
+		// // CAEN Controls
+		ControlLink<CAENQueue> CAENControlFac;
+		CAENInterfaceState cgui_state;
 
 		std::string i_run_dir;
 		std::string i_run_name;
@@ -124,7 +131,8 @@ public:
 				= static_cast<CAEN_DGTZ_TriggerMode_t>(CAEN_conf["SoftwareTrigger"].value_or(0L));
 			cgui_state.GlobalConfig.TriggerPolarity
 				= static_cast<CAEN_DGTZ_TriggerPolarity_t>(CAEN_conf["Polarity"].value_or(0L));
-
+			cgui_state.GlobalConfig.IOLevel
+				= static_cast<CAEN_DGTZ_IOLevel_t>(CAEN_conf["IOLevel"].value_or(0));
 			// We check how many CAEN.groupX there are and create that many
 			// groups.
 			for(uint8_t ch = 0; ch < MAX_CHANNELS; ch++) {
@@ -136,9 +144,9 @@ public:
 							.Number = ch,
 							.TriggerMask = CAEN_conf[ch_toml]["TrgMask"].value_or<uint8_t>(0),
 							.AcquisitionMask = CAEN_conf[ch_toml]["AcqMask"].value_or<uint8_t>(0),
-							.DCOffset = CAEN_conf[ch_toml]["Offset"].value_or(0x8000u),
+							.DCOffset = CAEN_conf[ch_toml]["Offset"].value_or<uint16_t>(0x8000u),
 							.DCRange = CAEN_conf[ch_toml]["Range"].value_or<uint8_t>(0u),
-							.TriggerThreshold = CAEN_conf[ch_toml]["Threshold"].value_or(0x8000u)
+							.TriggerThreshold = CAEN_conf[ch_toml]["Threshold"].value_or<uint16_t>(0x8000u)
 						}
 					);
 
@@ -439,7 +447,7 @@ public:
 				if(CAENControlFac.Button("Connect",
 					[=](CAENInterfaceState& state) {
 
-
+						state = cgui_state;
 
 						state.RunDir = i_run_dir;
 						state.RunName = i_run_name;
@@ -493,12 +501,13 @@ public:
 				ImGui::InputScalar("Post-Trigger buffer %", ImGuiDataType_U32,
 					&cgui_state.GlobalConfig.PostTriggerPorcentage);
 
-    			ImGui::Text("Overlapping Rejection:"); ImGui::SameLine();
-    			ImGui::RadioButton("Allowed",
-    				reinterpret_cast<int*>(&cgui_state.GlobalConfig.TriggerOverlappingEn), 1);
-    			ImGui::SameLine();
-    			ImGui::RadioButton("Not Allowed",
-    				reinterpret_cast<int*>(&cgui_state.GlobalConfig.TriggerOverlappingEn), 0);
+    			ImGui::Checkbox("Overlapping Rejection",
+    				&cgui_state.GlobalConfig.TriggerOverlappingEn);
+    			if(ImGui::IsItemHovered()) {
+    				ImGui::SetTooltip("If checked, overlapping rejection "
+    					"is disabled which leads to a non-constant record length. "
+    					"HIGHLY UNSTABLE FEATURE, DO NOT ENABLE.");
+    			}
 
     			ImGui::Checkbox("TRG-IN as Gate", &cgui_state.GlobalConfig.EXTasGate);
 
@@ -522,6 +531,12 @@ public:
     				cgui_state.GlobalConfig.TriggerPolarity,
     				{{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge, "Falling Edge"},
     				{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge, "Rising Edge"}},
+    				[]() {return false;}, [](){});
+
+    			CAENControlFac.ComboBox("IO Level",
+    				cgui_state.GlobalConfig.IOLevel,
+    				{{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM, "NIM"},
+    				{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_TTL, "TTL"}},
     				[]() {return false;}, [](){});
 
 				CAENControlFac.Button("Software Trigger",
@@ -559,12 +574,10 @@ public:
 				if(ImGui::BeginTabItem(tab_name.c_str())) {
 					ImGui::PushItemWidth(120);
 					// ImGui::Checkbox("Enabled", ch.);
-					ImGui::InputScalar("Mask", ImGuiDataType_U8,
-						&ch.EnableMask);
-					ImGui::InputScalar("DC Offset [counts]", ImGuiDataType_U32,
+					ImGui::InputScalar("DC Offset [counts]", ImGuiDataType_U16,
 						&ch.DCOffset);
 
-    				ImGui::InputScalar("Threshold [counts]", ImGuiDataType_U32,
+    				ImGui::InputScalar("Threshold [counts]", ImGuiDataType_U16,
 	    				&ch.TriggerThreshold);
 
 					ImGui::InputScalar("Trigger Mask", ImGuiDataType_U8, 
@@ -575,7 +588,7 @@ public:
 					int corr_i = 0;
 					for(auto& corr : ch.DCCorrections) {
 						std::string c_name = "Correction " + std::to_string(corr_i);
-						ImGui::InputScalar(c_name.c_str(), ImGuiDataType_U32, &corr);
+						ImGui::InputScalar(c_name.c_str(), ImGuiDataType_U8, &corr);
 						corr_i++;
 					}
 

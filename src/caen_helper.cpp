@@ -114,268 +114,272 @@ namespace SBCQueens {
 
 	}
 
-        void setup(CAEN &res, CAENGlobalConfig g_config,
-                   std::vector<CAENGroupConfig> gr_configs) noexcept {
+    void setup(CAEN &res, CAENGlobalConfig g_config,
+               std::vector<CAENGroupConfig> gr_configs) noexcept {
 
-          if (!res) {
-            return;
-          }
+      if (!res) {
+        return;
+      }
 
-          if (res->LatestError.isError) {
-            return;
-          }
+      if (res->LatestError.isError) {
+        return;
+      }
 
-          reset(res);
-          int &handle = res->Handle;
-          int latest_err = 0;
-          std::string err_msg = "";
+      reset(res);
+      int &handle = res->Handle;
+      int latest_err = 0;
+      std::string err_msg = "";
 
-          // This lambda wraps whatever CAEN function you pass to it,
-          // checks the error, and if there was an error, add the error msg to
-          // it If there is an error, it also does not execute the function.
-          auto error_wrap = [&](std::string msg, auto f, auto... args) {
-            if (latest_err >= 0) {
-              auto err = f(args...);
-              if (err < 0) {
-                latest_err = err;
-                err_msg += msg;
-              }
-            }
-          };
-
-          // Global config
-          res->GlobalConfig = g_config;
-          error_wrap("CAEN_DGTZ_SetMaxNumEventsBLT Failed. ",
-                     CAEN_DGTZ_SetMaxNumEventsBLT, handle,
-                     res->GlobalConfig.MaxEventsPerRead);
-          // Before:
-          // err = CAEN_DGTZ_SetMaxNumEventsBLT(handle,
-          //	res->GlobalConfig.MaxEventsPerRead);
-          // if(err < 0) {
-          // 		total_err |= err;
-          // 		err_msg += "CAEN_DGTZ_SetMaxNumEventsBLT Failed. ";
-          // }
-
-          error_wrap("CAEN_DGTZ_SetRecordLength Failed. ",
-                     CAEN_DGTZ_SetRecordLength, handle,
-                     res->GlobalConfig.RecordLength);
-
-          // This will calculate what is the max current max buffers
-          res->CurrentMaxBuffers = calculate_max_buffers(res);
-
-          // This will get the ACTUAL record length as calculated by
-          // CAEN_DGTZ_SetRecordLength
-          uint32_t nloc = 0;
-          error_wrap("Failed to read NLOC. ", CAEN_DGTZ_ReadRegister, handle,
-                     0x8020, &nloc);
-          res->GlobalConfig.RecordLength = res->GetNLOCTORecordLength() * nloc;
-
-          error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
-                     CAEN_DGTZ_SetPostTriggerSize, handle,
-                     res->GlobalConfig.PostTriggerPorcentage);
-
-          // Trigger Mode comes in four flavors:
-          // CAEN_DGTZ_TRGMODE_DISABLED
-          // 		is disabled
-          // CAEN_DGTZ_TRGMODE_EXTOUT_ONLY
-          // 		is used to generate the trigger output
-          // CAEN_DGTZ_TRGMODE_ACQ_ONLY
-          //		is used to generate the acquisition trigger
-          // CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT
-          //		is used to generate the acquisition trigger and trigger
-          //output
-          error_wrap("CAEN_DGTZ_SetSWTriggerMode Failed. ",
-                     CAEN_DGTZ_SetSWTriggerMode, handle,
-                     res->GlobalConfig.SWTriggerMode);
-
-          error_wrap("CAEN_DGTZ_SetExtTriggerInputMode Failed. ",
-                     CAEN_DGTZ_SetExtTriggerInputMode, handle,
-                     res->GlobalConfig.EXTTriggerMode);
-
-          // Acquisition mode comes in four flavors:
-          // CAEN_DGTZ_SW_CONTROLLED
-          // 		Start/stop of the run takes place on software
-          // 		command (by calling CAEN_DGTZ_SWStartAcquisition )
-          // CAEN_DGTZ_FIRST_TRG_CONTROLLED
-          // 		Run starts on the first trigger pulse (rising edge on
-          // TRG-IN) 		actual triggers start from the second pulse from there
-          // CAEN_DGTZ_S_IN_CONTROLLED
-          //		S-IN/GPI controller (depends on the board). Acquisition
-          // 		starts on edge of the GPI/S-IN
-          // CAEN_DGTZ_LVDS_CONTROLLED
-          //		VME ONLY, like S_IN_CONTROLLER but uses LVDS.
-          error_wrap("CAEN_DGTZ_SetAcquisitionMode Failed. ",
-                     CAEN_DGTZ_SetAcquisitionMode, handle,
-                     res->GlobalConfig.AcqMode);
-
-          // Trigger polarity
-          // These digitizers do not support channel-by-channel trigger pol
-          // so we treat it like a global config, and use 0 as a placeholder.
-          error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
-                     CAEN_DGTZ_SetTriggerPolarity, handle, 0,
-                     res->GlobalConfig.TriggerPolarity);
-
-          error_wrap("CAEN_DGTZ_SetIOLevel Failed. ",
-                     CAEN_DGTZ_SetIOLevel, handle,
-                     res->GlobalConfig.IOLevel);
-
-          // Board config register
-          // 0 = Trigger overlapping not allowed
-          // 1 = trigger overlapping allowed
-          write_bits(res, 0x8000, res->GlobalConfig.TriggerOverlappingEn, 1);
-
-          write_bits(res, 0x8100, res->GlobalConfig.MemoryFullModeSelection, 5);
-
-          // Channel stuff
-          if (res->Model == CAENDigitizerModel::DT5730B) {
-            // For DT5730B, there are no groups only channels so we take
-            // each configuration as a channel
-
-            // First, we make the channel mask (if applicable)
-            uint32_t channel_mask = 0;
-            for (auto ch_config : gr_configs) {
-              channel_mask |= 1 << ch_config.Number;
-            }
-
-            // Then enable those channels
-            error_wrap("CAEN_DGTZ_SetChannelEnableMask Failed. ",
-                       CAEN_DGTZ_SetChannelEnableMask, handle, channel_mask);
-
-            // Then enable their self trigger
-            error_wrap("CAEN_DGTZ_SetChannelSelfTrigger Failed. ",
-                       CAEN_DGTZ_SetChannelSelfTrigger, handle,
-                       res->GlobalConfig.CHTriggerMode, channel_mask);
-
-            // Let's clear the channel map to allow for new channels properties
-            res->GroupConfigs.clear();
-            for (auto ch_config : gr_configs) {
-              // Before we set any parameters for each channel, we add the
-              // new channel to the map. try_emplace(...) will make sure we do
-              // not add duplicates
-              auto ins =
-                  res->GroupConfigs.try_emplace(ch_config.Number, ch_config);
-
-              // if false, it was already inserted and we move to the next
-              // channel
-              if (!ins.second) {
-                continue;
-              }
-
-              // Trigger stuff
-              // Self Channel trigger
-              error_wrap("CAEN_DGTZ_SetChannelTriggerThreshold Failed. ",
-                         CAEN_DGTZ_SetChannelTriggerThreshold, handle,
-                         ch_config.Number, ch_config.TriggerThreshold);
-
-              error_wrap("CAEN_DGTZ_SetChannelDCOffset Failed. ",
-                         CAEN_DGTZ_SetChannelDCOffset, handle, ch_config.Number,
-                         ch_config.DCOffset);
-
-              // Writes to the registers that holds the DC range
-              // For 5730 it is the register 0x1n28
-              error_wrap("write_register to reg 0x1n28 Failed (DC Range). ",
-                         CAEN_DGTZ_WriteRegister, handle,
-                         0x1028 | (ch_config.Number & 0x0F) << 8,
-                         ch_config.DCRange & 0x0001);
-            }
-          } else if (res->Model == CAENDigitizerModel::DT5740D) {
-            // For DT5740D
-
-            uint32_t group_mask = 0;
-            for (auto gr_config : gr_configs) {
-              group_mask |= 1 << gr_config.Number;
-            }
-
-            error_wrap("CAEN_DGTZ_SetGroupEnableMask Failed. ",
-                       CAEN_DGTZ_SetGroupEnableMask, handle, group_mask);
-
-            error_wrap("CAEN_DGTZ_SetGroupSelfTrigger Failed. ",
-                       CAEN_DGTZ_SetGroupSelfTrigger, handle,
-                       res->GlobalConfig.CHTriggerMode, group_mask);
-
-            res->GroupConfigs.clear();
-            for (auto gr_config : gr_configs) {
-
-              // Before we set any parameters for each channel, we add the
-              // new channel to the map. try_emplace(...) will make sure we do
-              // not add duplicates
-              auto ins =
-                  res->GroupConfigs.try_emplace(gr_config.Number, gr_config);
-
-              // if false, it was already inserted and we move to the next
-              // channel
-              if (!ins.second) {
-                continue;
-              }
-
-              // Trigger stuff
-              error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
-                         CAEN_DGTZ_SetGroupTriggerThreshold, handle,
-                         gr_config.Number, gr_config.TriggerThreshold);
-
-              error_wrap("CAEN_DGTZ_SetGroupDCOffset Failed. ",
-                         CAEN_DGTZ_SetGroupDCOffset, handle, gr_config.Number,
-                         gr_config.DCOffset);
-
-              // Set the mask for channels enabled for self-triggering
-              error_wrap("CAEN_DGTZ_SetChannelGroupMask Failed. ",
-              	CAEN_DGTZ_SetChannelGroupMask,
-              	handle, gr_config.Number, gr_config.TriggerMask);
-
-              // Set acquisition mask
-              write_bits(res, 0x10A8 | (gr_config.Number << 8), 
-              	gr_config.AcquisitionMask, 0, 8);
-
-              // DCCorrections should be of length
-              // NumberofChannels / NumberofGroups.
-              // set individual channel 8-bitDC offset
-              // on 12 bit LSB scale, same as threshold
-              uint32_t word = 0;
-              for (int ch = 0; ch < 4; ch++) {
-                word += gr_config.DCCorrections[ch] << (ch * 8);
-              }
-              write_register(res, 0x10C0 | (gr_config.Number << 8), word);
-              word = 0;
-              for (int ch = 4; ch < 8; ch++) {
-                word += gr_config.DCCorrections[ch] << ((ch - 4) * 8);
-              }
-              write_register(res, 0x10C4 | (gr_config.Number << 8), word);
-            }
-
-
-            bool trg_out = false;
-
-            // For 740, to use TRG-IN as Gate / anti-veto
-            if (g_config.EXTasGate) {
-            	write_bits(res, 0x810C, 1, 27); // TRG-IN AND internal trigger, to serve as gate
-            	write_bits(res, 0x811C, 1, 10); // TRG-IN as gate
-            }
-
-            if (trg_out) {
-            	write_bits(res, 0x811C, 0, 15); // TRG-OUT based on internal signal
-            	write_bits(res, 0x811C, 0b00, 16, 2); // TRG-OUT based on internal signal
-            }
-            write_bits(res, 0x811C, 0b01, 21, 2);
-
-            // read_register(res, 0x8110, word);
-            // word |= 1; // enable group 0 to participate in GPO
-            // write_register(res, 0x8110, word);
-
-          } else {
-            // custom error message if not above models
-            latest_err = -1;
-            err_msg += "Model not supported.";
-          }
-
-          if (latest_err < 0) {
-            res->LatestError = CAENError{
-                .ErrorMessage = "There was en error during setup!" + err_msg,
-                .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(latest_err),
-                .isError = true};
+      // This lambda wraps whatever CAEN function you pass to it,
+      // checks the error, and if there was an error, add the error msg to
+      // it. If there is an error, it also does not execute the function.
+      auto error_wrap = [&](std::string msg, auto f, auto... args) {
+        if (latest_err >= 0) {
+          auto err = f(args...);
+          if (err < 0) {
+            latest_err = err;
+            err_msg += msg;
           }
         }
+      };
 
-        void enable_acquisition(CAEN& res) noexcept {
+      // Global config
+      res->GlobalConfig = g_config;
+      error_wrap("CAEN_DGTZ_SetMaxNumEventsBLT Failed. ",
+                 CAEN_DGTZ_SetMaxNumEventsBLT, handle,
+                 res->GlobalConfig.MaxEventsPerRead);
+      // Before:
+      // err = CAEN_DGTZ_SetMaxNumEventsBLT(handle,
+      //	res->GlobalConfig.MaxEventsPerRead);
+      // if(err < 0) {
+      // 		total_err |= err;
+      // 		err_msg += "CAEN_DGTZ_SetMaxNumEventsBLT Failed. ";
+      // }
+
+      error_wrap("CAEN_DGTZ_SetRecordLength Failed. ",
+                 CAEN_DGTZ_SetRecordLength, handle,
+                 res->GlobalConfig.RecordLength);
+
+      // This will calculate what is the max current max buffers
+      res->CurrentMaxBuffers = calculate_max_buffers(res);
+
+      // This will get the ACTUAL record length as calculated by
+      // CAEN_DGTZ_SetRecordLength
+      uint32_t nloc = 0;
+      error_wrap("Failed to read NLOC. ", CAEN_DGTZ_ReadRegister, handle,
+                 0x8020, &nloc);
+      res->GlobalConfig.RecordLength = res->GetNLOCTORecordLength() * nloc;
+
+      error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
+                 CAEN_DGTZ_SetPostTriggerSize, handle,
+                 res->GlobalConfig.PostTriggerPorcentage);
+
+      // Trigger Mode comes in four flavors:
+      // CAEN_DGTZ_TRGMODE_DISABLED
+      // 		is disabled
+      // CAEN_DGTZ_TRGMODE_EXTOUT_ONLY
+      // 		is used to generate the trigger output
+      // CAEN_DGTZ_TRGMODE_ACQ_ONLY
+      //		is used to generate the acquisition trigger
+      // CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT
+      //		is used to generate the acquisition trigger and trigger
+      //output
+      error_wrap("CAEN_DGTZ_SetSWTriggerMode Failed. ",
+                 CAEN_DGTZ_SetSWTriggerMode, handle,
+                 res->GlobalConfig.SWTriggerMode);
+
+      error_wrap("CAEN_DGTZ_SetExtTriggerInputMode Failed. ",
+                 CAEN_DGTZ_SetExtTriggerInputMode, handle,
+                 res->GlobalConfig.EXTTriggerMode);
+
+      // Acquisition mode comes in four flavors:
+      // CAEN_DGTZ_SW_CONTROLLED
+      // 		Start/stop of the run takes place on software
+      // 		command (by calling CAEN_DGTZ_SWStartAcquisition )
+      // CAEN_DGTZ_FIRST_TRG_CONTROLLED
+      // 		Run starts on the first trigger pulse (rising edge on
+      // TRG-IN) 		actual triggers start from the second pulse from there
+      // CAEN_DGTZ_S_IN_CONTROLLED
+      //		S-IN/GPI controller (depends on the board). Acquisition
+      // 		starts on edge of the GPI/S-IN
+      // CAEN_DGTZ_LVDS_CONTROLLED
+      //		VME ONLY, like S_IN_CONTROLLER but uses LVDS.
+      error_wrap("CAEN_DGTZ_SetAcquisitionMode Failed. ",
+                 CAEN_DGTZ_SetAcquisitionMode, handle,
+                 res->GlobalConfig.AcqMode);
+
+      // Trigger polarity
+      // These digitizers do not support channel-by-channel trigger pol
+      // so we treat it like a global config, and use 0 as a placeholder.
+      error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
+                 CAEN_DGTZ_SetTriggerPolarity, handle, 0,
+                 res->GlobalConfig.TriggerPolarity);
+
+      error_wrap("CAEN_DGTZ_SetIOLevel Failed. ",
+                 CAEN_DGTZ_SetIOLevel, handle,
+                 res->GlobalConfig.IOLevel);
+
+      // Board config register
+      // 0 = Trigger overlapping not allowed
+      // 1 = trigger overlapping allowed
+      write_bits(res, 0x8000, res->GlobalConfig.TriggerOverlappingEn, 1);
+
+      write_bits(res, 0x8100, res->GlobalConfig.MemoryFullModeSelection, 5);
+
+      // Channel stuff
+      if (res->Model == CAENDigitizerModel::DT5730B) {
+        // For DT5730B, there are no groups only channels so we take
+        // each configuration as a channel
+
+
+
+        // First, we make the channel mask
+        uint32_t channel_mask = 0;
+        for (auto ch_config : gr_configs) {
+          channel_mask |= 1 << ch_config.Number;
+        }
+
+        // Then enable those channels
+        error_wrap("CAEN_DGTZ_SetChannelEnableMask Failed. ",
+                   CAEN_DGTZ_SetChannelEnableMask, handle, channel_mask);
+
+        // Then enable their self trigger
+        error_wrap("CAEN_DGTZ_SetChannelSelfTrigger Failed. ",
+                   CAEN_DGTZ_SetChannelSelfTrigger, handle,
+                   res->GlobalConfig.CHTriggerMode, channel_mask);
+
+        // Let's clear the channel map to allow for new channels properties
+        res->GroupConfigs.clear();
+        for (auto ch_config : gr_configs) {
+
+    		spdlog::info("CH {0} enabled", ch_config.Number);
+          // Before we set any parameters for each channel, we add the
+          // new channel to the map. try_emplace(...) will make sure we do
+          // not add duplicates
+          auto ins =
+              res->GroupConfigs.try_emplace(ch_config.Number, ch_config);
+
+          // if false, it was already inserted and we move to the next
+          // channel
+          if (!ins.second) {
+            continue;
+          }
+
+          // Trigger stuff
+          // Self Channel trigger
+          error_wrap("CAEN_DGTZ_SetChannelTriggerThreshold Failed. ",
+                     CAEN_DGTZ_SetChannelTriggerThreshold, handle,
+                     ch_config.Number, ch_config.TriggerThreshold);
+
+          error_wrap("CAEN_DGTZ_SetChannelDCOffset Failed. ",
+                     CAEN_DGTZ_SetChannelDCOffset, handle, ch_config.Number,
+                     ch_config.DCOffset);
+
+          // Writes to the registers that holds the DC range
+          // For 5730 it is the register 0x1n28
+          error_wrap("write_register to reg 0x1n28 Failed (DC Range). ",
+                     CAEN_DGTZ_WriteRegister, handle,
+                     0x1028 | (ch_config.Number & 0x0F) << 8,
+                     ch_config.DCRange & 0x0001);
+        }
+    } else if (res->Model == CAENDigitizerModel::DT5740D) {
+        // For DT5740D
+
+        uint32_t group_mask = 0;
+        for (auto gr_config : gr_configs) {
+          group_mask |= 1 << gr_config.Number;
+        }
+
+        error_wrap("CAEN_DGTZ_SetGroupEnableMask Failed. ",
+                   CAEN_DGTZ_SetGroupEnableMask, handle, group_mask);
+
+        error_wrap("CAEN_DGTZ_SetGroupSelfTrigger Failed. ",
+                   CAEN_DGTZ_SetGroupSelfTrigger, handle,
+                   res->GlobalConfig.CHTriggerMode, group_mask);
+
+        res->GroupConfigs.clear();
+        for (auto gr_config : gr_configs) {
+
+          // Before we set any parameters for each channel, we add the
+          // new channel to the map. try_emplace(...) will make sure we do
+          // not add duplicates
+          auto ins =
+              res->GroupConfigs.try_emplace(gr_config.Number, gr_config);
+
+          // if false, it was already inserted and we move to the next
+          // channel
+          if (!ins.second) {
+            continue;
+          }
+
+          // Trigger stuff
+          error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
+                     CAEN_DGTZ_SetGroupTriggerThreshold, handle,
+                     gr_config.Number, gr_config.TriggerThreshold);
+
+          error_wrap("CAEN_DGTZ_SetGroupDCOffset Failed. ",
+                     CAEN_DGTZ_SetGroupDCOffset, handle, gr_config.Number,
+                     gr_config.DCOffset);
+
+          // Set the mask for channels enabled for self-triggering
+          error_wrap("CAEN_DGTZ_SetChannelGroupMask Failed. ",
+          	CAEN_DGTZ_SetChannelGroupMask,
+          	handle, gr_config.Number, gr_config.TriggerMask);
+
+          // Set acquisition mask
+          write_bits(res, 0x10A8 | (gr_config.Number << 8),
+          	gr_config.AcquisitionMask, 0, 8);
+
+          // DCCorrections should be of length
+          // NumberofChannels / NumberofGroups.
+          // set individual channel 8-bitDC offset
+          // on 12 bit LSB scale, same as threshold
+          uint32_t word = 0;
+          for (int ch = 0; ch < 4; ch++) {
+            word += gr_config.DCCorrections[ch] << (ch * 8);
+          }
+          write_register(res, 0x10C0 | (gr_config.Number << 8), word);
+          word = 0;
+          for (int ch = 4; ch < 8; ch++) {
+            word += gr_config.DCCorrections[ch] << ((ch - 4) * 8);
+          }
+          write_register(res, 0x10C4 | (gr_config.Number << 8), word);
+        }
+
+
+        bool trg_out = false;
+
+        // For 740, to use TRG-IN as Gate / anti-veto
+        if (g_config.EXTasGate) {
+        	write_bits(res, 0x810C, 1, 27); // TRG-IN AND internal trigger, to serve as gate
+        	write_bits(res, 0x811C, 1, 10); // TRG-IN as gate
+        }
+
+        if (trg_out) {
+        	write_bits(res, 0x811C, 0, 15); // TRG-OUT based on internal signal
+        	write_bits(res, 0x811C, 0b00, 16, 2); // TRG-OUT based on internal signal
+        }
+        write_bits(res, 0x811C, 0b01, 21, 2);
+
+        // read_register(res, 0x8110, word);
+        // word |= 1; // enable group 0 to participate in GPO
+        // write_register(res, 0x8110, word);
+
+      } else {
+        // custom error message if not above models
+        latest_err = -1;
+        err_msg += "Model not supported.";
+      }
+
+      if (latest_err < 0) {
+        res->LatestError = CAENError{
+            .ErrorMessage = "There was en error during setup! " + err_msg,
+            .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(latest_err),
+            .isError = true};
+      }
+    }
+
+    void enable_acquisition(CAEN& res) noexcept {
 		if(!res) {
 			return;
 		}
