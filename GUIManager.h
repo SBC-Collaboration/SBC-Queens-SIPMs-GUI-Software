@@ -68,9 +68,11 @@ public:
 			auto CAEN_conf = config_file["CAEN"];
 			auto file_conf = config_file["File"];
 
+			// These two guys are shared between CAEN and Teensy
 			i_run_dir 		= config_file["File"]["RunDir"].value_or("./RUNS");
 			i_run_name 		= config_file["File"]["RunName"].value_or("Testing");
 
+			// Teensy initial state
 			tgui_state.CurrentState = TeensyControllerStates::Standby;
 			tgui_state.Port 		= t_conf["Port"].value_or("COM4");
 			tgui_state.RunDir 		= i_run_dir;
@@ -102,30 +104,35 @@ public:
 			tgui_state.PIDTwoCurrentValues.Kp = t_conf["PID2AKp"].value_or(0.0f);
 			tgui_state.PIDTwoCurrentValues.Ti = t_conf["PID2ATi"].value_or(0.0f);
 			tgui_state.PIDTwoCurrentValues.Td = t_conf["PID2ATd"].value_or(0.0f);
-			// Indicators
 
+			// CAEN initial state
 			cgui_state.CurrentState = CAENInterfaceStates::Standby;
 			cgui_state.RunDir = i_run_dir;
 			cgui_state.RunName = i_run_name;
 			cgui_state.SiPMParameters = file_conf["SiPMParameters"].value_or("default");
 
-			cgui_state.Model = CAENDigitizerModels_map.at(
-				CAEN_conf["Model"].value_or("DT5730B"));
+			cgui_state.Model = CAENDigitizerModels_map.at(CAEN_conf["Model"].value_or("DT5730B"));
 			cgui_state.PortNum = CAEN_conf["Port"].value_or(0u);
 
-			cgui_state.GlobalConfig.MaxEventsPerRead = CAEN_conf["MaxEventsPerRead"].value_or(512Lu);
-			cgui_state.GlobalConfig.RecordLength = CAEN_conf["RecordLength"].value_or(2048Lu);
-			cgui_state.GlobalConfig.PostTriggerPorcentage = CAEN_conf["PostBufferPorcentage"].value_or(50u);
-			cgui_state.GlobalConfig.TriggerOverlappingEn = CAEN_conf["OverlappingRejection"].value_or(false);
-			cgui_state.GlobalConfig.EXTasGate = CAEN_conf["TRGINasGate"].value_or(false);
-			cgui_state.GlobalConfig.EXTTriggerMode = static_cast<CAEN_DGTZ_TriggerMode_t>(
-				CAEN_conf["ExternalTrigger"].value_or(0L));
-			cgui_state.GlobalConfig.SWTriggerMode = static_cast<CAEN_DGTZ_TriggerMode_t>(
-				CAEN_conf["SoftwareTrigger"].value_or(0L));
+			cgui_state.GlobalConfig.MaxEventsPerRead
+				= CAEN_conf["MaxEventsPerRead"].value_or(512Lu);
+			cgui_state.GlobalConfig.RecordLength
+				= CAEN_conf["RecordLength"].value_or(2048Lu);
+			cgui_state.GlobalConfig.PostTriggerPorcentage
+				= CAEN_conf["PostBufferPorcentage"].value_or(50u);
+			cgui_state.GlobalConfig.TriggerOverlappingEn
+				= CAEN_conf["OverlappingRejection"].value_or(false);
+			cgui_state.GlobalConfig.EXTasGate
+				= CAEN_conf["TRGINasGate"].value_or(false);
+			cgui_state.GlobalConfig.EXTTriggerMode
+				= static_cast<CAEN_DGTZ_TriggerMode_t>(CAEN_conf["ExternalTrigger"].value_or(0L));
+			cgui_state.GlobalConfig.SWTriggerMode
+				= static_cast<CAEN_DGTZ_TriggerMode_t>(CAEN_conf["SoftwareTrigger"].value_or(0L));
+			cgui_state.GlobalConfig.TriggerPolarity
+				= static_cast<CAEN_DGTZ_TriggerPolarity_t>(CAEN_conf["Polarity"].value_or(0L));
 
-			cgui_state.GlobalConfig.TriggerPolarity = static_cast<CAEN_DGTZ_TriggerPolarity_t>(
-				CAEN_conf["Polarity"].value_or(0L));
-
+			// We check how many CAEN.groupX there are and create that many
+			// groups.
 			for(uint8_t ch = 0; ch < MAX_CHANNELS; ch++) {
 				std::string ch_toml = "group" + std::to_string(ch);
 				if(auto ch_conf = CAEN_conf[ch_toml].as_table()) {
@@ -339,10 +346,10 @@ public:
 
 				ImPlot::SetupAxes("time [ns]", "Counts", g_axis_flags, g_axis_flags);
 
-				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_ZERO, "Plot 1");
-				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_ONE, "Plot 2");
-				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_TWO, "Plot 3");
-				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_THREE, "Plot 4");
+				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_ZERO, "Plot 1", true);
+				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_ONE, "Plot 2", true);
+				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_TWO, "Plot 3", true);
+				_indicatorReceiver.plot(IndicatorNames::SiPM_Plot_THREE, "Plot 4", true);
 
 				ImPlot::EndPlot();
 			}

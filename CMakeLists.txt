@@ -1,7 +1,7 @@
 # Example usage:
 #  mkdir build
 #  cd build
-#  cmake ../ -G "MinGW Makefiles" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
+#  cmake ../ -G "MinGW Makefiles" -DUSE_VULKAN=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
 #  cmake ../ -G "MinGW Makefiles" -DUSE_VULKAN=ON -DCAEN_DIR="X:\\Program Files\\CAEN" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
 cmake_minimum_required(VERSION 3.11)
 

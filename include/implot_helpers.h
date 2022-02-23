@@ -183,11 +183,6 @@ public:
 		using type = T;
 		using data_type = double;
 
-
-
-
-		Plot() { }
-
 		explicit Plot(const T& id, bool clearOnNewData = false)
 			: Indicator<T>(id), ClearOnNewData(clearOnNewData) {
 		}

@@ -405,7 +405,6 @@ private:
 		}
 
 		bool run_mode() {
-			//spdlog::info("Run mode.");
 			static bool isFileOpen = false;
 			static auto extract_for_gui_nb = make_total_timed_event(
 				std::chrono::milliseconds(200),
@@ -426,6 +425,7 @@ private:
 					extract_event(Port, i, processing_evts[i]);
 
 					if(_pulseFile) {
+						// Copy event to the file buffer
 						_pulseFile->Add(processing_evts[i]);
 					}
 				}
@@ -528,8 +528,7 @@ private:
 				y_values = new double[size];
 
 				for(uint32_t i = 0; i < size; i++) {
-					x_values[i]
-					 = i*(1.0/Port->GetSampleRate())*(1e9);
+					x_values[i] = i*(1.0/Port->GetSampleRate())*(1e9);
 					y_values[i] = static_cast<double>(buf[i]);
 				}
 

@@ -83,7 +83,6 @@ public:
 		ControlLink(ControlLink&&) = delete;
 		ControlLink(const ControlLink&) = delete;
 
-
 		// When event is true, callback is added to the queue
 		// If the Callback cannot be added to the queue, then it calls callback
 		template<typename Condition, typename Callback>
@@ -188,6 +187,8 @@ public:
 				states.push_back(pair.first);
 				s_states.push_back(pair.second);
 
+				// This is to make sure the current selected item is the one
+				// that is already saved in state
 				if(state == pair.first) {
 					index = i;
 				}
