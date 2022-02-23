@@ -42,6 +42,9 @@ namespace SBCQueens {
 		// If 0, digitizer does not deal in groups
 		uint8_t NumberOfGroups = 0;
 
+		// Number of channels per group
+		uint8_t NumChannelsPerGroup = 1;
+
 		uint32_t MaxNumBuffers = 1024;
 
 		float NLOCToRecordLength = 1;
@@ -66,6 +69,7 @@ namespace SBCQueens {
 				.MemoryPerChannel = static_cast<uint32_t>(5.12e6),
 				.NumChannels = 8,
 				.NumberOfGroups = 0,
+				.NumChannelsPerGroup = 8,
 				.NLOCToRecordLength = 10,
 				.VoltageRanges = {0.5, 2.0}
 			}},
@@ -75,6 +79,7 @@ namespace SBCQueens {
 				.MemoryPerChannel = static_cast<uint32_t>(192e3),
 				.NumChannels = 32,
 				.NumberOfGroups = 4,
+				.NumChannelsPerGroup = 8,
 				.NLOCToRecordLength = 1.5,
 				.VoltageRanges = {2.0, 10.0}
 			}}
@@ -114,6 +119,9 @@ namespace SBCQueens {
 		CAEN_DGTZ_AcqMode_t AcqMode
 			= CAEN_DGTZ_AcqMode_t::CAEN_DGTZ_SW_CONTROLLED;
 
+		CAEN_DGTZ_IOLevel_t IOLevel 
+			= CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM;
+
 		// This feature is for X730
 		// True = disabled, False = enabled
 		bool TriggerOverlappingEn = false;
@@ -136,14 +144,15 @@ namespace SBCQueens {
 		uint8_t Number = 0;
 
 		// Mask of enabled channels within the group
-		uint8_t EnableMask = 0;
+		uint8_t TriggerMask = 0;
+		uint8_t AcquisitionMask = 0;
 
 		// 0x8000 no offset if 16 bit DAC
 		// 0x1000 no offset if 14 bit DAC
 		// 0x400 no offset if 14 bit DAC
 		// DC offsets of each channel in the group
 		uint32_t DCOffset;
-		std::vector<uint32_t> DCCorrections;
+		std::vector<uint8_t> DCCorrections;
 
 		// For DT5730
 		// 0 = 2Vpp, 1 = 0.5Vpp
@@ -279,6 +288,10 @@ private:
 			return ModelConstants.NumberOfGroups;
 		}
 
+		uint8_t GetNumberOfChannelsPerGroup() const {
+			return ModelConstants.NumChannelsPerGroup;
+		}
+
 		uint32_t GetCommTransferRate() const {
 			return ModelConstants.USBTransferRate;
 		}
@@ -409,6 +422,12 @@ private:
 	void read_register(CAEN&,
 		uint32_t&& addr,
 		uint32_t& value) noexcept;
+
+	// Write arbitrary bits of any length at any position, 
+	// Keeps the other bits unchanged, 
+	// Following instructions at https://stackoverflow.com/questions/11815894/how-to-read-write-arbitrary-bits-in-c-c
+	void write_bits(CAEN& res, uint32_t&& addr,
+		const uint32_t& value, uint8_t pos, uint8_t len = 1) noexcept;
 
 	// Forces a software trigger in the digitizer.
 	// Does not trigger if resource is null or there are errors.

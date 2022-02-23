@@ -87,7 +87,8 @@ private:
 
 		std::array<int, MAX_CHANNELS> 	ic_ch_number;
 		std::array<bool, MAX_CHANNELS> 	ic_ch_enabled;
-		std::array<int, MAX_CHANNELS>   ic_ch_mask;
+		std::array<int, MAX_CHANNELS>   ic_ch_trgmask;
+		std::array<int, MAX_CHANNELS>   ic_ch_acqmask;
 		std::array<int, MAX_CHANNELS> 	ic_ch_offsets;
 		std::array<std::array<int, 8>, MAX_CHANNELS> 	ic_ch_corrections;
 		std::array<int, MAX_CHANNELS> 	ic_ch_thresholds;
@@ -314,9 +315,8 @@ public:
 				std::string ch_toml = "group" + std::to_string(i);
 				ic_ch_number[i] 	= CAEN_conf[ch_toml]["Number"].value_or(0u);
 				ic_ch_enabled[i] 	= CAEN_conf[ch_toml]["Enabled"].value_or(false);
-
-				ic_ch_mask[i] 		= CAEN_conf[ch_toml]["Mask"].value_or(0u);
-
+				ic_ch_trgmask[i] 	= CAEN_conf[ch_toml]["TrgMask"].value_or(0u);
+				ic_ch_acqmask[i] 	= CAEN_conf[ch_toml]["AcqMask"].value_or(0u);
 				ic_ch_offsets[i] 	= CAEN_conf[ch_toml]["Offset"].value_or(0x8000u);
 				if(toml::array* arr = CAEN_conf[ch_toml]["Corrections"].as_array()) {
 					spdlog::info("Corrections exist");
@@ -645,12 +645,14 @@ public:
 
 								.Number
 									= static_cast<uint8_t>(ic_ch_number[i]),
-								.EnableMask
-									= static_cast<uint8_t>(ic_ch_mask[i]),
+								.TriggerMask
+									= static_cast<uint8_t>(ic_ch_trgmask[i]),
+								.AcquisitionMask
+									= static_cast<uint8_t>(ic_ch_acqmask[i]),
 								.DCOffset
 									= static_cast<uint32_t>(ic_ch_offsets[i]),
 								.DCCorrections
-									= std::vector<uint32_t>(
+									= std::vector<uint8_t>(
 										ic_ch_corrections[i].cbegin(),
 										ic_ch_corrections[i].cend()),
 								.DCRange
@@ -758,14 +760,15 @@ public:
 
 			// Channel tabs
 			for(int i = 0; i < MAX_CHANNELS; i++) {
-				std::string tab_name = "CAEN GROUP " + std::to_string(i);
+				std::string tab_name = "CAEN GR" + std::to_string(i);
 				if(ImGui::BeginTabItem(tab_name.c_str())) {
 					ImGui::PushItemWidth(120);
 					ImGui::Checkbox("Enabled", &ic_ch_enabled[i]);
 					ImGui::InputInt("Group #", &ic_ch_number[i]);
-					ImGui::InputInt("Mask", &ic_ch_mask[i]);
 					ImGui::InputInt("DC Offset [counts]", &ic_ch_offsets[i]);
-
+					ImGui::InputInt("Threshold [counts]", &ic_ch_thresholds[i]);
+					ImGui::InputInt("Trigger Mask", &ic_ch_trgmask[i]);
+					ImGui::InputInt("Acquisition Mask", &ic_ch_acqmask[i]);
 
 					for(int j = 0; j < 8; j++) {
 						std::string c_name = "Correction " + std::to_string(j);
@@ -776,8 +779,6 @@ public:
 					// ranges of the digitizer used, maybe change it to a dropbox?
 	    			ImGui::RadioButton("2V", &ic_ch_ranges[i], 0); ImGui::SameLine();
 	    			ImGui::RadioButton("0.5V", &ic_ch_ranges[i], 1);
-
-	    			ImGui::InputInt("Threshold [counts]", &ic_ch_thresholds[i]);
 
 	    			ImGui::EndTabItem();
 				}

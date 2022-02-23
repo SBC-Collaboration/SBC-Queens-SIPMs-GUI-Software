@@ -1,6 +1,6 @@
 [File]
-RunDir = "../RUNS"
-RunName = "Testing"
+RunDir = "C:\\Users\\SBC\\Documents\\SIPM-Testing-Software"
+RunName = "RUNS"
 
 [Teensy]
 Port = "COM4"
@@ -48,20 +48,30 @@ Polarity = 1
 Enabled = 1
 # Group or channel number
 Number = 0
+# Trigger Enable Mask
+TrgMask = 7
+# Acquisition Enable Mask
+AcqMask = 7
 # Group offset
 Offset = 0x8000
 # Individual corrections to offset
-Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
+Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
-Range = 1
-Threshold = 2075
+Range = 0
+Threshold = 2100
 
 
-# [CAEN.ch1]
-# Enabled = 0
-# Channel = 1
-# Offset = 0x8000
-# # 0 = rising edge, 1 = falling edge
-# Polarity = 1
-# Range = 1
-# Threshold = 2075
+[CAEN.group1]
+Enabled = 0
+# Group or channel number
+Number = 1
+
+[CAEN.group2]
+Enabled = 0
+# Group or channel number
+Number = 2
+
+[CAEN.group3]
+Enabled = 0
+# Group or channel number
+Number = 3
