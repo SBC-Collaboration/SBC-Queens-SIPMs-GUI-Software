@@ -214,6 +214,19 @@ public:
 						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
 							state.CurrentState == CAENInterfaceStates::StatisticsMode) {
 							state.CurrentState = CAENInterfaceStates::RunMode;
+							state.SiPMParameters = cgui_state.SiPMParameters;
+						}
+						return true;
+					});
+
+					CAENControlFac.Button(
+						"Stop Data Taking",
+						[=](CAENInterfaceState& state) {
+						// Only change state if its in a work related
+						// state, i.e oscilloscope mode
+						if(state.CurrentState == CAENInterfaceStates::RunMode) {
+							state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
+							state.SiPMParameters = cgui_state.SiPMParameters;
 						}
 						return true;
 					});
