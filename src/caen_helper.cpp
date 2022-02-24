@@ -5,7 +5,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <spdlog/spdlog.h>
 #include <bitset>
 #include <iostream>
 #include <functional>
@@ -239,20 +238,24 @@ namespace SBCQueens {
           channel_mask |= 1 << ch_config.Number;
         }
 
+        uint32_t trg_mask = 0;
+        for (auto ch_config : gr_configs) {
+          trg_mask |= 1 << (ch_config.TriggerMask > 0);
+        }
+
         // Then enable those channels
         error_wrap("CAEN_DGTZ_SetChannelEnableMask Failed. ",
                    CAEN_DGTZ_SetChannelEnableMask, handle, channel_mask);
 
-        // Then enable their self trigger
+        // Then enable if they are part of the trigger
         error_wrap("CAEN_DGTZ_SetChannelSelfTrigger Failed. ",
                    CAEN_DGTZ_SetChannelSelfTrigger, handle,
-                   res->GlobalConfig.CHTriggerMode, channel_mask);
+                   res->GlobalConfig.CHTriggerMode, trg_mask);
 
         // Let's clear the channel map to allow for new channels properties
         res->GroupConfigs.clear();
         for (auto ch_config : gr_configs) {
 
-    		spdlog::info("CH {0} enabled", ch_config.Number);
           // Before we set any parameters for each channel, we add the
           // new channel to the map. try_emplace(...) will make sure we do
           // not add duplicates
@@ -739,6 +742,8 @@ namespace SBCQueens {
 		// header string = name;type;x,y,z...;
 		auto g_config = res->GlobalConfig;
 		auto group_configs = res->GroupConfigs;
+		const uint8_t num_groups = res->GetNumberOfGroups();
+		const bool has_groups = num_groups > 0;
 
 		// The enum and the map is to simplify the code for the lambdas.
 		// and the header could potentially change any moment with any type
@@ -775,15 +780,19 @@ namespace SBCQueens {
 
 		std::string header = SingleDimToBinaryHeader("sample_rate", Types::DOUBLE, 1);
 
-		// TODO(Zhiheng): ch_configs.size() should not be used for your
-		// case. Calculate the number of channels using the mask and number
-		// of groups
 		std::function<uint32_t (uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
-			return acq_mask==0 ? 0: (acq_mask & 1) + n_channels_acq(acq_mask>>1);
+			return acq_mask==0 ? 0 : (acq_mask & 1) + n_channels_acq(acq_mask>>1);
 		};
+
 		uint32_t num_ch = 0;
 		for (auto gr_pair : res->GroupConfigs) {
-			num_ch += n_channels_acq(gr_pair.second.AcquisitionMask);
+			// This bool will make sure nothing will be added if it does not
+			// have groups
+			if(has_groups) {
+				num_ch += has_groups*n_channels_acq(gr_pair.second.AcquisitionMask);
+			} else {
+				num_ch = res->GroupConfigs.size();
+			}
 		}
 
 		header += SingleDimToBinaryHeader(
@@ -892,25 +901,15 @@ namespace SBCQueens {
 		//
 		// Total length 				20 + ch_size(10 + 2*recordlength)
 
+		const auto rl = res->GlobalConfig.RecordLength;
+		const uint8_t ch_per_group = res->GetNumberOfChannelsPerGroup();
+		const uint8_t num_groups = res->GetNumberOfGroups();
+		const bool has_groups = num_groups > 0;
+
 		std::function<uint32_t (uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
 			return acq_mask==0 ? 0: (acq_mask & 1) + n_channels_acq(acq_mask>>1);
 		};
-		uint32_t num_ch = 0;
-		for (auto gr_pair : res->GroupConfigs) {
-			num_ch += n_channels_acq(gr_pair.second.AcquisitionMask);
-		}
-		const auto rl = res->GlobalConfig.RecordLength;
 
-		const size_t nline = 20 + (2*rl + 10)*num_ch;
-
-		const uint8_t ch_per_group = res->GetNumberOfChannelsPerGroup();
-
-
-
-		// No strings for this one as this is more efficient
-		char out_str[nline];
-
-		// double
 		uint64_t offset = 0;
 		auto append_cstr = [](auto num, uint64_t& offset, char* str) {
 			char* ptr = reinterpret_cast<char*>(&num);
@@ -920,63 +919,134 @@ namespace SBCQueens {
 			offset += sizeof(num) / sizeof(char);
 		};
 
+		// This will switch between Zhiheng code and mine if it has groups
+		auto wrap_if_group = [=, grp_conf = res->GroupConfigs]
+			(uint64_t& offset, char* str, auto f) {
+			for(auto gr_pair : grp_conf) {
+				if(has_groups){
+					for(int ch = 0; ch < ch_per_group; ch++) {
+						if (gr_pair.second.AcquisitionMask & (1 << ch)){
+							f(gr_pair.second, offset, str, ch);
+						}
+					}
+				} else {
+					f(gr_pair.second, offset, str, 0);
+				}
+			}
+		};
+
+
+		uint32_t num_ch = 0;
+		for (auto gr_pair : res->GroupConfigs) {
+			if(has_groups) {
+				num_ch += has_groups*n_channels_acq(gr_pair.second.AcquisitionMask);
+			} else {
+				num_ch = res->GroupConfigs.size();
+			}
+		}
+
+		// No strings for this one as this is more efficient
+		const size_t nline = 20 + (2*rl + 10)*num_ch;
+		char out_str[nline];
+
 		// sample_rate
 		append_cstr(res->GetSampleRate(), offset, &out_str[0]);
 
 		// en_chs
-		for(auto gr_pair : res->GroupConfigs) {
-			for(int ch = 0; ch < ch_per_group; ch++) {
-				if (gr_pair.second.AcquisitionMask & (1<<ch)){
-					uint8_t channel = gr_pair.second.Number * ch_per_group + ch;
-					append_cstr(channel, offset, &out_str[0]);
-				}
+		// for(auto gr_pair : res->GroupConfigs) {
+		// 	for(int ch = 0; ch < ch_per_group; ch++) {
+		// 		if (gr_pair.second.AcquisitionMask & (1<<ch)){
+		// 			uint8_t channel = gr_pair.second.Number * ch_per_group + ch;
+		// 			append_cstr(channel, offset, &out_str[0]);
+		// 		}
+		// 	}
+		// }
+
+		wrap_if_group(offset, &out_str[0],
+			[=](auto group, uint64_t& offset, char* str, uint8_t ch) {
+				uint8_t channel = group.Number * ch_per_group + ch;
+				append_cstr(channel, offset, str);
 			}
-		}
+		);
 
 		// trg_mask
 		uint32_t trg_mask = 0;
 		for(auto gr_pair : res->GroupConfigs) {
-			trg_mask |= (gr_pair.second.TriggerMask << 
-				(gr_pair.second.Number * ch_per_group));
+			uint32_t pos = has_groups ? gr_pair.second.Number * ch_per_group
+			: gr_pair.second.Number;
+			trg_mask |= (gr_pair.second.TriggerMask << pos);
 		}
+
 		append_cstr(trg_mask, offset, &out_str[0]);
 
 		// thresholds
-		for(auto gr_pair : res->GroupConfigs) {
-			for(int ch = 0; ch < ch_per_group; ch++) {
-				if (gr_pair.second.AcquisitionMask & (1<<ch)){
-					append_cstr(gr_pair.second.TriggerThreshold, offset, &out_str[0]);
-				}
+		// for(auto gr_pair : res->GroupConfigs) {
+		// 	if(has_groups){
+		// 		for(int ch = 0; ch < ch_per_group; ch++) {
+		// 			if (gr_pair.second.AcquisitionMask & (1 << ch)){
+		// 				append_cstr(gr_pair.second.TriggerThreshold, offset, &out_str[0]);
+		// 			}
+		// 		}
+		// 	} else {
+		// 		append_cstr(gr_pair.second.TriggerThreshold, offset, &out_str[0]);
+		// 	}
+		// }
+
+		wrap_if_group(offset, &out_str[0],
+			[=](auto group, uint64_t& offset, char* str, uint8_t ch) {
+				append_cstr(group.TriggerThreshold, offset, str);
 			}
-		}
+		);
 
 		// dc_offsets
-		for(auto gr_pair : res->GroupConfigs) {
-			for(int ch = 0; ch < ch_per_group; ch++) {
-				if (gr_pair.second.AcquisitionMask & (1<<ch)){
-					append_cstr(gr_pair.second.DCOffset, offset, &out_str[0]);
-				}
+		// for(auto gr_pair : res->GroupConfigs) {
+		// 	for(int ch = 0; ch < ch_per_group; ch++) {
+		// 		if (gr_pair.second.AcquisitionMask & (1<<ch)){
+		// 			append_cstr(gr_pair.second.DCOffset, offset, &out_str[0]);
+		// 		}
+		// 	}
+		// }
+		wrap_if_group(offset, &out_str[0],
+			[=](auto group, uint64_t& offset, char* str, uint8_t ch) {
+				append_cstr(group.DCOffset, offset, str);
 			}
-		}
+		);
 
 		// dc_corrections
-		for(auto gr_pair : res->GroupConfigs) {
-			for(int ch = 0; ch < ch_per_group; ch++) {
-				if (gr_pair.second.AcquisitionMask & (1<<ch)){
-					append_cstr(gr_pair.second.DCCorrections[ch], offset, &out_str[0]);
+		// for(auto gr_pair : res->GroupConfigs) {
+		// 	for(int ch = 0; ch < ch_per_group; ch++) {
+		// 		if (gr_pair.second.AcquisitionMask & (1<<ch)){
+		// 			append_cstr(gr_pair.second.DCCorrections[ch], offset, &out_str[0]);
+		// 		}
+		// 	}
+		// }
+		wrap_if_group(offset, &out_str[0],
+			[=](auto group, uint64_t& offset, char* str, uint8_t ch) {
+				if(group.DCCorrections.size() == 8){
+					append_cstr(group.DCCorrections[ch], offset, str);
+				} else {
+					uint8_t tmp = 0;
+					append_cstr(tmp, offset, str);
 				}
 			}
-		}
+		);
 
 		// dc_range
-		for(auto gr_pair : res->GroupConfigs) {
-			for(int ch = 0; ch < ch_per_group; ch++) {
-				if (gr_pair.second.AcquisitionMask & (1<<ch)){
-					float val = res->GetVoltageRange(gr_pair.second.Number);
-					append_cstr(val, offset, &out_str[0]);
-				}
+		// for(auto gr_pair : res->GroupConfigs) {
+		// 	for(int ch = 0; ch < ch_per_group; ch++) {
+		// 		if (gr_pair.second.AcquisitionMask & (1<<ch)){
+		// 			float val = res->GetVoltageRange(gr_pair.second.Number);
+		// 			append_cstr(val, offset, &out_str[0]);
+		// 		}
+		// 	}
+		// }
+
+		wrap_if_group(offset, &out_str[0],
+			[&](auto group, uint64_t& off, char* str, uint8_t ch) {
+				float val = res->GetVoltageRange(group.Number);
+				append_cstr(val, off, str);
 			}
-		}
+		);
 
 		// time_stamp
 		append_cstr(evt->Info.TriggerTimeTag, offset, &out_str[0]);
@@ -990,11 +1060,20 @@ namespace SBCQueens {
 		// number of channels that are activated
 		auto& evtdata = evt->Data;
 		for(auto gr_pair : res->GroupConfigs){
-			auto& gr = gr_pair.second.Number;
-			for(int ch = 0; ch < ch_per_group; ch++) {
-				if (gr_pair.second.AcquisitionMask & (1<<ch)){
-					for(uint32_t xp = 0; xp < evtdata->ChSize[gr*ch_per_group+ch]; xp++) {
-						append_cstr(evtdata->DataChannel[ch][xp], offset, &out_str[0]);
+			auto gr = gr_pair.second.Number;
+
+			if(has_groups){
+				for(int ch = 0; ch < ch_per_group; ch++) {
+					if (gr_pair.second.AcquisitionMask & (1<<ch)){
+						for(uint32_t xp = 0; xp < evtdata->ChSize[gr*ch_per_group+ch]; xp++) {
+							append_cstr(evtdata->DataChannel[ch][xp], offset, &out_str[0]);
+						}
+					}
+				}
+			} else {
+				if(evtdata->ChSize[gr] > 0) {
+					for(uint32_t xp = 0; xp < evtdata->ChSize[gr]; xp++) {
+						append_cstr(evtdata->DataChannel[gr][xp], offset, &out_str[0]);
 					}
 				}
 			}

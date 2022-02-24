@@ -143,8 +143,12 @@ namespace SBCQueens {
 		// channel # or channel group
 		uint8_t Number = 0;
 
-		// Mask of enabled channels within the group
+		// Mask of channels within the group enabled to trigger
+		// If Channel, if its != 0 then its enabled
 		uint8_t TriggerMask = 0;
+
+		// Mask of enabled channels within the group
+		// Ignored for single channels.
 		uint8_t AcquisitionMask = 0;
 
 		// 0x8000 no offset if 16 bit DAC
