@@ -23,6 +23,7 @@
 #include "include/caen_helper.h"
 #include "include/timing_events.h"
 #include "indicators.h"
+#include "spdlog/spdlog.h"
 #include "timing_events.h"
 
 namespace SBCQueens {
@@ -332,9 +333,9 @@ private:
 
 			if(Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
 
-				// spdlog::info("Total size buffer: {0}",  port->Data.TotalSizeBuffer);
-				// spdlog::info("Data size: {0}", port->Data.DataSize);
-				// spdlog::info("Num events: {0}",  port->Data.NumEvents);
+				// spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
+				// spdlog::info("Data size: {0}", Port->Data.DataSize);
+				// spdlog::info("Num events: {0}", Port->Data.NumEvents);
 
 				extract_event(Port, 0, osc_event);
 				// spdlog::info("Event size: {0}", osc_event->Info.EventSize);
@@ -342,7 +343,6 @@ private:
 				// spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
 
 				process_data_for_gui();
-
 
 				// if(port->Data.NumEvents >= 2) {
 				// 	extract_event(port, 1, adj_osc_event);
@@ -369,7 +369,8 @@ private:
 		bool statistics_mode() {
 
 			static auto process_events = [&]() {
-				bool isData = retrieve_data_until_n_events(Port, 512);
+				bool isData = retrieve_data_until_n_events(Port, 
+					+Port->GlobalConfig.MaxEventsPerRead);
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
@@ -411,7 +412,8 @@ private:
 				std::bind(&CAENDigitizerInterface::rdm_extract_for_gui, this)
 			);
 			static auto process_events = [&]() {
-				bool isData = retrieve_data_until_n_events(Port, 512);
+				bool isData = retrieve_data_until_n_events(Port, 
+					+Port->GlobalConfig.MaxEventsPerRead);
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
@@ -429,6 +431,8 @@ private:
 						_pulseFile->Add(processing_evts[i]);
 					}
 				}
+				spdlog::info("Saving");
+				_pulseFile->flush();
 
 			};
 
@@ -436,22 +440,44 @@ private:
 				// spdlog::info("Saving SIPM data");
 				save(_pulseFile, sbc_save_func, Port);
 			} else {
+				
+				// Get current date and time, e.g. 202201051103
+				std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+				std::time_t now_t = std::chrono::system_clock::to_time_t(now);
+				char filename[16];
+    			std::strftime(filename, sizeof(filename), "%Y%m%d%H%M", 
+    				std::localtime(&now_t));
+
 				open(_pulseFile,
 					state_of_everything.RunDir
 					+ "/" + state_of_everything.RunName
-					+ "/" + state_of_everything.SiPMParameters + ".bin",
+					+ "/" + filename + ".bin",
+					// state_of_everything.SiPMParameters
 
 					// sbc_init_file is a function that saves the header
 					// of the sbc data format as a function of record length
 					// and number of channels
 					sbc_init_file,
 					Port);
+
 				isFileOpen = _pulseFile > 0;
 			}
 			process_events();
 			extract_for_gui_nb();
 			if(change_state()) {
+				// save remaining data
+				retrieve_data(Port);
+				if (isFileOpen) {
+					for(uint32_t i = 0; i < Port->Data.NumEvents; i++) {
+						extract_event(Port, i, processing_evts[i]);
+						_pulseFile->Add(processing_evts[i]);
+					}
+					save(_pulseFile, sbc_save_func, Port);
+				}
+
 				isFileOpen = false;
+				_pulseFile->close();
+				_pulseFile.release();
 			}
 			return true;
 		}
@@ -510,13 +536,14 @@ private:
 		};
 
 		void process_data_for_gui() {
-			int j = 0;
+			// int j = 0;
 
 			//TODO(Zhiheng): change anything you need here, too...
-			for(auto ch : Port->GroupConfigs) {
-				auto& ch_num = ch.second.Number;
-				auto buf = osc_event->Data->DataChannel[ch_num];
-				auto size = osc_event->Data->ChSize[ch_num];
+			// for(auto ch : Port->GroupConfigs) {
+			for (int j=0; j<3; j++) {
+				// auto& ch_num = ch.second.Number;
+				auto buf = osc_event->Data->DataChannel[j];
+				auto size = osc_event->Data->ChSize[j];
 
 				//spdlog::info("Event size size: {0}", size);
 				if(size <= 0) {
@@ -559,7 +586,7 @@ private:
 				delete x_values;
 				delete y_values;
 
-				j++;
+				// j++;
 			}
 		}
 	};

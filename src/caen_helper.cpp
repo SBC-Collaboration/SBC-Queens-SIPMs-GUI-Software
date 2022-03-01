@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -9,6 +10,7 @@
 #include <bitset>
 #include <iostream>
 #include <functional>
+#include <spdlog/fmt/fmt.h>
 
 namespace SBCQueens {
 
@@ -68,7 +70,7 @@ namespace SBCQueens {
 		// stopped)
 		// Resources are freed when the pointer is released
 		int errCode = CAEN_DGTZ_SWStopAcquisition(handle);
-		errCode |= CAEN_DGTZ_ClearData(handle);
+		// errCode |= CAEN_DGTZ_ClearData(handle);
 		errCode |= CAEN_DGTZ_CloseDigitizer(handle);
 
 		if(errCode < 0) {
@@ -567,6 +569,12 @@ namespace SBCQueens {
 	bool retrieve_data_until_n_events(CAEN& res, uint32_t&& n) noexcept {
 		int& handle = res->Handle;
 
+		if (not res->start_rate_calculation){
+			res->ts = std::chrono::steady_clock::now();
+			res->start_rate_calculation = true;
+			// When starting statistics mode, mark time
+		}
+
 		if(!res) {
 			return false;
 		}
@@ -606,6 +614,21 @@ namespace SBCQueens {
 				res->Data.Buffer,
 				res->Data.DataSize,
 				&res->Data.NumEvents);
+		
+		// Calculate trigger rate
+		res->te = std::chrono::steady_clock::now();
+		res->t_us = std::chrono::
+			duration_cast<std::chrono::microseconds>(res->te - res->ts).count();
+		res->n_events = res->Data.NumEvents;
+		res->ts = res->te;
+		res->duration += res->t_us;
+		res->trg_count += res->n_events;
+		spdlog::info(fmt::format("#Triggers: {:7d}, Duration: {:-6.2f}s, Inst Rate:{:-8.2f}Hz, Accl Rate:{:-8.2f}Hz", 
+			res->trg_count, 
+			res->duration/1e6, 
+			res->n_events*1e6/res->t_us, 
+			res->trg_count*1e6/res->duration));
+
 
 		if(res->LatestError.ErrorCode < 0){
 			res->LatestError.isError = true;

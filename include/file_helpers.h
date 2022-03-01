@@ -10,6 +10,7 @@
 #include <string>
 #include <type_traits>
 #include <filesystem>
+#include <spdlog/spdlog.h>
 
 // 3rd party includes
 #include <concurrentqueue.h>
@@ -119,6 +120,16 @@ public:
 			_stream << fmt;
 		}
 
+		// Flush the buffer to file
+		void flush() {
+			_stream.flush();
+		}
+
+		// Closes the file
+		void close() {
+			_stream.close();
+		}
+
 	};
 
 	template<typename T>
@@ -180,13 +191,15 @@ public:
 			// If it takes the entire format, then apply it to all.
 			} else if constexpr (std::is_invocable_v<FormatFunc,
 				std::vector<T>&, Args...>) {
-
 				(*file) << f(data, std::forward<Args>(args)...);
 
 			// if not, just save what f returns
 			} else {
 				(*file) << f(std::forward<Args>(args)...);
 			}
+
+			(*file).flush();
+
 		}
 
 	}
