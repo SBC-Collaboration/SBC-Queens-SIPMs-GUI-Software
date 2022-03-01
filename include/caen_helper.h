@@ -11,10 +11,10 @@
 #include <unordered_map>
 #include <map>
 #include <cmath>
+#include <chrono>
 
 // 3rd party includes
 #include <CAENDigitizer.h>
-
 
 // my includes
 
@@ -268,6 +268,11 @@ private:
 
 		int Handle;
 		CAENError LatestError;
+
+		bool start_rate_calculation = false;
+		std::chrono::steady_clock::time_point ts, te;
+		uint64_t t_us, n_events;
+		uint64_t trg_count = 0, duration = 0;
 
 		// This holds the latest raw CAEN data
 		CAENData Data;
