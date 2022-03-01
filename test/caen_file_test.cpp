@@ -1,5 +1,5 @@
 // g++ caen_file_test.cpp ../src/caen_helper.cpp -Og -I"X:/Program Files/CAEN/Comm/include" -I"X:/Program Files/CAEN/VME/include" -I"X:/Program Files/CAEN/Digitizers/Library/include" -I../include -I../deps/concurrentqueue -L"X:/Program Files/CAEN/Comm/lib" -L"X:/Program Files/CAEN/VME/lib" -L"X:/Program Files/CAEN/Digitizers/Library/lib" -lCAENDigitizer -o out.exe -static-libstdc++ -g
-
+// g++ caen_file_test.cpp ../src/caen_helper.cpp -Og -I"C:/Program Files/CAEN/Comm/include" -I"C:/Program Files/CAEN/VME/include" -I"C:/Program Files/CAEN/Digitizers/Library/include" -I../include -I../deps/concurrentqueue -L"X:/Program Files/CAEN/Comm/lib" -L"C:/Program Files/CAEN/VME/lib" -L"C:/Program Files/CAEN/Digitizers/Library/lib" -lCAENDigitizer -o out.exe -static-libstdc++ -g
 #include "caen_helper.h"
 #include "file_helpers.h"
 
@@ -23,23 +23,27 @@ int main(int argc, char const *argv[])
 		.RecordLength = 1200,
 	};
 
-	res->ChannelConfigs[0] = SBCQueens::CAENChannelConfig {
-		.Channel = 3,
+	res->GroupConfigs[0] = SBCQueens::CAENGroupConfig {
+		.Number = 3,
+		.TriggerMask = 1,
 		.DCOffset = 0x4534,
 		.DCRange = 1,
-		.TriggerThreshold = 7500
+		.TriggerThreshold = 7500,
+
 	};
 
-	res->ChannelConfigs[1] = SBCQueens::CAENChannelConfig {
-		.Channel = 5,
+	res->GroupConfigs[1] = SBCQueens::CAENGroupConfig {
+		.Number = 5,
+		.TriggerMask = 1,
 		.DCOffset = 0x4569,
 		.DCRange = 0,
-		.TriggerThreshold = 7200
+		.TriggerThreshold = 7200,
+
 	};
 
 	SBCQueens::DataFile<SBCQueens::CAENEvent> testFile;
 
-	open(testFile, "test.txt", SBCQueens::sbc_init_file, res);
+	open(testFile, "test.bin", SBCQueens::sbc_init_file, res);
 
 	SBCQueens::CAENEvent evt = std::make_shared<SBCQueens::caenEvent>(
 		res->Handle

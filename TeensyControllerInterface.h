@@ -368,6 +368,7 @@ namespace SBCQueens {
 
 				// This will send a command only if its not none
 				send_teensy_cmd(state_of_everything.CommandToSend);
+				state_of_everything.CommandToSend = TeensyCommands::None;
 
 				// This will turn into an SML soon*
 				switch(state_of_everything.CurrentState) {

@@ -19,8 +19,6 @@
 #include "TeensyControllerInterface.h"
 #include "CAENDigitizerInterface.h"
 #include "caen_helper.h"
-#include "deps/imgui/imgui.h"
-#include "imgui.h"
 #include "imgui_helpers.h"
 #include "implot_helpers.h"
 #include "indicators.h"
@@ -216,6 +214,19 @@ public:
 						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
 							state.CurrentState == CAENInterfaceStates::StatisticsMode) {
 							state.CurrentState = CAENInterfaceStates::RunMode;
+							state.SiPMParameters = cgui_state.SiPMParameters;
+						}
+						return true;
+					});
+
+					CAENControlFac.Button(
+						"Stop Data Taking",
+						[=](CAENInterfaceState& state) {
+						// Only change state if its in a work related
+						// state, i.e oscilloscope mode
+						if(state.CurrentState == CAENInterfaceStates::RunMode) {
+							state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
+							state.SiPMParameters = cgui_state.SiPMParameters;
 						}
 						return true;
 					});
@@ -707,14 +718,14 @@ public:
 				TeensyControlFac.ComboBox("PID1 State",
 					tgui_state.PIDOneState,
 					{{PIDState::Running, "Running"}, {PIDState::Standby, "Standby"}},
-					ImGui::IsItemEdited,
+					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 
 						oldState.PIDOneState = tgui_state.PIDOneState;
 						if(oldState.PIDOneState == PIDState::Standby) {
-							oldState.CommandToSend = TeensyCommands::StartPIDOne;
-						} else {
 							oldState.CommandToSend = TeensyCommands::StopPIDOne;
+						} else {
+							oldState.CommandToSend = TeensyCommands::StartPIDOne;
 						}
 
 						return true;
@@ -739,7 +750,7 @@ public:
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrSetpoint;
-						oldState.PIDOneCurrentValues.SetPoint = tgui_state.PIDOneTempValues.SetPoint;
+						oldState.PIDOneCurrentValues.SetPoint = tgui_state.PIDOneCurrentValues.SetPoint;
 						return true;
 					}
 				);
@@ -766,7 +777,8 @@ public:
 				);
 				TeensyControlFac.InputFloat("Td",
 					tgui_state.PIDOneTempValues.Td,
-					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					0.01f, 6.0f, "%.6f ms",
+					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPIDOneTempTd;
 						oldState.PIDOneTempValues.Td = tgui_state.PIDOneTempValues.Td;
@@ -777,7 +789,8 @@ public:
 				ImGui::Text("Current PID coefficients.");
 				TeensyControlFac.InputFloat("AKp",
 					tgui_state.PIDOneCurrentValues.Kp,
-					0.01f, 6.0f, "%.6f", ImGui::IsItemDeactivated,
+					0.01f, 6.0f, "%.6f",
+					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrKp;
 						oldState.PIDOneCurrentValues.Kp = tgui_state.PIDOneCurrentValues.Kp;
@@ -796,7 +809,8 @@ public:
 				);
 				TeensyControlFac.InputFloat("ATd",
 					tgui_state.PIDOneCurrentValues.Td,
-					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+					0.01f, 6.0f, "%.6f ms",
+					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrTd;
 						oldState.PIDOneCurrentValues.Td = tgui_state.PIDOneCurrentValues.Td;
@@ -812,14 +826,14 @@ public:
 				TeensyControlFac.ComboBox("PID2 State",
 					tgui_state.PIDTwoState,
 					{{PIDState::Running, "Running"}, {PIDState::Standby, "Standby"}},
-					ImGui::IsItemEdited,
+					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 
 						oldState.PIDTwoState = tgui_state.PIDTwoState;
 						if(oldState.PIDOneState == PIDState::Standby) {
-							oldState.CommandToSend = TeensyCommands::StartPIDTwo;
-						} else {
 							oldState.CommandToSend = TeensyCommands::StopPIDTwo;
+						} else {
+							oldState.CommandToSend = TeensyCommands::StartPIDTwo;
 						}
 
 						return true;
@@ -829,13 +843,15 @@ public:
 				ImGui::Text("PID Setpoints");
 				TeensyControlFac.InputFloat("Temperature Setpoint",
 					tgui_state.PIDTwoTempValues.SetPoint,
-					0.01f, 6.0f, "%.6f °C", ImGui::IsItemDeactivated,
+					0.01f, 6.0f, "%.6f °C",
+					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPIDTwoTempSetpoint;
 						oldState.PIDTwoTempValues.SetPoint = tgui_state.PIDTwoTempValues.SetPoint;
 						return true;
 					}
 				);
+
 				TeensyControlFac.InputFloat("Current Setpoint",
 					tgui_state.PIDTwoCurrentValues.SetPoint,
 					0.01f, 6.0f, "%.6f A",
