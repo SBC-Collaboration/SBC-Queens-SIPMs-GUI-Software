@@ -452,6 +452,7 @@ private:
 			extract_for_gui_nb();
 			if(change_state()) {
 				isFileOpen = false;
+				close(_pulseFile);
 			}
 			return true;
 		}

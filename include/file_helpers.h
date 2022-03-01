@@ -79,6 +79,7 @@ public:
 		// the Datafile is out of the scope but I want to make sure.
 		~dataFile() {
 			_stream.close();
+			_open = false;
 		}
 
 		bool IsOpen() const {
@@ -151,6 +152,13 @@ public:
 
 		res = std::make_unique<dataFile<T>>(fileName,
 			std::forward<InitWriteFunc>(f), std::forward<Args>(args)...);
+	}
+
+	template <typename T>
+	void close(DataFile<T>& res) {
+		if(res) {
+			res.release();
+		}
 	}
 
 	// Saves the contents of DataFile using the format function f

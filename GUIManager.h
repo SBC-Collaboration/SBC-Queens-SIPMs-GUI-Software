@@ -222,8 +222,6 @@ public:
 					CAENControlFac.Button(
 						"Stop Data Taking",
 						[=](CAENInterfaceState& state) {
-						// Only change state if its in a work related
-						// state, i.e oscilloscope mode
 						if(state.CurrentState == CAENInterfaceStates::RunMode) {
 							state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
 							state.SiPMParameters = cgui_state.SiPMParameters;
