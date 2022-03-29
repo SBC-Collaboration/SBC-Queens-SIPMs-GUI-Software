@@ -45,7 +45,7 @@ private:
 
 		// // CAEN Controls
 		ControlLink<CAENQueue> CAENControlFac;
-		CAENInterfaceState cgui_state;
+		CAENInterfaceData cgui_state;
 
 		std::string i_run_dir;
 		std::string i_run_name;
@@ -208,7 +208,7 @@ public:
 					// TODO(Hector): generalize this in the future
 					CAENControlFac.Button(
 						"Start Data Taking",
-						[=](CAENInterfaceState& state) {
+						[=](CAENInterfaceData& state) {
 						// Only change state if its in a work related
 						// state, i.e oscilloscope mode
 						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
@@ -221,7 +221,7 @@ public:
 
 					CAENControlFac.Button(
 						"Stop Data Taking",
-						[=](CAENInterfaceState& state) {
+						[=](CAENInterfaceData& state) {
 						if(state.CurrentState == CAENInterfaceStates::RunMode) {
 							state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
 							state.SiPMParameters = cgui_state.SiPMParameters;
@@ -412,7 +412,7 @@ public:
 
 		 	CAENQueue& cq = std::get<CAENQueue&>(_queues);
 			cq.try_enqueue(
-				[](CAENInterfaceState& state) {
+				[](CAENInterfaceData& state) {
 					state.CurrentState = CAENInterfaceStates::Closing;
 					return true;
 				}
@@ -454,7 +454,7 @@ public:
 				// This button starts the CAEN communication and sends all
 				// the setup configuration
 				if(CAENControlFac.Button("Connect",
-					[=](CAENInterfaceState& state) {
+					[=](CAENInterfaceData& state) {
 
 						state = cgui_state;
 
@@ -481,7 +481,7 @@ public:
 					static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
 
 				if(CAENControlFac.Button("Disconnect",
-					[=](CAENInterfaceState& state) {
+					[=](CAENInterfaceData& state) {
 
 						// Only change the state if any of these states
 						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
@@ -549,7 +549,7 @@ public:
     				[]() {return false;}, [](){});
 
 				CAENControlFac.Button("Software Trigger",
-					[](CAENInterfaceState& state) {
+					[](CAENInterfaceData& state) {
 						//software_trigger(state.Port);
 						return true;
 					}
@@ -560,7 +560,7 @@ public:
 				}
 
     			CAENControlFac.Button("Start processing",
-    				[](CAENInterfaceState& state) {
+    				[](CAENInterfaceData& state) {
 						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
 							state.CurrentState == CAENInterfaceStates::RunMode){
 							state.CurrentState = CAENInterfaceStates::StatisticsMode;

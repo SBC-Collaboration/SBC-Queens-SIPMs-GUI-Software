@@ -9,7 +9,7 @@
 #include <bitset>
 #include <iostream>
 #include <functional>
-#include <spdlog/fmt/fmt.h>
+#include <spdlog/spdlog.h>
 
 namespace SBCQueens {
 
