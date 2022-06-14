@@ -192,7 +192,7 @@ public:
 				std::is_invocable_v<FormatFunc, const T&, Args...> 	||
 				std::is_invocable_v<FormatFunc, T&, Args...>) {
 
-				for(auto item : data) {
+				for(auto& item : data) {
 					(*file) << f(item, std::forward<Args>(args)...);
 				}
 
@@ -205,8 +205,6 @@ public:
 			} else {
 				(*file) << f(std::forward<Args>(args)...);
 			}
-
-			(*file).flush();
 
 		}
 

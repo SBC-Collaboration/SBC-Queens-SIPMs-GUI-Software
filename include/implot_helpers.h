@@ -349,7 +349,8 @@ public:
 
 		// Adds plot with ID, and draws it at the placed location if exists
 		// It returns a smart pointer to the indicator (not plot)
-		auto& plot(const T& id, const std::string& label, bool clearOnNewData = false) {
+		auto& plot(const T& id, const std::string& label,
+			bool clearOnNewData = false) {
 
 			_indicators.try_emplace(id,
 				std::make_unique<Plot<T>>(id, clearOnNewData));
@@ -363,6 +364,16 @@ public:
 
 			return ind;
 
+		}
+
+		void clear_plot(const T& id) {
+			auto search = _indicators.find(id);
+			if(search != _indicators.end()) {
+				Plot<T>* plt = dynamic_cast<Plot<T>*>(
+					_indicators.at(id).get()
+					);
+				plt->clear();
+			}
 		}
 
 	};

@@ -247,7 +247,8 @@ private:
 		}
 
 		~caen() {
-			CAEN_DGTZ_FreeReadoutBuffer(&Data.Buffer);
+			// Moved the deallocation to disconnect(...)
+			//CAEN_DGTZ_FreeReadoutBuffer(&Data.Buffer);
 			Data.Buffer = nullptr;
 		}
 
@@ -270,7 +271,7 @@ private:
 		CAENError LatestError;
 
 		bool start_rate_calculation = false;
-		std::chrono::steady_clock::time_point ts, te;
+		std::chrono::high_resolution_clock::time_point ts, te;
 		uint64_t t_us, n_events;
 		uint64_t trg_count = 0, duration = 0;
 
@@ -459,7 +460,7 @@ private:
 	// Does not retrieve data if resource is null, there are errors,
 	// or events in buffer are less than n.
 	// n cannot be bigger than the max number of buffers allowed
-	bool retrieve_data_until_n_events(CAEN&, uint32_t&& n) noexcept;
+	bool retrieve_data_until_n_events(CAEN&, uint32_t& n) noexcept;
 
 	// Extracts event i from the data retrieved by retrieve_data(...)
 	// into Event evt.

@@ -370,7 +370,7 @@ private:
 
 			static auto process_events = [&]() {
 				bool isData = retrieve_data_until_n_events(Port, 
-					+Port->GlobalConfig.MaxEventsPerRead);
+					Port->GlobalConfig.MaxEventsPerRead);
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
@@ -413,7 +413,7 @@ private:
 			);
 			static auto process_events = [&]() {
 				bool isData = retrieve_data_until_n_events(Port, 
-					+Port->GlobalConfig.MaxEventsPerRead);
+					Port->GlobalConfig.MaxEventsPerRead);
 
 				// While all of this is happening, the digitizer is taking data
 				if(!isData) {
@@ -422,7 +422,6 @@ private:
 
 				//double frequency = 0.0;
 				for(uint32_t i = 0; i < Port->Data.NumEvents; i++) {
-
 					// Extract event i
 					extract_event(Port, i, processing_evts[i]);
 
@@ -431,8 +430,6 @@ private:
 						_pulseFile->Add(processing_evts[i]);
 					}
 				}
-				spdlog::info("Saving");
-				_pulseFile->flush();
 
 			};
 
@@ -452,7 +449,7 @@ private:
 					state_of_everything.RunDir
 					+ "/" + state_of_everything.RunName
 					+ "/" + filename + ".bin",
-					// state_of_everything.SiPMParameters
+					// + state_of_everything.SiPMParameters + ".bin",
 
 					// sbc_init_file is a function that saves the header
 					// of the sbc data format as a function of record length
@@ -462,9 +459,20 @@ private:
 
 				isFileOpen = _pulseFile > 0;
 			}
+
 			process_events();
 			extract_for_gui_nb();
 			if(change_state()) {
+				// save remaining data
+				retrieve_data(Port);
+				if (isFileOpen) {
+					for(uint32_t i = 0; i < Port->Data.NumEvents; i++) {
+						extract_event(Port, i, processing_evts[i]);
+						_pulseFile->Add(processing_evts[i]);
+					}
+					save(_pulseFile, sbc_save_func, Port);
+				}
+
 				isFileOpen = false;
 				close(_pulseFile);
 			}

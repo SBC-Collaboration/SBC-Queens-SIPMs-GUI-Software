@@ -9,6 +9,8 @@
 #include <bitset>
 #include <iostream>
 #include <functional>
+
+#include <spdlog/spdlog.h>
 #include <spdlog/fmt/fmt.h>
 
 namespace SBCQueens {
@@ -69,6 +71,8 @@ namespace SBCQueens {
 		// stopped)
 		// Resources are freed when the pointer is released
 		int errCode = CAEN_DGTZ_SWStopAcquisition(handle);
+
+		errCode |= CAEN_DGTZ_FreeReadoutBuffer(&res->Data.Buffer);
 		// errCode |= CAEN_DGTZ_ClearData(handle);
 		errCode |= CAEN_DGTZ_CloseDigitizer(handle);
 
@@ -231,8 +235,6 @@ namespace SBCQueens {
       if (res->Model == CAENDigitizerModel::DT5730B) {
         // For DT5730B, there are no groups only channels so we take
         // each configuration as a channel
-
-
 
         // First, we make the channel mask
         uint32_t channel_mask = 0;
@@ -569,11 +571,11 @@ namespace SBCQueens {
 	   	}
 	}
 
-	bool retrieve_data_until_n_events(CAEN& res, uint32_t&& n) noexcept {
+	bool retrieve_data_until_n_events(CAEN& res, uint32_t& n) noexcept {
 		int& handle = res->Handle;
 
 		if (not res->start_rate_calculation){
-			res->ts = std::chrono::steady_clock::now();
+			res->ts = std::chrono::high_resolution_clock::now();
 			res->start_rate_calculation = true;
 			// When starting statistics mode, mark time
 		}
@@ -582,7 +584,7 @@ namespace SBCQueens {
 			return false;
 		}
 
-		if(n > res->CurrentMaxBuffers) {
+		if(n >= res->CurrentMaxBuffers) {
 			if(get_events_in_buffer(res) < res->CurrentMaxBuffers) {
 				return false;
 			}
@@ -619,17 +621,17 @@ namespace SBCQueens {
 				&res->Data.NumEvents);
 		
 		// Calculate trigger rate
-		res->te = std::chrono::steady_clock::now();
+		res->te = std::chrono::high_resolution_clock::now();
 		res->t_us = std::chrono::
 			duration_cast<std::chrono::microseconds>(res->te - res->ts).count();
 		res->n_events = res->Data.NumEvents;
 		res->ts = res->te;
 		res->duration += res->t_us;
 		res->trg_count += res->n_events;
-		spdlog::info(fmt::format("#Triggers: {:7d}, Duration: {:-6.2f}s, Inst Rate:{:-8.2f}Hz, Accl Rate:{:-8.2f}Hz", 
-			res->trg_count, 
-			res->duration/1e6, 
-			res->n_events*1e6/res->t_us, 
+		spdlog::info(fmt::format("#Triggers: {:7d}, Duration: {:-6.2f}s, Inst Rate:{:-8.2f}Hz, Accl Rate:{:-8.2f}Hz",
+			res->trg_count,
+			res->duration/1e6,
+			res->n_events*1e6/res->t_us,
 			res->trg_count*1e6/res->duration));
 
 
@@ -750,12 +752,14 @@ namespace SBCQueens {
 		// Unless this is enabled, then it is always that number minus one.
 		// Except when the buffers is 1
 		if(res->GlobalConfig.MemoryFullModeSelection) {
-			if(real_max_buffs > 1) {
+			if(real_max_buffs > 2) {
 				real_max_buffs--;
 			} else {
-				real_max_buffs = 2;
+				real_max_buffs = 1;
 			}
 		}
+
+		spdlog::info("Number of buffers {0}", real_max_buffs);
 
 		// Phew, we are done!
 		return real_max_buffs;

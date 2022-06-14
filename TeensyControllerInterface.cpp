@@ -10,6 +10,7 @@
 #include <ratio>
 #include <optional>
 #include <sstream>
+#include <cmath>
 
 //
 #include "timing_events.h"
@@ -18,20 +19,48 @@ namespace SBCQueens {
 
     // I have no reason to use it in the future. I am adding
     // it just in case
-	void to_json(json& j, const PIDs& p) {
-        j = json{{"PID1T", p.PID1.Temperature},
-    			{"PID1I", p.PID1.Current},
-    			{"PID2T", p.PID2.Temperature},
-    			{"PID2I", p.PID2.Current}};
+	void to_json(json& j, const Peltiers& p) {
+        j = json{{"PELTIER1I", p.PID.Current}};
     }
 
-    void from_json(const json& j, PIDs& p) {
+    void from_json(const json& j, Peltiers& p) {
     	p.time = get_current_time_epoch();
-    	j.at("PID1T").get_to(p.PID1.Temperature);
-    	j.at("PID1I").get_to(p.PID1.Current);
+    	j.at("PELTIER1I").get_to(p.PID.Current);
+    }
 
-    	j.at("PID2T").get_to(p.PID2.Temperature);
-    	j.at("PID2I").get_to(p.PID2.Current);
+    void to_json(json& j, const RTDs& p) {
+    	j = json{{"RTDT1", p.RTD_1.Temperature}};
+    	j = json{{"RTDT2", p.RTD_2.Temperature}};
+    }
+
+    void from_json(const json& j, RTDs& p) {
+    	p.time = get_current_time_epoch();
+    	j.at("RTDT1").get_to(p.RTD_1.Temperature);
+    	j.at("RTDT2").get_to(p.RTD_2.Temperature);
+    }
+
+    void to_json(json& j, const Pressures& p) {
+
+    	j = json{{"VACUUMP", p.Vacuum.Pressure}};
+
+    	j = json{{"NTWOP", p.N2Line.Pressure}};
+    }
+
+    void from_json(const json& j, Pressures& p) {
+    	auto press = 0.0;
+
+    	p.time = get_current_time_epoch();
+    	j.at("VACUUMP").get_to(press);
+    	press *= (3.32/exp2(12)) * (1.0/135); // to current
+    	press = 14.6959 - (14.7/16e-3)*(press - 4e-3); // to psi
+    	press /= 14.5038; //to bar
+    	p.Vacuum.Pressure = press;
+
+    	j.at("NTWOP").get_to(press);
+    	press *= (3.32/exp2(12)) * (1.0/135); // to current
+    	press = 14.6959 + (30/16e-3)*(press - 4e-3); // to psi
+    	press /= 14.5038; //to bar
+    	p.N2Line.Pressure = press;
     }
 
     // I have no reason to use it in the future. I am adding

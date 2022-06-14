@@ -19,6 +19,8 @@
 #include "TeensyControllerInterface.h"
 #include "CAENDigitizerInterface.h"
 #include "caen_helper.h"
+#include "deps/imgui/imgui.h"
+#include "deps/implot/implot.h"
 #include "imgui_helpers.h"
 #include "implot_helpers.h"
 #include "indicators.h"
@@ -78,31 +80,20 @@ public:
 			tgui_state.RunName 		= i_run_name;
 
 			// Send initial states of the PIDs
-			tgui_state.GeneralRelayState = false;
-			tgui_state.PIDRelayState = false;
+			tgui_state.PeltierState = false;
+			tgui_state.ReliefValveState = false;
+			tgui_state.N2ValveState = false;
 
-			tgui_state.PIDOneState = PIDState::Standby;
-			tgui_state.PIDOneTempValues.SetPoint = t_conf["PID1TempSetpoint"].value_or(0.0f);
-			tgui_state.PIDOneTempValues.Kp = t_conf["PID1TKp"].value_or(0.0f);
-			tgui_state.PIDOneTempValues.Ti = t_conf["PID1TTi"].value_or(0.0f);
-			tgui_state.PIDOneTempValues.Td = t_conf["PID1TTd"].value_or(0.0f);
+			tgui_state.PIDState = PIDState::Standby;
+			tgui_state.PIDTempValues.SetPoint = t_conf["PIDTempSetpoint"].value_or(0.0f);
+			tgui_state.PIDTempValues.Kp = t_conf["PIDTKp"].value_or(0.0f);
+			tgui_state.PIDTempValues.Ti = t_conf["PIDTTi"].value_or(0.0f);
+			tgui_state.PIDTempValues.Td = t_conf["PIDTTd"].value_or(0.0f);
 
-			tgui_state.PIDOneCurrentValues.SetPoint = t_conf["PID1CurrentSetpoint"].value_or(0.0f);
-			tgui_state.PIDOneCurrentValues.Kp = t_conf["PID1AKp"].value_or(0.0f);
-			tgui_state.PIDOneCurrentValues.Ti = t_conf["PID1ATi"].value_or(0.0f);
-			tgui_state.PIDOneCurrentValues.Td = t_conf["PID2ATd"].value_or(0.0f);
-
-			//PID2Enable
-			tgui_state.PIDTwoState = PIDState::Standby;
-			tgui_state.PIDTwoTempValues.SetPoint = t_conf["PID2TempSetpoint"].value_or(0.0f);
-			tgui_state.PIDTwoTempValues.Kp = t_conf["PID2TKp"].value_or(0.0f);
-			tgui_state.PIDTwoTempValues.Ti = t_conf["PID2TTi"].value_or(0.0f);
-			tgui_state.PIDTwoTempValues.Td = t_conf["PID2TTd"].value_or(0.0f);
-
-			tgui_state.PIDTwoCurrentValues.SetPoint = t_conf["PID2CurrentSetpoint"].value_or(0.0f);
-			tgui_state.PIDTwoCurrentValues.Kp = t_conf["PID2AKp"].value_or(0.0f);
-			tgui_state.PIDTwoCurrentValues.Ti = t_conf["PID2ATi"].value_or(0.0f);
-			tgui_state.PIDTwoCurrentValues.Td = t_conf["PID2ATd"].value_or(0.0f);
+			tgui_state.PIDCurrentValues.SetPoint = t_conf["PIDCurrentSetpoint"].value_or(0.0f);
+			tgui_state.PIDCurrentValues.Kp = t_conf["PIDAKp"].value_or(0.0f);
+			tgui_state.PIDCurrentValues.Ti = t_conf["PIDATi"].value_or(0.0f);
+			tgui_state.PIDCurrentValues.Td = t_conf["PIDATd"].value_or(0.0f);
 
 			// CAEN initial state
 			cgui_state.CurrentState = CAENInterfaceStates::Standby;
@@ -255,14 +246,14 @@ public:
 			const auto g_axis_flags = ImPlotAxisFlags_AutoFit;
 			// /// Teensy-BME280 Plots
 			if(ImGui::Button("Clear")) {
-				// local_bme_humi_plot.clear();
-				// local_bme_temp_plot.clear();
-				// local_bme_pres_plot.clear();
-				// box_bme_humi_plot.clear();
-				// box_bme_temp_plot.clear();
-				// box_bme_pres_plot.clear();
+				_indicatorReceiver.clear_plot(IndicatorNames::LOCAL_BME_Humidity);
+				_indicatorReceiver.clear_plot(IndicatorNames::LOCAL_BME_Temps);
+				_indicatorReceiver.clear_plot(IndicatorNames::LOCAL_BME_Pressure);
+				_indicatorReceiver.clear_plot(IndicatorNames::BOX_BME_Humidity);
+				_indicatorReceiver.clear_plot(IndicatorNames::BOX_BME_Temps);
+				_indicatorReceiver.clear_plot(IndicatorNames::BOX_BME_Pressure);
 			}
-			if (ImGui::BeginTabBar("BME Plots")) {
+			if (ImGui::BeginTabBar("Other Plots")) {
 				if (ImGui::BeginTabItem("Local BME")) {
 					if (ImPlot::BeginPlot("Local BME", ImVec2(-1,0))) {
 
@@ -315,6 +306,18 @@ public:
 					ImGui::EndTabItem();
 				}
 
+				if (ImGui::BeginTabItem("Pressures")) {
+					if(ImPlot::BeginPlot("Pressures", ImVec2(-1, 0))) {
+						ImPlot::SetupAxes("time [s]", "P [Bar]", g_axis_flags, g_axis_flags);
+						_indicatorReceiver.plot(IndicatorNames::VACUUM_PRESS, "Vacuum line");
+						_indicatorReceiver.plot(IndicatorNames::NTWO_PRESS, "N2 line");
+
+						ImPlot::EndPlot();
+					}
+
+					ImGui::EndTabItem();
+				}
+
 				ImGui::EndTabBar();
 			}
 
@@ -324,25 +327,25 @@ public:
 			// /// Teensy-PID Plots
 			ImGui::Begin("Teensy-PID Plots"); 
 			if(ImGui::Button("Clear")) {
-					// pid1_temps_plot.clear();
-					// pid1_currs_plot.clear();
-					// pid2_temps_plot.clear();
-					// pid2_currs_plot.clear();
+				_indicatorReceiver.clear_plot(IndicatorNames::RTD_TEMP_ONE);
+				_indicatorReceiver.clear_plot(IndicatorNames::RTD_TEMP_TWO);
+				_indicatorReceiver.clear_plot(IndicatorNames::PELTIER_CURR);
+
+				_indicatorReceiver.clear_plot(IndicatorNames::VACUUM_PRESS);
+				_indicatorReceiver.clear_plot(IndicatorNames::NTWO_PRESS);
 			}
+
 			if (ImPlot::BeginPlot("PIDs", ImVec2(-1,0))) {
 				ImPlot::SetupAxes("time [s]", "Temperature [degC]", g_axis_flags, g_axis_flags);
 				ImPlot::SetupAxis(ImAxis_Y2, "Current [A]", g_axis_flags | ImPlotAxisFlags_Opposite);
 
-				_indicatorReceiver.plot(IndicatorNames::PID1_Temps, "RTD1");
+				_indicatorReceiver.plot(IndicatorNames::RTD_TEMP_ONE, "RTD1");
 
 				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-				_indicatorReceiver.plot(IndicatorNames::PID1_Currs, "Driver 1");
+				_indicatorReceiver.plot(IndicatorNames::PELTIER_CURR, "Peltier");
 
 				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
-				_indicatorReceiver.plot(IndicatorNames::PID2_Temps, "RTD2");
-
-				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-				_indicatorReceiver.plot(IndicatorNames::PID2_Currs, "Driver 2");
+				_indicatorReceiver.plot(IndicatorNames::RTD_TEMP_TWO, "RTD2");
 
 				ImPlot::EndPlot();
 			}
@@ -373,14 +376,15 @@ public:
 
 			// Teensy
 			ImGui::Text("Teensy");
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_PID1_TEMP, "Latest PID1 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_PID1_CURR, "Latest PID1 Curr"); ImGui::SameLine(); ImGui::Text("[A]");
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_PID2_TEMP, "Latest PID2 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_PID2_CURR, "Latest PID2 Curr"); ImGui::SameLine(); ImGui::Text("[A]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_RTD1_TEMP, "RTD1 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_RTD2_TEMP, "RTD2 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_Peltier_CURR, "Peltier"); ImGui::SameLine(); ImGui::Text("[A]");
 
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_VACUUM_PRESS, "Vacuum"); ImGui::SameLine(); ImGui::Text("[???]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_N2_PRESS, "N2 Line"); ImGui::SameLine(); ImGui::Text("[???]");
 
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_BOX_BME_HUM, "Latest BOX BME Humidity"); ImGui::SameLine();ImGui::Text("[%%]");
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_BOX_BME_TEMP, "Latest BOX BME Temperature"); ImGui::SameLine(); ImGui::Text("[degC]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_BOX_BME_HUM, "BOX BME Humidity"); ImGui::SameLine();ImGui::Text("[%%]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_BOX_BME_TEMP, "BOX BME Temperature"); ImGui::SameLine(); ImGui::Text("[degC]");
 			// End Teensy
 
 			// CAEN
@@ -457,12 +461,12 @@ public:
 					[=](CAENInterfaceState& state) {
 
 						state = cgui_state;
-
 						state.RunDir = i_run_dir;
 						state.RunName = i_run_name;
 						state.CurrentState =
 							CAENInterfaceStates::AttemptConnection;
 						return true;
+
 					}
 				)) {
 					connected_mod = 0.5;
@@ -482,7 +486,6 @@ public:
 
 				if(CAENControlFac.Button("Disconnect",
 					[=](CAENInterfaceState& state) {
-
 						// Only change the state if any of these states
 						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
 							state.CurrentState == CAENInterfaceStates::StatisticsMode ||
@@ -603,10 +606,13 @@ public:
 
 					// TODO(Hector): change this to get the actual
 					// ranges of the digitizer used, maybe change it to a dropbox?
-	    			ImGui::RadioButton("2V",
-	    			 	reinterpret_cast<int*>(&ch.DCRange), 0); ImGui::SameLine();
-	    			ImGui::RadioButton("0.5V",
-	    				reinterpret_cast<int*>(&ch.DCRange), 1);
+					CAENControlFac.ComboBox("Range", ch.DCRange,
+						{{0, "2V"}, {1, "0.5V"}},
+						[]() {return false;}, [](){});
+	    			// ImGui::RadioButton("2V",
+	    			//  	reinterpret_cast<int*>(&ch.DCRange), 0); ImGui::SameLine();
+	    			// ImGui::RadioButton("0.5V",
+	    			// 	reinterpret_cast<int*>(&ch.DCRange), 1);
 
 	    			ImGui::EndTabItem();
 				}
@@ -688,22 +694,32 @@ public:
 				ImGui::PopStyleColor(3);
 				ImGui::PopItemWidth();
 
-				TeensyControlFac.Checkbox("PID Relay",
-					tgui_state.PIDRelayState,
+				TeensyControlFac.Checkbox("Peltier Relay",
+					tgui_state.PeltierState,
 					ImGui::IsItemEdited,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDRelay;
-						oldState.PIDRelayState = tgui_state.PIDRelayState;
+						oldState.CommandToSend = TeensyCommands::SetPeltierRelay;
+						oldState.PeltierState = tgui_state.PeltierState;
 						return true;
 					}
 				);
 
-				TeensyControlFac.Checkbox("General Relay",
-					tgui_state.GeneralRelayState,
+				TeensyControlFac.Checkbox("Pressure Relief Valve",
+					tgui_state.ReliefValveState,
 					ImGui::IsItemEdited,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetGeneralRelay;
-						oldState.GeneralRelayState = tgui_state.GeneralRelayState;
+						oldState.CommandToSend = TeensyCommands::SetReleaseValve;
+						oldState.ReliefValveState = tgui_state.ReliefValveState;
+						return true;
+					}
+				);
+
+				TeensyControlFac.Checkbox("N2 Release Relay",
+					tgui_state.N2ValveState,
+					ImGui::IsItemEdited,
+					[=](TeensyControllerState& oldState) {
+						oldState.CommandToSend = TeensyCommands::SetN2Valve;
+						oldState.N2ValveState = tgui_state.N2ValveState;
 						return true;
 					}
 				);
@@ -711,19 +727,19 @@ public:
 				ImGui::EndTabItem();
 			}
 
-			if (ImGui::BeginTabItem("PID1")) {
+			if (ImGui::BeginTabItem("PID")) {
 				ImGui::PushItemWidth(180);
-				TeensyControlFac.ComboBox("PID1 State",
-					tgui_state.PIDOneState,
+				TeensyControlFac.ComboBox("PID State",
+					tgui_state.PIDState,
 					{{PIDState::Running, "Running"}, {PIDState::Standby, "Standby"}},
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 
-						oldState.PIDOneState = tgui_state.PIDOneState;
-						if(oldState.PIDOneState == PIDState::Standby) {
-							oldState.CommandToSend = TeensyCommands::StopPIDOne;
+						oldState.PIDState = tgui_state.PIDState;
+						if(oldState.PIDState == PIDState::Standby) {
+							oldState.CommandToSend = TeensyCommands::StopPID;
 						} else {
-							oldState.CommandToSend = TeensyCommands::StartPIDOne;
+							oldState.CommandToSend = TeensyCommands::StartPID;
 						}
 
 						return true;
@@ -732,86 +748,86 @@ public:
 
 				ImGui::Text("PID Setpoints");
 				TeensyControlFac.InputFloat("Temperature Setpoint",
-					tgui_state.PIDOneTempValues.SetPoint,
+					tgui_state.PIDTempValues.SetPoint,
 					0.01f, 6.0f, "%.6f °C",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneTempSetpoint;
-						oldState.PIDOneTempValues.SetPoint = tgui_state.PIDOneTempValues.SetPoint;
+						oldState.CommandToSend = TeensyCommands::SetPIDTempSetpoint;
+						oldState.PIDTempValues.SetPoint = tgui_state.PIDTempValues.SetPoint;
 						return true;
 					}
 				);
 
 				TeensyControlFac.InputFloat("Current Setpoint",
-					tgui_state.PIDOneCurrentValues.SetPoint,
+					tgui_state.PIDCurrentValues.SetPoint,
 					0.01f, 6.0f, "%.6f A",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrSetpoint;
-						oldState.PIDOneCurrentValues.SetPoint = tgui_state.PIDOneCurrentValues.SetPoint;
+						oldState.CommandToSend = TeensyCommands::SetPIDCurrSetpoint;
+						oldState.PIDCurrentValues.SetPoint = tgui_state.PIDCurrentValues.SetPoint;
 						return true;
 					}
 				);
 
 				ImGui::Text("Temperature PID coefficients.");
 				TeensyControlFac.InputFloat("Kp",
-					tgui_state.PIDOneTempValues.Kp,
+					tgui_state.PIDTempValues.Kp,
 					0.01f, 6.0f, "%.6f",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneTempKp;
-						oldState.PIDOneTempValues.Kp = tgui_state.PIDOneTempValues.Kp;
+						oldState.CommandToSend = TeensyCommands::SetPIDTempKp;
+						oldState.PIDTempValues.Kp = tgui_state.PIDTempValues.Kp;
 						return true;
 					}
 				);
 				TeensyControlFac.InputFloat("Ti",
-					tgui_state.PIDOneTempValues.Ti,
+					tgui_state.PIDTempValues.Ti,
 					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrSetpoint;
-						oldState.PIDOneTempValues.Ti = tgui_state.PIDOneTempValues.Ti;
+						oldState.CommandToSend = TeensyCommands::SetPIDTempTi;
+						oldState.PIDTempValues.Ti = tgui_state.PIDTempValues.Ti;
 						return true;
 					}
 				);
 				TeensyControlFac.InputFloat("Td",
-					tgui_state.PIDOneTempValues.Td,
+					tgui_state.PIDTempValues.Td,
 					0.01f, 6.0f, "%.6f ms",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneTempTd;
-						oldState.PIDOneTempValues.Td = tgui_state.PIDOneTempValues.Td;
+						oldState.CommandToSend = TeensyCommands::SetPIDTempTd;
+						oldState.PIDTempValues.Td = tgui_state.PIDTempValues.Td;
 						return true;
 					}
 				);
 
 				ImGui::Text("Current PID coefficients.");
 				TeensyControlFac.InputFloat("AKp",
-					tgui_state.PIDOneCurrentValues.Kp,
+					tgui_state.PIDCurrentValues.Kp,
 					0.01f, 6.0f, "%.6f",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrKp;
-						oldState.PIDOneCurrentValues.Kp = tgui_state.PIDOneCurrentValues.Kp;
+						oldState.CommandToSend = TeensyCommands::SetPIDCurrKp;
+						oldState.PIDCurrentValues.Kp = tgui_state.PIDCurrentValues.Kp;
 						return true;
 					}
 				);
 				TeensyControlFac.InputFloat("ATi",
-					tgui_state.PIDOneCurrentValues.Ti,
+					tgui_state.PIDCurrentValues.Ti,
 					0.01f, 6.0f, "%.6f ms",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrTi;
-						oldState.PIDOneCurrentValues.Ti = tgui_state.PIDOneCurrentValues.Ti;
+						oldState.CommandToSend = TeensyCommands::SetPIDCurrTi;
+						oldState.PIDCurrentValues.Ti = tgui_state.PIDCurrentValues.Ti;
 						return true;
 					}
 				);
 				TeensyControlFac.InputFloat("ATd",
-					tgui_state.PIDOneCurrentValues.Td,
+					tgui_state.PIDCurrentValues.Td,
 					0.01f, 6.0f, "%.6f ms",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDOneCurrTd;
-						oldState.PIDOneCurrentValues.Td = tgui_state.PIDOneCurrentValues.Td;
+						oldState.CommandToSend = TeensyCommands::SetPIDCurrTd;
+						oldState.PIDCurrentValues.Td = tgui_state.PIDCurrentValues.Td;
 						return true;
 					}
 				);
@@ -819,115 +835,6 @@ public:
 				ImGui::EndTabItem();
 			}
 
-			if (ImGui::BeginTabItem("PID2")) {
-				ImGui::PushItemWidth(180);
-				TeensyControlFac.ComboBox("PID2 State",
-					tgui_state.PIDTwoState,
-					{{PIDState::Running, "Running"}, {PIDState::Standby, "Standby"}},
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-
-						oldState.PIDTwoState = tgui_state.PIDTwoState;
-						if(oldState.PIDOneState == PIDState::Standby) {
-							oldState.CommandToSend = TeensyCommands::StopPIDTwo;
-						} else {
-							oldState.CommandToSend = TeensyCommands::StartPIDTwo;
-						}
-
-						return true;
-					}
-				);
-
-				ImGui::Text("PID Setpoints");
-				TeensyControlFac.InputFloat("Temperature Setpoint",
-					tgui_state.PIDTwoTempValues.SetPoint,
-					0.01f, 6.0f, "%.6f °C",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoTempSetpoint;
-						oldState.PIDTwoTempValues.SetPoint = tgui_state.PIDTwoTempValues.SetPoint;
-						return true;
-					}
-				);
-
-				TeensyControlFac.InputFloat("Current Setpoint",
-					tgui_state.PIDTwoCurrentValues.SetPoint,
-					0.01f, 6.0f, "%.6f A",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoCurrSetpoint;
-						oldState.PIDTwoCurrentValues.SetPoint = tgui_state.PIDTwoCurrentValues.SetPoint;
-						return true;
-					}
-				);
-
-				ImGui::Text("Temperature PID coefficients.");
-				TeensyControlFac.InputFloat("Kp",
-					tgui_state.PIDTwoTempValues.Kp,
-					0.01f, 6.0f, "%.6f",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoTempKp;
-						oldState.PIDTwoTempValues.Kp = tgui_state.PIDTwoTempValues.Kp;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("Ti",
-					tgui_state.PIDTwoTempValues.Ti,
-					0.01f, 6.0f, "%.6f ms",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoTempTi;
-						oldState.PIDTwoTempValues.Ti = tgui_state.PIDTwoTempValues.Ti;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("Td",
-					tgui_state.PIDTwoTempValues.Td,
-					0.01f, 6.0f, "%.6f ms",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoTempTd;
-						oldState.PIDTwoTempValues.Td = tgui_state.PIDTwoTempValues.Td;
-						return true;
-					}
-				);
-
-				ImGui::Text("Current PID coefficients.");
-				TeensyControlFac.InputFloat("Kp",
-					tgui_state.PIDTwoCurrentValues.Kp,
-					0.01f, 6.0f, "%.6f",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoCurrKp;
-						oldState.PIDTwoCurrentValues.Kp = tgui_state.PIDTwoCurrentValues.Kp;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("ATi",
-					tgui_state.PIDTwoCurrentValues.Ti,
-					0.01f, 6.0f, "%.6f ms",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoCurrTi;
-						oldState.PIDTwoCurrentValues.Ti = tgui_state.PIDTwoCurrentValues.Ti;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("ATd",
-					tgui_state.PIDTwoCurrentValues.Td,
-					0.01f, 6.0f, "%.6f ms",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPIDTwoCurrTd;
-						oldState.PIDTwoCurrentValues.Td = tgui_state.PIDTwoCurrentValues.Td;
-						return true;
-					}
-				);
-
-
-				ImGui::EndTabItem();
-			}
 		}
 
 	};

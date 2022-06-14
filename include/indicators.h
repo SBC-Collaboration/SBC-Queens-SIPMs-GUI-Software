@@ -6,10 +6,11 @@ namespace SBCQueens {
 
 	enum class IndicatorNames {
 		// For plots:
-		PID1_Temps,
-		PID1_Currs,
-		PID2_Temps,
-		PID2_Currs,
+		PELTIER_CURR,
+		RTD_TEMP_ONE,
+		RTD_TEMP_TWO,
+		VACUUM_PRESS,
+		NTWO_PRESS,
 		LOCAL_BME_Temps,
 		LOCAL_BME_Pressure,
 		LOCAL_BME_Humidity,
@@ -24,10 +25,13 @@ namespace SBCQueens {
 
 		// For indicators:
 		// Teeensy Indicators
-		LATEST_PID1_TEMP,
-		LATEST_PID1_CURR,
-		LATEST_PID2_TEMP,
-		LATEST_PID2_CURR,
+		LATEST_RTD1_TEMP,
+		LATEST_RTD2_TEMP,
+		LATEST_Peltier_CURR,
+
+		LATEST_VACUUM_PRESS,
+		LATEST_N2_PRESS,
+
 		LATEST_BOX_BME_HUM,
 		LATEST_BOX_BME_TEMP,
 
