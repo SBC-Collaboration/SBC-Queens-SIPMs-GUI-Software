@@ -43,7 +43,12 @@ These are all the dependencies so far:
 * concurrentqueue 	- https://github.com/cameron314/concurrentqueue
 * tomlcplusplus 	- https://github.com/marzer/tomlplusplus
 
-The compilation steps are:
+The dependencies can be installed (after calling git clone or copying the rep) by calling:
+
+git submodule init
+git submodule update
+
+The compilation steps are (WINDOWS):
 
 mkdir build
 cd build
@@ -51,6 +56,18 @@ cmake ../ -G "MinGW Makefiles" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 mingw32-make -j8
 
 You will need to install mingw64 using MSYS2 first and install the toolchain and extras (for clang-tidy and clangd)
+
+The compilation steps are (LINUX):
+
+mkdir build
+cd build
+cmake ../ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+mingw32-make -j8
+
+You will probably have some errors in the cmake running, most of them can be solved by googling the library that is required!
+
+Another problem in LINUX you might encounter is the fact that even if you install CAEN libraries the way it tell you to install them, cmake wont find them. My proposed solution is to imitate the Windows installation structure: first, create a folder named CAEN. Then, copy all the files extracted directly from the tar file (for example CAENComm-1.5.0). Then, rename: CAENComm-X.X.X to CAENComm, CAENDigitizer-X.X.X to CAENDigitizer, CAENVMELib-X.X.X to CAENVME. Finally, install the libs by running the install_64 that are found in each lib.
+
 
 To install MSYS2 follow:
 

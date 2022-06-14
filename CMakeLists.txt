@@ -7,6 +7,10 @@ cmake_minimum_required(VERSION 3.11)
 
 project(SiPMControlGUI C CXX)
 
+if(UNIX AND NOT APPLE)
+  set(LINUX TRUE)
+endif()
+
 # Default to debug
 set(DEPENDENCY_DIR ${CMAKE_SOURCE_DIR}/deps 
   CACHE FILEPATH "Directory where all the dependencies are found. Full path only.")
@@ -124,7 +128,12 @@ if(IS_DIRECTORY ${SERIAL_DIR})
     ${SERIAL_DIR}/src/impl/list_ports/list_ports_win.cc
     ${SERIAL_DIR}/src/impl/list_ports/list_ports_linux.cc
     ${SERIAL_DIR}/src/impl/list_ports/list_ports_osx.cc)
-  target_link_libraries(serial setupapi)
+  if(LINUX)
+    target_link_libraries(serial)
+  else()
+    target_link_libraries(serial setupapi)
+  endif()
+
 else()
   message(FATAL_ERROR "Serial library not found. Make sure to run git submodules init first")
 endif()
@@ -183,18 +192,32 @@ endif()
 
 ## First VME as it is the main component
 if(IS_DIRECTORY ${CAEN_DIR})
-  message("${CAEN_DIR} Found!")
-  include_directories(${CAEN_DIR}/VME/include)
-  link_directories(${CAEN_DIR}/VME/lib/x86_64)
-  #target_link_libraries(SiPMControlGUI CAENVMElib)
+  message("-- ${CAEN_DIR} Found!")
 
-  ## Then Comm libs
-  include_directories(${CAEN_DIR}/Comm/include)
-  link_directories(${CAEN_DIR}/Comm/lib/x86_64)
+  if(LINUX)
+    include_directories(${CAEN_DIR}/CAENVMElib/include)
+    link_directories(${CAEN_DIR}/CAENVMElib/lib/x64)
+    #target_link_libraries(SiPMControlGUI CAENVMElib)
+      ## Then Comm libs
+    include_directories(${CAEN_DIR}/CAENComm/include)
+    link_directories(${CAEN_DIR}/CAENComm/lib/x64)
 
-  ## Then digitizers
-  include_directories(${CAEN_DIR}/Digitizers/Library/include)
-  link_directories(${CAEN_DIR}/Digitizers/Library/lib/x86_64)
+    ## Then digitizers
+    include_directories(${CAEN_DIR}/CAENDigitizer/include)
+    link_directories(${CAEN_DIR}/CAENDigitizer/lib/x86_64)
+  else()
+    include_directories(${CAEN_DIR}/VME/include)
+    link_directories(${CAEN_DIR}/VME/lib/x86_64)
+    #target_link_libraries(SiPMControlGUI CAENVMElib)
+      ## Then Comm libs
+    include_directories(${CAEN_DIR}/Comm/include)
+    link_directories(${CAEN_DIR}/Comm/lib/x86_64)
+
+    ## Then digitizers
+    include_directories(${CAEN_DIR}/Digitizers/Library/include)
+    link_directories(${CAEN_DIR}/Digitizers/Library/lib/x86_64)
+  endif()
+
 else()
   message(FATAL_ERROR "CAEN not found. Make sure to install VME, Comm and Digitizers libraries. ${CAEN_DIR}")
 endif()
@@ -206,7 +229,6 @@ include_directories(./include)
 file(GLOB sources *.cpp)
 file(GLOB srcsources ./src/*.cpp)
 file(GLOB renderers ./src/rendering_wrappers/*.cpp)
-
 
 add_executable(SiPMControlGUI ${sources} ${srcsources} ${renderers})
 
@@ -223,6 +245,6 @@ file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 target_link_libraries(SiPMControlGUI ${LIBRARIES} ${IMGUI_LIBRARIES} 
   glfw imgui implot
   serial atomic spdlog
-  CAENVMElib
+  CAENVME
   CAENComm
   CAENDigitizer)

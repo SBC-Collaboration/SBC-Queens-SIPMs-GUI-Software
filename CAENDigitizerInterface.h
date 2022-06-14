@@ -39,7 +39,7 @@ namespace SBCQueens {
 		Closing
 	};
 
-	struct CAENInterfaceState {
+	struct CAENInterfaceData {
 
 		std::string RunDir = "";
 		std::string RunName =  "";
@@ -57,7 +57,7 @@ namespace SBCQueens {
 	};
 
 	using CAENQueueType 
-		= std::function < bool(CAENInterfaceState&) >;
+		= std::function < bool(CAENInterfaceData&) >;
 
 	using CAENQueue 
 		= moodycamel::ReaderWriterQueue< CAENQueueType >;
@@ -66,7 +66,7 @@ namespace SBCQueens {
 	class CAENDigitizerInterface {
 
 		std::tuple<Queues&...> _queues;
-		CAENInterfaceState state_of_everything;
+		CAENInterfaceData state_of_everything;
 
 		DataFile<CAENEvent> _pulseFile;
 
