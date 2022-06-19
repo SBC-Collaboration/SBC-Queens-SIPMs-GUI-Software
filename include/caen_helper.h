@@ -18,6 +18,7 @@
 
 // my includes
 
+
 namespace SBCQueens {
 
 	enum class CAENDigitizerModel {
@@ -386,7 +387,7 @@ private:
 	//  For CONET, indicates which link of A2818 or A3818 is used.
 	// cn -> Conet Node. Identifies which device in the daisy chain is being
 	//  addressed.
-	// addr -> VME Base adress of the board. Only for VME models.
+	// addr -> VME Base address of the board. Only for VME models.
 	//  0 in all other cases
 	CAENError connect(CAEN&, const CAENDigitizerModel&,
 		const CAEN_DGTZ_ConnectionType&, const int&,

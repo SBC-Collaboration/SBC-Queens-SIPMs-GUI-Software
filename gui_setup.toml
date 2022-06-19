@@ -6,14 +6,16 @@ RunName = "RUNS"
 Port = "COM3"
 
 PIDEnable = false
-PIDTempSetpoint = -18
-PIDCurrentSetpoint = 5
-PIDTKp = -3e3
-PIDTTi = 50e3
-PIDTTd = 0
-PIDAKp = 200
-PIDATi = 100
-PIDATd = 0
+PeltierTempSetpoint = -90
+NTempSetpoint = -100
+
+PeltierTKp = -3e3
+PeltierTTi = 50e3
+PeltierTTd = 0
+
+NTKp = -1e3
+NTTi = 10e3
+NTTd = 0
 
 [CAEN]
 # DT5730B or DT5740D
