@@ -203,17 +203,19 @@ namespace SBCQueens {
 		GetError,
 		Reset,
 
-		StartPID,
-		SetPIDTempSetpoint,
-		SetPIDTempKp,
-		SetPIDTempTi,
-		SetPIDTempTd,
+		SetPPID,
+		SetPPIDTempSetpoint,
+		SetPPIDTempKp,
+		SetPPIDTempTi,
+		SetPPIDTempTd,
+		ResetPPID,
 
-		SetPIDCurrSetpoint,
-		SetPIDCurrKp,
-		SetPIDCurrTi,
-		SetPIDCurrTd,
-		StopPID,
+		SetNPID,
+		SetNPIDTempSetpoint,
+		SetNPIDTempKp,
+		SetNPIDTempTi,
+		SetNPIDTempTd,
+		ResetNPID,
 
 		SetPeltierRelay,
 		SetPSILimit,
@@ -238,16 +240,19 @@ namespace SBCQueens {
 		/// !General system commands
 		////
 		/// Hardware specific commands
-		{TeensyCommands::StartPID, 				"START_PID"},
-		{TeensyCommands::SetPIDTempSetpoint, 	"SET_TEMP"},
-		{TeensyCommands::SetPIDTempKp, 			"SET_TKP_PID"},
-		{TeensyCommands::SetPIDTempTi, 			"SET_TTi_PID"},
-		{TeensyCommands::SetPIDTempTd, 			"SET_TTd_PID"},
-		{TeensyCommands::SetPIDCurrSetpoint, 	"SET_CURRENT"},
-		{TeensyCommands::SetPIDCurrKp, 			"SET_AKP_PID"},
-		{TeensyCommands::SetPIDCurrTi, 			"SET_ATi_PID"},
-		{TeensyCommands::SetPIDCurrTd, 			"SET_ATd_PID"},
-		{TeensyCommands::StopPID, 				"STOP_PID"},
+		{TeensyCommands::SetPPID, 				"SET_PPID"},
+		{TeensyCommands::SetPPIDTempSetpoint, 	"SET_PTEMP"},
+		{TeensyCommands::SetPPIDTempKp, 		"SET_PTKP_PID"},
+		{TeensyCommands::SetPPIDTempTi, 		"SET_PTTi_PID"},
+		{TeensyCommands::SetPPIDTempTd, 		"SET_PTTd_PID"},
+		{TeensyCommands::ResetPPID, 			"RESET_PPID"},
+
+		{TeensyCommands::SetNPID, 				"SET_NPID"},
+		{TeensyCommands::SetNPIDTempSetpoint, 	"SET_NTEMP"},
+		{TeensyCommands::SetNPIDTempKp, 		"SET_NTKP_PID"},
+		{TeensyCommands::SetNPIDTempTi, 		"SET_NTTi_PID"},
+		{TeensyCommands::SetNPIDTempTd, 		"SET_NTTd_PID"},
+		{TeensyCommands::ResetNPID, 			"RESET_NPID"},
 
 		{TeensyCommands::SetPeltierRelay, 		"SET_PELTIER_RELAY"},
 		{TeensyCommands::SetPSILimit, 			"SET_PSI_LIMIT"},
@@ -272,10 +277,10 @@ namespace SBCQueens {
 	// So far, I do not like teensy_serial is here.
 	struct TeensyControllerState {
 
-		std::string RunDir = "";
-		std::string RunName = "";
+		std::string RunDir 		= "";
+		std::string RunName 	= "";
 
-		std::string Port = "COM4";
+		std::string Port 		= "COM4";
 
 		TeensyControllerStates CurrentState
 			= TeensyControllerStates::NullState;
@@ -284,15 +289,18 @@ namespace SBCQueens {
 			= TeensyCommands::None;
 
 		// Relay stuff
-		bool PeltierState = false;
-		bool ReliefValveState = false;
-		bool N2ValveState = false;
+		bool PeltierState 		= false;
+		bool ReliefValveState 	= false;
+		bool N2ValveState 		= false;
 
 		// PID Stuff
-		PIDState PIDState;
-		PIDConfig PIDCurrentValues;
+		bool PeltierPIDState 	= false;
+		bool LN2PIDState 		= false;
+
+		double PSILimit 		= 5.0;
 		PIDConfig PIDTempValues;
-		double PSILimit;
+		PIDConfig NTempValues;
+
 	};
 
 	using TeensyQueueInType
@@ -508,15 +516,16 @@ private:
 					}
 				);
 
-			send_ts_cmd_b(TeensyCommands::SetPIDTempSetpoint);
-			send_ts_cmd_b(TeensyCommands::SetPIDTempKp);
-			send_ts_cmd_b(TeensyCommands::SetPIDTempTd);
-			send_ts_cmd_b(TeensyCommands::SetPIDTempTi);
 
-			send_ts_cmd_b(TeensyCommands::SetPIDCurrSetpoint);
-			send_ts_cmd_b(TeensyCommands::SetPIDCurrKp);
-			send_ts_cmd_b(TeensyCommands::SetPIDCurrTd);
-			send_ts_cmd_b(TeensyCommands::SetPIDCurrTi);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempKp);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempTd);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempTi);
+
+			send_ts_cmd_b(TeensyCommands::SetNPIDTempSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetNPIDTempKp);
+			send_ts_cmd_b(TeensyCommands::SetNPIDTempTd);
+			send_ts_cmd_b(TeensyCommands::SetNPIDTempTi);
 
 			// Flush so there is nothing in the buffer
 			// making everything annoying
@@ -825,73 +834,52 @@ private:
 			out << std::defaultfloat;
 
 			switch(cmd) {
-				case TeensyCommands::StartPID:
-					str_cmd += " 1";
-				break;
-
-				case TeensyCommands::SetPIDTempSetpoint:
+				case TeensyCommands::SetPPIDTempSetpoint:
 					out << tcs.PIDTempValues.SetPoint;
-					str_cmd += " " + out.str();
 				break;
 
-				case TeensyCommands::SetPIDTempKp:
+				case TeensyCommands::SetPPIDTempKp:
 					out << tcs.PIDTempValues.Kp;
-					str_cmd += " " + out.str();
 				break;
 
-				case TeensyCommands::SetPIDTempTi:
+				case TeensyCommands::SetPPIDTempTi:
 					out << tcs.PIDTempValues.Ti;
-					str_cmd += " " + out.str();
 				break;
 
-				case TeensyCommands::SetPIDTempTd:
+				case TeensyCommands::SetPPIDTempTd:
 					out << tcs.PIDTempValues.Td;
-					str_cmd += " " + out.str();
 				break;
 
-
-				case TeensyCommands::SetPIDCurrSetpoint:
-					out << tcs.PIDCurrentValues.SetPoint;
-					str_cmd += " " + out.str();
+				case TeensyCommands::SetNPIDTempSetpoint:
+					out << tcs.NTempValues.SetPoint;
 				break;
 
-				case TeensyCommands::SetPIDCurrKp:
-					out << tcs.PIDCurrentValues.Kp;
-					str_cmd += " " + out.str();
+				case TeensyCommands::SetNPIDTempKp:
+					out << tcs.NTempValues.Kp;
 				break;
 
-				case TeensyCommands::SetPIDCurrTi:
-					out << tcs.PIDCurrentValues.Ti;
-					str_cmd += " " + out.str();
+				case TeensyCommands::SetNPIDTempTi:
+					out << tcs.NTempValues.Ti;
 				break;
 
-				case TeensyCommands::SetPIDCurrTd:
-					out << tcs.PIDCurrentValues.Td;
-					str_cmd += " " + out.str();
-				break;
-
-				case TeensyCommands::StopPID:
-					str_cmd += " 0";
+				case TeensyCommands::SetNPIDTempTd:
+					out << tcs.NTempValues.Td;
 				break;
 
 				case TeensyCommands::SetPeltierRelay:
 					out << tcs.PeltierState;
-					str_cmd += " " + out.str();
 				break;
 
 				case TeensyCommands::SetPSILimit:
 					out << tcs.PSILimit;
-					str_cmd += " " + out.str();
 				break;
 
 				case TeensyCommands::SetReleaseValve:
 					out << tcs.ReliefValveState;
-					str_cmd += " " + out.str();
 				break;
 
 				case TeensyCommands::SetN2Valve:
 					out << tcs.N2ValveState;
-					str_cmd += " " + out.str();
 				break;
 
 				// The default case assumes all the commands not mention above
@@ -909,6 +897,7 @@ private:
 			}
 
 			// Always add the ;\n at the end!
+			str_cmd += " " + out.str();
 			str_cmd += ";\n";
 
 			return send_msg(port, str_cmd);
