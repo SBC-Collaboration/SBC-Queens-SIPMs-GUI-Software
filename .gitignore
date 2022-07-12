@@ -2,3 +2,5 @@
 RUNS/
 build/
 *.sublime-*
+build*/
+compile_commands.json
