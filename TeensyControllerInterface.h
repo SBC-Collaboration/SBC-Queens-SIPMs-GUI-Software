@@ -320,7 +320,7 @@ namespace SBCQueens {
 		std::map<std::string, std::string> _crc_cmds;
 
 		TeensyControllerState state_of_everything;
-		IndicatorSender<IndicatorNames> IndicatorSender;
+		IndicatorSender<IndicatorNames> TeensyIndicatorSender;
 
 		double _init_time;
 
@@ -335,7 +335,7 @@ namespace SBCQueens {
 
 		explicit TeensyControllerInterface(Queues&... queues) 
 			: _queues(forward_as_tuple(queues...)),
-			IndicatorSender(std::get<SiPMsPlotQueue&>(_queues)) { }
+			TeensyIndicatorSender(std::get<SiPMsPlotQueue&>(_queues)) { }
 
 		// No copying
 		TeensyControllerInterface(const TeensyControllerInterface&) = delete;
@@ -577,10 +577,10 @@ private:
 					double dt = (pids.time - _init_time) / 1000.0;
 
 					// Send them to GUI to draw them
-					IndicatorSender(IndicatorNames::PELTIER_CURR,
+					TeensyIndicatorSender(IndicatorNames::PELTIER_CURR,
 						dt, pids.PID.Current);
 
-					IndicatorSender(IndicatorNames::LATEST_Peltier_CURR,
+					TeensyIndicatorSender(IndicatorNames::LATEST_Peltier_CURR,
 						pids.PID.Current);
 
 					_PeltiersFile->Add(pids);
@@ -606,14 +606,14 @@ private:
 					double dt = (rtds.time - _init_time) / 1000.0;
 
 					// Send them to GUI to draw them
-					IndicatorSender(IndicatorNames::RTD_TEMP_ONE,
+					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_ONE,
 						dt, rtds.RTD_1.Temperature);
-					IndicatorSender(IndicatorNames::LATEST_RTD1_TEMP,
+					TeensyIndicatorSender(IndicatorNames::LATEST_RTD1_TEMP,
 						rtds.RTD_1.Temperature);
 
-					IndicatorSender(IndicatorNames::RTD_TEMP_TWO,
+					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_TWO,
 						dt, rtds.RTD_2.Temperature);
-					IndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
+					TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
 						rtds.RTD_2.Temperature);
 
 					_RTDsFile->Add(rtds);
@@ -639,14 +639,14 @@ private:
 					double dt = (press.time - _init_time) / 1000.0;
 
 					// Send them to GUI to draw them
-					IndicatorSender(IndicatorNames::VACUUM_PRESS,
+					TeensyIndicatorSender(IndicatorNames::VACUUM_PRESS,
 						dt, press.Vacuum.Pressure);
-					IndicatorSender(IndicatorNames::LATEST_VACUUM_PRESS,
+					TeensyIndicatorSender(IndicatorNames::LATEST_VACUUM_PRESS,
 						press.Vacuum.Pressure);
 
-					IndicatorSender(IndicatorNames::NTWO_PRESS,
+					TeensyIndicatorSender(IndicatorNames::NTWO_PRESS,
 						dt, press.N2Line.Pressure);
-					IndicatorSender(IndicatorNames::LATEST_N2_PRESS,
+					TeensyIndicatorSender(IndicatorNames::LATEST_N2_PRESS,
 						press.N2Line.Pressure);
 
 					_PressuresFile->Add(press);
@@ -672,23 +672,23 @@ private:
 					// Time since communication with the Teensy
 					double dt = (bmes.time - _init_time) / 1000.0;
 
-					IndicatorSender(IndicatorNames::LOCAL_BME_Temps,
+					TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Temps,
 						dt, bmes.LocalBME.Temperature);
-					IndicatorSender(IndicatorNames::LOCAL_BME_Pressure,
+					TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Pressure,
 						dt, bmes.LocalBME.Pressure);
-					IndicatorSender(IndicatorNames::LOCAL_BME_Humidity,
+					TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Humidity,
 						dt, bmes.LocalBME.Humidity);
 
-					IndicatorSender(IndicatorNames::BOX_BME_Temps,
+					TeensyIndicatorSender(IndicatorNames::BOX_BME_Temps,
 						dt, bmes.BoxBME.Temperature);
-					IndicatorSender(IndicatorNames::BOX_BME_Pressure,
+					TeensyIndicatorSender(IndicatorNames::BOX_BME_Pressure,
 						dt, bmes.BoxBME.Pressure);
-					IndicatorSender(IndicatorNames::BOX_BME_Humidity,
+					TeensyIndicatorSender(IndicatorNames::BOX_BME_Humidity,
 						dt, bmes.BoxBME.Humidity);
 
-					IndicatorSender(IndicatorNames::LATEST_BOX_BME_HUM,
+					TeensyIndicatorSender(IndicatorNames::LATEST_BOX_BME_HUM,
 						bmes.BoxBME.Humidity);
-					IndicatorSender(IndicatorNames::LATEST_BOX_BME_TEMP,
+					TeensyIndicatorSender(IndicatorNames::LATEST_BOX_BME_TEMP,
 						bmes.BoxBME.Temperature);
 
 					_BMEsFile->Add(bmes);
