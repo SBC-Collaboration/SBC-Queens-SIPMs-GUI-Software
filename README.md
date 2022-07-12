@@ -60,6 +60,12 @@ The compilation steps are (Linux):
 
 You will probably have some errors in the cmake running, most of them can be solved by googling the library that is required!
 
+## CAEN Libraries
+
+If the intention is to use this software to run the CAEN digitizer functionalities. It is required to install CAEN libraries. For both linux and windows, this can be done by following the CAENVME, CAENComm and CAENDigitizer libraries installation instruction.
+
+If they are installed in an unusual location, it is possible to add `-DCAEN_DIR=dir\to\CAEN` while runnin gcmake.
+
 # Developer instructions
 
 If the intention is to develop the code:

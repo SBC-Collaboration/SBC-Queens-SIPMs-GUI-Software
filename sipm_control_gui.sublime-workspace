@@ -428,64 +428,18 @@
 	"buffers":
 	[
 		{
-			"file": ".gitignore",
+			"file": "GUIManager.cpp",
 			"settings":
 			{
-				"buffer_size": 32,
-				"encoding": "UTF-8",
+				"buffer_size": 72,
 				"line_ending": "Windows"
-			},
-			"undo_stack":
-			[
-				[
-					3,
-					1,
-					"insert",
-					{
-						"characters": "\n"
-					},
-					"AQAAABQAAAAAAAAAFQAAAAAAAAAAAAAA",
-					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAUAAAAAAAAABQAAAAAAAAAAAAAAAAA8L8"
-				],
-				[
-					4,
-					1,
-					"insert",
-					{
-						"characters": ".sublime-*"
-					},
-					"CgAAABUAAAAAAAAAFgAAAAAAAAAAAAAAFgAAAAAAAAAXAAAAAAAAAAAAAAAXAAAAAAAAABgAAAAAAAAAAAAAABgAAAAAAAAAGQAAAAAAAAAAAAAAGQAAAAAAAAAaAAAAAAAAAAAAAAAaAAAAAAAAABsAAAAAAAAAAAAAABsAAAAAAAAAHAAAAAAAAAAAAAAAHAAAAAAAAAAdAAAAAAAAAAAAAAAdAAAAAAAAAB4AAAAAAAAAAAAAAB4AAAAAAAAAHwAAAAAAAAAAAAAA",
-					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAVAAAAAAAAABUAAAAAAAAAAAAAAAAA8L8"
-				],
-				[
-					10,
-					1,
-					"insert",
-					{
-						"characters": "*"
-					},
-					"AQAAABUAAAAAAAAAFgAAAAAAAAAAAAAA",
-					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAVAAAAAAAAABUAAAAAAAAAAAAAAAAA8L8"
-				]
-			]
-		},
-		{
-			"file": "TeensyControllerInterface.h",
-			"settings":
-			{
-				"buffer_size": 23595,
-				"encoding": "UTF-8",
-				"line_ending": "Unix"
-			},
-			"undo_stack":
-			[
-			]
+			}
 		},
 		{
 			"file": "GUIManager.h",
 			"settings":
 			{
-				"buffer_size": 28658,
+				"buffer_size": 29617,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			},
@@ -658,6 +612,18 @@
 		"selected_items":
 		[
 			[
+				"LSP: Enable",
+				"LSP: Enable Language Server Globally"
+			],
+			[
+				"package Contro l",
+				"Package Control: Install Package"
+			],
+			[
+				"Package Control: ins",
+				"Package Control: Install Package"
+			],
+			[
 				"Package Control: ",
 				"Package Control: Install Package"
 			],
@@ -702,7 +668,20 @@
 	],
 	"file_history":
 	[
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/sipm_control_gui.sublime-workspace",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/sipm_control_gui.sublime-project",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/README.md",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/TeensyControllerInterface.h",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/TeensyControllerInterface.cpp",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/.gitignore",
+		"/C/msys64/mingw64/include/c++/11.2.0/cstdint",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/Preferences.sublime-settings",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/GUIManager.h",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/CAENDigitizerInterface.h",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/gui_setup.toml",
 		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/GUIManager.cpp",
+		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI/.clang-tidy",
+		"/C/Users/Popcorn/Desktop/Algorythmic Approach.ipynb",
 		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/PICO250EventAction.cc",
 		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/muon.mac",
 		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/muon_construction_src/assemblies/MuonConstructionPICO500.cc",
@@ -816,24 +795,11 @@
 		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/include/muon_veto_include/MuonVetoWaterTankHit.hh",
 		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/muon_construction_src/MuonConstructionLabWorld.cc",
 		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/muon_construction_src/MuonConstructionMaterials.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/include/PICO250TrackingAction.hh",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/muon_construction_src/assemblies/MuonConstructionDEAP.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/muon_veto_src/MuonVetoActionInitialization.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/PICO250TrackingAction.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/PICO250SteppingAction.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/PICO250StackingAction.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/PICO250PrimaryGeneratorAction.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/Geant4 examples/basic/B3/B3b/src/B3StackingAction.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/Geant4 examples/basic/B4/B4b/src/B4bSteppingAction.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/include/muon_veto_include/MuonVetoWaterTankSensitiveDetector.hh",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/include/muon_construction_include/MuonConstructionLabWorld.hh",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/src/muon_veto_src/MuonVetoHistogramManager.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/picoGEANT4/PICO500/src/PICO250DetectorConstruction.cc",
-		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/include/muon_construction_include/assemblies/MuonConstructionDEAP.hh"
+		"/X/OneDrive - Queen's University/Research/Research - PICO500 - Muon veto simulations/PICO 500 Muon Veto Code/include/PICO250TrackingAction.hh"
 	],
 	"find":
 	{
-		"height": 30.0
+		"height": 25.0
 	},
 	"find_in_files":
 	{
@@ -848,6 +814,10 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"print",
+			"last_winning_guess",
+			"PeltierState",
+			"Checkbox",
 			"nhit_total_hist",
 			"out_hist",
 			"{\n",
@@ -971,11 +941,7 @@
 			"1",
 			"5",
 			"glisur",
-			"DiffuseReflector",
-			":\n",
-			"static",
-			"] ",
-			"]))\n"
+			"DiffuseReflector"
 		],
 		"highlight": true,
 		"in_selection": false,
@@ -1006,19 +972,19 @@
 			[
 				{
 					"buffer": 0,
-					"file": ".gitignore",
-					"semi_transient": false,
+					"file": "GUIManager.cpp",
+					"semi_transient": true,
 					"settings":
 					{
-						"buffer_size": 32,
+						"buffer_size": 72,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								32,
-								32
+								0,
+								0
 							]
 						],
 						"settings":
@@ -1032,44 +998,21 @@
 								{
 									"rhs_empty": true,
 									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".<>:\"/",
+									"selector": "punctuation.accessor | (meta.preprocessor.include string - punctuation.definition.string.end)",
+									"server": "clangd"
 								}
 							],
-							"lsp_uri": "file:///X:/OneDrive%20-%20Queen%27s%20University/Research/Research%20-%20SIPMs%20-%20Queens/Project%20-%20SiPM%20Cooler%20v2/Software/SiPMControlGUI/.gitignore",
-							"syntax": "Packages/Git Formats/Git Ignore.sublime-syntax"
+							"lsp_active": true,
+							"lsp_hover_provider_count": 1,
+							"lsp_uri": "file:///X:/OneDrive%20-%20Queen%27s%20University/Research/Research%20-%20SIPMs%20-%20Queens/Project%20-%20SiPM%20Cooler%20v2/Software/SiPMControlGUI/GUIManager.cpp",
+							"show_definitions": false,
+							"syntax": "Packages/C++/C++.sublime-syntax"
 						},
 						"translation.x": 0.0,
 						"translation.y": 0.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 2,
-					"stack_multiselect": false,
-					"type": "text"
-				},
-				{
-					"buffer": 1,
-					"file": "TeensyControllerInterface.h",
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 23595,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								22909,
-								22909
-							]
-						],
-						"settings":
-						{
-							"syntax": "Packages/C++/C++.sublime-syntax",
-							"tab_size": 4,
-							"translate_tabs_to_spaces": false
-						},
-						"translation.x": 0.0,
-						"translation.y": 18110.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 1,
@@ -1077,31 +1020,51 @@
 					"type": "text"
 				},
 				{
-					"buffer": 2,
+					"buffer": 1,
 					"file": "GUIManager.h",
 					"selected": true,
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 28658,
+						"buffer_size": 29617,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								24341,
-								24341
+								29617,
+								29617
 							]
 						],
 						"settings":
 						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".<>:\"/",
+									"selector": "punctuation.accessor | (meta.preprocessor.include string - punctuation.definition.string.end)",
+									"server": "clangd"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 1,
+							"lsp_uri": "file:///X:/OneDrive%20-%20Queen%27s%20University/Research/Research%20-%20SIPMs%20-%20Queens/Project%20-%20SiPM%20Cooler%20v2/Software/SiPMControlGUI/GUIManager.h",
+							"show_definitions": false,
 							"syntax": "Packages/C++/C++.sublime-syntax",
 							"tab_size": 4,
 							"translate_tabs_to_spaces": false
 						},
 						"translation.x": 0.0,
-						"translation.y": 14376.0,
+						"translation.y": 13705.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -1113,7 +1076,7 @@
 	],
 	"incremental_find":
 	{
-		"height": 30.0
+		"height": 25.0
 	},
 	"input":
 	{
@@ -1156,7 +1119,7 @@
 	},
 	"output.exec":
 	{
-		"height": 136.0
+		"height": 159.0
 	},
 	"output.find_results":
 	{
@@ -1178,11 +1141,11 @@
 	{
 		"height": 0.0
 	},
-	"pinned_build_system": "",
+	"pinned_build_system": "Build GUI",
 	"project": "sipm_control_gui.sublime-project",
 	"replace":
 	{
-		"height": 56.0
+		"height": 46.0
 	},
 	"save_all_on_build": true,
 	"select_file":
@@ -1220,7 +1183,7 @@
 	"show_open_files": true,
 	"show_tabs": true,
 	"side_bar_visible": true,
-	"side_bar_width": 316.0,
+	"side_bar_width": 277.0,
 	"status_bar_visible": true,
 	"template_settings":
 	{

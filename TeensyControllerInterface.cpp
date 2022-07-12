@@ -33,6 +33,7 @@ namespace SBCQueens {
     	j = json{{"RTDT2", p.RTD_2.Temperature}};
     }
 
+
     void from_json(const json& j, RTDs& p) {
     	p.time = get_current_time_epoch();
     	j.at("RTDT1").get_to(p.RTD_1.Temperature);
@@ -62,7 +63,6 @@ namespace SBCQueens {
     	press /= 14.5038; //to bar
     	p.N2Line.Pressure = press;
     }
-
     // I have no reason to use it in the future. I am adding
     // it just in case
     void to_json(json& j, const BMEs& p) {

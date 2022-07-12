@@ -731,11 +731,12 @@ public:
 
 				ImGui::Text("Peltier PID");
 				TeensyControlFac.Checkbox(
-					"PID ON/OFF",
+					"Peltier ON/OFF",
 					tgui_state.PeltierPIDState,
 					ImGui::IsItemEdited,
 					[=](TeensyControllerState& oldState) {
 
+						oldState.CommandToSend = TeensyCommands::SetPPID;
 						oldState.PeltierPIDState = tgui_state.PeltierPIDState;
 
 						return true;
@@ -760,7 +761,7 @@ public:
 				// );
 
 
-				TeensyControlFac.InputFloat("Temperature Setpoint",
+				TeensyControlFac.InputFloat("Peltier T Setpoint",
 					tgui_state.PIDTempValues.SetPoint,
 					0.01f, 6.0f, "%.6f °C",
 					ImGui::IsItemDeactivated,
@@ -771,7 +772,7 @@ public:
 					}
 				);
 
-				TeensyControlFac.InputFloat("Kp",
+				TeensyControlFac.InputFloat("PKp",
 					tgui_state.PIDTempValues.Kp,
 					0.01f, 6.0f, "%.6f",
 					ImGui::IsItemDeactivated,
@@ -781,7 +782,7 @@ public:
 						return true;
 					}
 				);
-				TeensyControlFac.InputFloat("Ti",
+				TeensyControlFac.InputFloat("PTi",
 					tgui_state.PIDTempValues.Ti,
 					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
@@ -790,7 +791,7 @@ public:
 						return true;
 					}
 				);
-				TeensyControlFac.InputFloat("Td",
+				TeensyControlFac.InputFloat("PTd",
 					tgui_state.PIDTempValues.Td,
 					0.01f, 6.0f, "%.6f ms",
 					ImGui::IsItemDeactivated,
@@ -801,20 +802,30 @@ public:
 					}
 				);
 
+				TeensyControlFac.Button("Reset PPID",
+					[=](TeensyControllerState& oldState) {
+
+						oldState.CommandToSend = TeensyCommands::ResetPPID;
+
+						return true;
+					}
+				);
+
 				ImGui::Text("LN2 Line PID");
 				TeensyControlFac.Checkbox(
-					"PID ON/OFF",
+					"LN2 ON/OFF",
 					tgui_state.LN2PIDState,
 					ImGui::IsItemEdited,
 					[=](TeensyControllerState& oldState) {
 
+						oldState.CommandToSend = TeensyCommands::SetNPID;
 						oldState.LN2PIDState = tgui_state.LN2PIDState;
 
 						return true;
 					}
 				);
 
-				TeensyControlFac.InputFloat("Temperature Setpoint",
+				TeensyControlFac.InputFloat("LN2 T Setpoint",
 					tgui_state.NTempValues.SetPoint,
 					0.01f, 6.0f, "%.6f °C",
 					ImGui::IsItemDeactivated,
@@ -825,7 +836,7 @@ public:
 					}
 				);
 
-				TeensyControlFac.InputFloat("TKp",
+				TeensyControlFac.InputFloat("NKp",
 					tgui_state.NTempValues.Kp,
 					0.01f, 6.0f, "%.6f",
 					ImGui::IsItemDeactivated,
@@ -835,7 +846,7 @@ public:
 						return true;
 					}
 				);
-				TeensyControlFac.InputFloat("TTi",
+				TeensyControlFac.InputFloat("NTi",
 					tgui_state.NTempValues.Ti,
 					0.01f, 6.0f, "%.6f ms",
 					ImGui::IsItemDeactivated,
@@ -845,13 +856,22 @@ public:
 						return true;
 					}
 				);
-				TeensyControlFac.InputFloat("TTd",
+				TeensyControlFac.InputFloat("NTd",
 					tgui_state.NTempValues.Td,
 					0.01f, 6.0f, "%.6f ms",
 					ImGui::IsItemDeactivated,
 					[=](TeensyControllerState& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetNPIDTempTd;
 						oldState.NTempValues.Td = tgui_state.NTempValues.Td;
+						return true;
+					}
+				);
+
+				TeensyControlFac.Button("Reset NPID",
+					[=](TeensyControllerState& oldState) {
+
+						oldState.CommandToSend = TeensyCommands::ResetNPID;
+
 						return true;
 					}
 				);

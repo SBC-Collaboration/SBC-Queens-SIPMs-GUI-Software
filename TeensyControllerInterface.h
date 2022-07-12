@@ -834,6 +834,10 @@ private:
 			out << std::defaultfloat;
 
 			switch(cmd) {
+				case TeensyCommands::SetPPID:
+					out << tcs.PeltierPIDState;
+				break;
+
 				case TeensyCommands::SetPPIDTempSetpoint:
 					out << tcs.PIDTempValues.SetPoint;
 				break;
@@ -848,6 +852,10 @@ private:
 
 				case TeensyCommands::SetPPIDTempTd:
 					out << tcs.PIDTempValues.Td;
+				break;
+
+				case TeensyCommands::SetNPID:
+					out << tcs.LN2PIDState;
 				break;
 
 				case TeensyCommands::SetNPIDTempSetpoint:
