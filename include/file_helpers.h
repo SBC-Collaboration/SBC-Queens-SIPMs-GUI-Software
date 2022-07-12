@@ -17,9 +17,8 @@
 
 namespace SBCQueens {
 
-	// This is just to let the programmer (or idiot me) that
-	// this file is going to be used to write the data files
-	// No reading allowed
+	// Manages the ofstream to work in concurrent or non-concurrent modes.
+	// Do not use on its own.
 	template <typename T>
 	struct dataFile {
 private:
@@ -133,11 +132,15 @@ public:
 
 	};
 
+	// As a file is a dynamic resource, it is better to manage it using
+	// smart pointers, and using a functional based approach it is easier
+	// to parallelize it.
 	template<typename T>
 	using DataFile = std::unique_ptr<dataFile<T>>;
 
 	// Opens the file with name fileName.
 	// If file is an already opened file, it is closed and opened again.
+	// res returns nullptr if it failed to open.
 	template <typename T>
 	void open(DataFile<T>& res, const std::string& fileName) {
 
@@ -147,12 +150,18 @@ public:
 
 		res = std::make_unique<dataFile<T>>(fileName);
 
+		// If it fails to open, release resources
+		if(not res->IsOpen()) {
+			res.release();
+		}
+
 	}
 
 	// Opens the file with name fileName.
 	// If file is an already opened file, it is closed and opened again.
 	// It will also write to the file whatever f returns with args...
 	// as long as f returns anything that can be saved using the steam << operator.
+	// res returns nullptr if it failed to open.
 	template <typename T, typename InitWriteFunc, typename... Args>
 	void open(DataFile<T>& res,
 		const std::string& fileName, InitWriteFunc&& f,  Args&&... args) {
@@ -163,8 +172,14 @@ public:
 
 		res = std::make_unique<dataFile<T>>(fileName,
 			std::forward<InitWriteFunc>(f), std::forward<Args>(args)...);
+
+		// If it fails to open, release resources
+		if(not res->IsOpen()) {
+			res.release();
+		}
 	}
 
+	// Closes the file and releases resources (res is nullptr after this call)
 	template <typename T>
 	void close(DataFile<T>& res) {
 		if(res) {
@@ -172,10 +187,15 @@ public:
 		}
 	}
 
-	// Saves the contents of DataFile using the format function f
-	// that takes T as an argument, or
-	// takes std::vector<T>& as argument which then uses all the information
-	// at once to generate the string that is saved to the file
+	// Saves the contents of DataFile using three different methods depending on f:
+	//
+	// If f takes T (T& or const T) as an argument, it will write the return of
+	//		f for each data member in the vector.
+	// Else if f takes std::vector<T>& as argument, it will then use all the
+	//		information contained inside the vector before writing f.
+	// Else, write what f returns.
+	// Note: as long as the return type is compatible with the << operator
+	// for all of these cases.
 	template<typename T, typename FormatFunc, typename... Args>
 	void save(DataFile<T>& file, FormatFunc&& f,  Args&&... args) noexcept {
 
@@ -210,13 +230,16 @@ public:
 
 	}
 
-	// Saves the contents of the DataFile asynchronously using packaged tasks
+	// Saves the contents of the DataFile asynchronously using the save function
+	// described here. See save for more information.
 	template<typename T, typename FormatFunc, typename... Args>
 	void async_save(DataFile<T>& file, FormatFunc&& f, Args&&... args) noexcept {
+
 		std::packaged_task<void(DataFile<T>&, FormatFunc&&)>
 			_pt(save<T, FormatFunc>);
 			
 		_pt(file, std::forward<FormatFunc>(f), std::forward<Args>(args)...);
+
 	}
 
 

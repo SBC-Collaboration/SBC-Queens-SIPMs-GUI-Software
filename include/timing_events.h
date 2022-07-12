@@ -23,7 +23,8 @@ namespace SBCQueens {
 
 	// TotalTimeEvent
 	// Makes sure the function passed to it with arguments args
-	// is only called 
+	// is only called every delta T. Units are by default in milliseconds
+	// but it can be changed.
 	template<typename FuncName, typename Y = std::chrono::milliseconds>
 	class TotalTimeEvent {
 	public:
@@ -38,7 +39,6 @@ namespace SBCQueens {
 
 		TotalTimeEvent<FuncName, Y>& operator=(TotalTimeEvent<FuncName, Y>&) = default;
 		TotalTimeEvent<FuncName, Y>& operator=(TotalTimeEvent<FuncName, Y>&&) = default;
-
 
 		template<typename... Args>
 		auto operator()(Args&&... args) {
