@@ -556,7 +556,8 @@ private:
 			json json_parse = json::parse(msg_opt.value(), nullptr, false);
 			if(json_parse.is_discarded()) {
 				spdlog::warn("Invalid json string. "
-							"Message received from Teensy: {0}", msg_opt.value());
+							"Message received from Teensy: {0}",
+							msg_opt.value());
 				flush(port);
 				return;
 			}
@@ -590,6 +591,7 @@ private:
 								"Message received from Teensy: {1}",
 								cTeensyCommands.at(TeensyCommands::GetPeltiers),
 								msg.value());
+					flush(port);
 				}
 			});
 
@@ -623,6 +625,7 @@ private:
 								"Message received from Teensy: {1}",
 								cTeensyCommands.at(TeensyCommands::GetRTDs),
 								msg.value());
+					flush(port);
 				}
 
 			});
@@ -656,6 +659,8 @@ private:
 								"Message received from Teensy: {1}",
 								cTeensyCommands.at(TeensyCommands::GetPressures),
 								msg.value());
+
+					flush(port);
 				}
 
 			});
@@ -698,6 +703,7 @@ private:
 								"Message received from Teensy: {1}",
 								cTeensyCommands.at(TeensyCommands::GetBMEs),
 								msg.value());
+					flush(port);
 				}
 			});
 

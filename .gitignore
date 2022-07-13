@@ -4,3 +4,5 @@ build/
 *.sublime-*
 build*/
 compile_commands.json
+
+siipm_control_gui.sublime-project
