@@ -4,3 +4,11 @@ build/
 *.sublime-*
 build*/
 compile_commands.json
+
+Teensy41-Controller-Board/.pio
+Teensy41-Controller-Board/.pio
+Teensy41-Controller-Board/.vscode/.browse.c_cpp.db*
+Teensy41-Controller-Board/.vscode/c_cpp_properties.json
+Teensy41-Controller-Board/.vscode/launch.json
+Teensy41-Controller-Board/.vscode/ipch
+Teensy41-Controller-Board/lib/freertos-teensy-10.4.1_v0.7/*

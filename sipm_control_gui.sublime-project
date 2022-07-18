@@ -4,6 +4,10 @@
 		{
 			"path": "."
 		},
+		{
+			"name" : "Teensy",
+			"path" : "Teensy41-Controller-Board"
+		},
 	],
 	"build_systems":
 	[

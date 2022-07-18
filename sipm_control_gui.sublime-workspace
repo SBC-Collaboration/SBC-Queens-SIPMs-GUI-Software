@@ -428,20 +428,23 @@
 	"buffers":
 	[
 		{
-			"file": "GUIManager.cpp",
-			"settings":
-			{
-				"buffer_size": 72,
-				"line_ending": "Windows"
-			}
-		},
-		{
 			"file": "GUIManager.h",
 			"settings":
 			{
 				"buffer_size": 29617,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
+			},
+			"undo_stack":
+			[
+			]
+		},
+		{
+			"file": "sipm_control_gui.sublime-project",
+			"settings":
+			{
+				"buffer_size": 378,
+				"line_ending": "Windows"
 			},
 			"undo_stack":
 			[
@@ -664,7 +667,7 @@
 	},
 	"expanded_folders":
 	[
-		"/X/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI"
+		"/C/Users/StaticPopcorn/OneDrive - Queen's University/Research/Research - SIPMs - Queens/Project - SiPM Cooler v2/Software/SiPMControlGUI"
 	],
 	"file_history":
 	[
@@ -799,7 +802,7 @@
 	],
 	"find":
 	{
-		"height": 25.0
+		"height": 27.0
 	},
 	"find_in_files":
 	{
@@ -972,57 +975,7 @@
 			[
 				{
 					"buffer": 0,
-					"file": "GUIManager.cpp",
-					"semi_transient": true,
-					"settings":
-					{
-						"buffer_size": 72,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								0,
-								0
-							]
-						],
-						"settings":
-						{
-							"auto_complete_triggers":
-							[
-								{
-									"characters": "<",
-									"selector": "text.html, text.xml"
-								},
-								{
-									"rhs_empty": true,
-									"selector": "punctuation.accessor"
-								},
-								{
-									"characters": ".<>:\"/",
-									"selector": "punctuation.accessor | (meta.preprocessor.include string - punctuation.definition.string.end)",
-									"server": "clangd"
-								}
-							],
-							"lsp_active": true,
-							"lsp_hover_provider_count": 1,
-							"lsp_uri": "file:///X:/OneDrive%20-%20Queen%27s%20University/Research/Research%20-%20SIPMs%20-%20Queens/Project%20-%20SiPM%20Cooler%20v2/Software/SiPMControlGUI/GUIManager.cpp",
-							"show_definitions": false,
-							"syntax": "Packages/C++/C++.sublime-syntax"
-						},
-						"translation.x": 0.0,
-						"translation.y": 0.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 1,
-					"stack_multiselect": false,
-					"type": "text"
-				},
-				{
-					"buffer": 1,
 					"file": "GUIManager.h",
-					"selected": true,
 					"semi_transient": false,
 					"settings":
 					{
@@ -1033,8 +986,8 @@
 						"selection":
 						[
 							[
-								29617,
-								29617
+								27177,
+								27177
 							]
 						],
 						"settings":
@@ -1055,8 +1008,9 @@
 									"server": "clangd"
 								}
 							],
+							"load_file_name": "C:\\Users\\StaticPopcorn\\OneDrive - Queen's University\\Research\\Research - SIPMs - Queens\\Project - SiPM Cooler v2\\Software\\SiPMControlGUI\\GUIManager.h",
 							"lsp_active": true,
-							"lsp_hover_provider_count": 1,
+							"lsp_hover_provider_count": 2,
 							"lsp_uri": "file:///X:/OneDrive%20-%20Queen%27s%20University/Research/Research%20-%20SIPMs%20-%20Queens/Project%20-%20SiPM%20Cooler%20v2/Software/SiPMControlGUI/GUIManager.h",
 							"show_definitions": false,
 							"syntax": "Packages/C++/C++.sublime-syntax",
@@ -1065,6 +1019,40 @@
 						},
 						"translation.x": 0.0,
 						"translation.y": 13705.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "sipm_control_gui.sublime-project",
+					"selected": true,
+					"semi_transient": true,
+					"settings":
+					{
+						"buffer_size": 378,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								378,
+								378
+							]
+						],
+						"settings":
+						{
+							"load_file_name": "C:\\Users\\StaticPopcorn\\OneDrive - Queen's University\\Research\\Research - SIPMs - Queens\\Project - SiPM Cooler v2\\Software\\SiPMControlGUI\\sipm_control_gui.sublime-project",
+							"lsp_uri": "file:///C:/Users/StaticPopcorn/OneDrive%20-%20Queen%27s%20University/Research/Research%20-%20SIPMs%20-%20Queens/Project%20-%20SiPM%20Cooler%20v2/Software/SiPMControlGUI/sipm_control_gui.sublime-project",
+							"syntax": "Packages/JSON/JSON.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -1076,7 +1064,7 @@
 	],
 	"incremental_find":
 	{
-		"height": 25.0
+		"height": 27.0
 	},
 	"input":
 	{
@@ -1145,7 +1133,7 @@
 	"project": "sipm_control_gui.sublime-project",
 	"replace":
 	{
-		"height": 46.0
+		"height": 50.0
 	},
 	"save_all_on_build": true,
 	"select_file":
