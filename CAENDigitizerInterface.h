@@ -363,10 +363,11 @@ private:
 				// 	spdlog::info("Time difference between events: {0}", t1 - t0);
 				// }
 
+				// Clear events in buffer
+				clear_data(Port);
 
 			}
-			// Clear events in buffer
-			clear_data(Port);
+
 
 			lec();
 			change_state();
