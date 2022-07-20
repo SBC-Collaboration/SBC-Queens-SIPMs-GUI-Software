@@ -375,7 +375,7 @@ namespace SBCQueens {
 
 				// If the queue does not return a valid function, this call will
 				// do nothing and should return true always.
-				// The tasks are essentially any GUI driven modifcation, example
+				// The tasks are essentially any GUI driven modification, example
 				// setting the PID setpoints or constants
 				// or an user driven reset
 				if(!task(state_of_everything)) {

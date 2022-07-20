@@ -47,7 +47,7 @@ void update_ntwo_pid(TimerHandle_t xTimer) {
     SBCQueens::N2_RELEASE_RELAY.Value = SBCQueens::N2_RELEASE_PID_REG | SBCQueens::N2_RELEASE_MAN_REG;
     SBCQueens::give_reg_mux();
 
-    SBCQueens::relay_update(SBCQueens::N2_INPUT_RELAY);
+    // SBCQueens::relay_update(SBCQueens::N2_INPUT_RELAY);
     SBCQueens::relay_update(SBCQueens::N2_RELEASE_RELAY);
 }
 

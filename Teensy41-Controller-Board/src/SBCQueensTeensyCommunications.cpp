@@ -94,7 +94,7 @@ namespace SBCQueens {
     }
 
     void REL_VALVE_STATE(float newVal) {
-        digitalWrite(TWELVEV_PIN_TWO, newVal == 0);
+        // digitalWrite(TWELVEV_PIN_TWO, newVal == 0);
     }
 
     void N2_VALVE_STATE(float newVal) {

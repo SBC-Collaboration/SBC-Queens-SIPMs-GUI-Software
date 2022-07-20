@@ -82,16 +82,23 @@ namespace SBCQueens {
 				take_reg_mux();
 					// If the difference in temperatures is less than 5.0 change to temp mode
 					if(abs(temperature_setpoint - latest_temp_meas) < 5.0) {
-						controller.State = PID_STATE::TEMP_MODE;
+						// if ( latest_current_meas < 0.95*controller.REGISTERS.DESIRED_SET_VAL ) {
+							controller.State = PID_STATE::TEMP_MODE;
+						// }
 					}
+
 					*controller.Ouput = tmp;
 					controller._set_comm_err = pid_comm_err;
+					controller._last_set_err = pid_error;
 				give_reg_mux();
 				break;
 			}
 				
 			case PID_STATE::TEMP_MODE:
 			{
+
+
+
 				float& latest_temp_error  = controller._last_cont_err;
 
 				float& kp = controller.REGISTERS.CONTROL_KP;
@@ -121,12 +128,16 @@ namespace SBCQueens {
 				}
 
 				// If the difference in temperatures is higher or equal than 5.0 change to current mode
+				
 				take_reg_mux();
+					// Changes states only if enabled and away from 5 degC
 					if(abs(pid_error) >= 5.0 && controller.SET_EN) {
 						controller.State = PID_STATE::CURRENT_MODE;
 					}
+
 					*controller.Ouput = tmp;
 					controller._cont_comm_err = pid_comm_err;
+					controller._last_cont_err = pid_error;
 				give_reg_mux();
 				break;
 			}

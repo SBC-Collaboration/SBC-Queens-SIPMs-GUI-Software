@@ -54,6 +54,8 @@ namespace SBCQueens {
 		CAENInterfaceStates CurrentState =
 			CAENInterfaceStates::NullState;
 
+		bool SoftwareTrigger = false;
+
 	};
 
 	using CAENQueueType 
@@ -246,9 +248,12 @@ private:
 				if(!task(state_of_everything)) {
 					spdlog::warn("Something went wrong with a command!");
 				} else {
+
 					switch_state(state_of_everything.CurrentState);
 					return true;
+
 				}
+
 			}
 
 			return false;
@@ -330,6 +335,11 @@ private:
 			_plotSender(IndicatorNames::CAENBUFFEREVENTS, events);
 
 			retrieve_data(Port);
+
+			if(state_of_everything.SoftwareTrigger) {
+				software_trigger(Port);
+				state_of_everything.SoftwareTrigger = false;
+			}
 
 			if(Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
 

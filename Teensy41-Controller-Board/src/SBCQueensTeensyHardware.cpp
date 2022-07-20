@@ -57,16 +57,17 @@ namespace SBCQueens {
 		RTD_DAC_02.Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
 
 		PELTIER_PID.State                        	= PID_STATE::SLEEP; // starts at sleep
-		PELTIER_PID.SET_EN							= false;				// there is a control/set
+		PELTIER_PID.SET_EN							= true;				// there is a control/set
 		PELTIER_PID.OutputMax                   	= 0x0FFF; 			// 12 bits
+		PELTIER_PID.OutputMax                   	= 3400; 			// 5 amps approx
 		PELTIER_PID.OutputMin                   	= 0;				// 0 min
 		PELTIER_PID.DeltaTime                   	= 100.0;			// ms
 		PELTIER_PID.Ouput               			= &PELTIER_DRIVER.REGISTERS.LAST_DAC_REG;
 		PELTIER_PID.REGISTERS.LATEST_CONTROL 		= &RTD_DAC_01.REGISTERS.LAST_TEMP_REG;
 		PELTIER_PID.REGISTERS.LATEST_SET 			= &PELTIER_DRIVER.REGISTERS.LAST_CURRENT_REG;
-		PELTIER_PID.REGISTERS.DESIRED_SET_VAL 		= 6.0;	// 2 amps max
-		PELTIER_PID.REGISTERS.SET_KP 				= 200;	// pid values have been tested and proven
-		PELTIER_PID.REGISTERS.SET_TI				= 100;
+		PELTIER_PID.REGISTERS.DESIRED_SET_VAL 		= 5.0;	// amps max
+		PELTIER_PID.REGISTERS.SET_KP 				= 100;	// pid values have been tested and proven
+		PELTIER_PID.REGISTERS.SET_TI				= 200;
 		PELTIER_PID.REGISTERS.SET_TD				= 0;
 
 		N2_PID.State 								= PID_STATE::SLEEP;

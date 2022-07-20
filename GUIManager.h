@@ -552,7 +552,8 @@ public:
 
 				CAENControlFac.Button("Software Trigger",
 					[](CAENInterfaceData& state) {
-						//software_trigger(state.Port);
+						state.SoftwareTrigger = true;
+						// software_trigger(state.);
 						return true;
 					}
 				);
