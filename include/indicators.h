@@ -9,14 +9,12 @@ namespace SBCQueens {
 		PELTIER_CURR,
 		RTD_TEMP_ONE,
 		RTD_TEMP_TWO,
+
 		VACUUM_PRESS,
-		NTWO_PRESS,
+
 		LOCAL_BME_Temps,
 		LOCAL_BME_Pressure,
 		LOCAL_BME_Humidity,
-		BOX_BME_Temps,
-		BOX_BME_Pressure,
-		BOX_BME_Humidity,
 
 		SiPM_Plot_ZERO,
 		SiPM_Plot_ONE,
@@ -30,16 +28,14 @@ namespace SBCQueens {
 		LATEST_Peltier_CURR,
 
 		LATEST_VACUUM_PRESS,
-		LATEST_N2_PRESS,
-
-		LATEST_BOX_BME_HUM,
-		LATEST_BOX_BME_TEMP,
 
 		// CAEN Indicators
 		CAENBUFFEREVENTS,
 		FREQUENCY,
 		DARK_NOISE_RATE,
-		GAIN
+		GAIN,
+
+		SAVED_WAVEFORMS
 	};
 
 

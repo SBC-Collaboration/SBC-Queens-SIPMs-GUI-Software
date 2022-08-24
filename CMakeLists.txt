@@ -144,7 +144,7 @@ endif()
 # json serializer
 # https://github.com/nlohmann/json
 set(JSON_DIR ${DEPENDENCY_DIR}/json) 
-if(IS_DIRECTORY ${GL3W_DIR})
+if(IS_DIRECTORY ${JSON_DIR})
   include_directories(${JSON_DIR}/single_include)
 else()
   message(FATAL_ERROR "json single_include not found. Make sure to run git submodules init first")

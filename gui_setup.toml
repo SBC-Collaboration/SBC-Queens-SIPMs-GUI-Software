@@ -1,34 +1,30 @@
 [File]
-RunDir = "C:\\Users\\SBC\\Documents\\SIPM-Testing-Software"
-RunName = "RUNS"
+RunDir = "./RUNS"
+RunName = "TESTING"
 
 [Teensy]
-Port = "COM3"
+Port = "/dev/ttyACM0"
 
 PIDEnable = false
-PeltierTempSetpoint = -90
-NTempSetpoint = -100
+PeltierTempSetpoint = -30
 
-PeltierTKp = -3e3
-PeltierTTi = 50e3
+PeltierTKp = -100
+PeltierTTi = 1e6
 PeltierTTd = 0
 
-NTKp = -1e3
-NTTi = 10e3
-NTTd = 0
 
 [CAEN]
 # DT5730B or DT5740D
-Model = "DT5740D"
-Port = 0
+Model = "DT5730B"
+Port = 1
 # 0 = not allowed
-RecordLength = 180
+RecordLength = 500
 MaxEventsPerRead = 500
 PostBufferPorcentage = 50
 OverlappingRejection = false
 TRGINasGate = false
 # 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
-ExternalTrigger = 1
+ExternalTrigger = 0
 SoftwareTrigger = 1
 # 0 = rising edge, 1 = falling edge
 Polarity = 1
@@ -49,8 +45,8 @@ Offset = 0x8000
 # Individual corrections to offset
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
-Range = 0
-Threshold = 2103
+Range = 1
+Threshold = 8000
 
 # [CAEN.group1]
 # Enabled = 0

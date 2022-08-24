@@ -75,6 +75,7 @@ namespace SBCQueens {
 		IndicatorSender<IndicatorNames> _plotSender;
 
 		CAEN Port = nullptr;
+		std::uint64_t Waveforms = 0;
 
 		//tmp stuff
 		uint16_t* data;
@@ -442,6 +443,9 @@ private:
 					}
 				}
 
+				Waveforms += Port->Data.NumEvents;
+				_plotSender(IndicatorNames::SAVED_WAVEFORMS, Waveforms);
+
 			};
 
 			if(isFileOpen) {
@@ -469,6 +473,7 @@ private:
 					Port);
 
 				isFileOpen = _pulseFile > 0;
+				Waveforms = 0;
 			}
 
 			process_events();

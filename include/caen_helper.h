@@ -461,7 +461,7 @@ private:
 	// Does not retrieve data if resource is null, there are errors,
 	// or events in buffer are less than n.
 	// n cannot be bigger than the max number of buffers allowed
-	bool retrieve_data_until_n_events(CAEN&, uint32_t& n) noexcept;
+	bool retrieve_data_until_n_events(CAEN&, uint32_t& n, bool debug_info = false) noexcept;
 
 	// Extracts event i from the data retrieved by retrieve_data(...)
 	// into Event evt.

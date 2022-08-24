@@ -81,18 +81,12 @@ public:
 
 			// Send initial states of the PIDs
 			tgui_state.PeltierState = false;
-			tgui_state.ReliefValveState = false;
-			tgui_state.N2ValveState = false;
 
+			tgui_state.PIDTempTripPoint = t_conf["PeltierTempTripPoint"].value_or(0.0f);
 			tgui_state.PIDTempValues.SetPoint = t_conf["PeltierTempSetpoint"].value_or(0.0f);
 			tgui_state.PIDTempValues.Kp = t_conf["PeltierTKp"].value_or(0.0f);
 			tgui_state.PIDTempValues.Ti = t_conf["PeltierTTi"].value_or(0.0f);
 			tgui_state.PIDTempValues.Td = t_conf["PeltierTTd"].value_or(0.0f);
-
-			tgui_state.NTempValues.SetPoint = t_conf["NTempSetpoint"].value_or(0.0f);
-			tgui_state.NTempValues.Kp = t_conf["NTKp"].value_or(0.0f);
-			tgui_state.NTempValues.Ti = t_conf["NTTi"].value_or(0.0f);
-			tgui_state.NTempValues.Td = t_conf["NTTd"].value_or(0.0f);
 
 			// CAEN initial state
 			cgui_state.CurrentState = CAENInterfaceStates::Standby;
@@ -233,7 +227,6 @@ public:
 				caen_tabs();
 				ImGui::EndTabBar();
 			} 
-
 			ImGui::End();
 
 			//// Plots
@@ -248,9 +241,6 @@ public:
 				_indicatorReceiver.clear_plot(IndicatorNames::LOCAL_BME_Humidity);
 				_indicatorReceiver.clear_plot(IndicatorNames::LOCAL_BME_Temps);
 				_indicatorReceiver.clear_plot(IndicatorNames::LOCAL_BME_Pressure);
-				_indicatorReceiver.clear_plot(IndicatorNames::BOX_BME_Humidity);
-				_indicatorReceiver.clear_plot(IndicatorNames::BOX_BME_Temps);
-				_indicatorReceiver.clear_plot(IndicatorNames::BOX_BME_Pressure);
 			}
 			if (ImGui::BeginTabBar("Other Plots")) {
 				if (ImGui::BeginTabItem("Local BME")) {
@@ -279,37 +269,10 @@ public:
 					ImGui::EndTabItem();
 				}
 
-				if (ImGui::BeginTabItem("Box BME")) {
-					if (ImPlot::BeginPlot("Local BME", ImVec2(-1,0))) {
-
-						// We setup the axis
-						ImPlot::SetupAxes("time [s]", "Humidity [%]", g_axis_flags, g_axis_flags);
-						ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]", g_axis_flags | ImPlotAxisFlags_Opposite);
-						ImPlot::SetupAxis(ImAxis_Y2, "Temperature [degC]", g_axis_flags | ImPlotAxisFlags_Opposite);
-
-						// This one does not need an SetAxes as it takes the default
-						// This functor is almost the same as calling ImPlot
-						_indicatorReceiver.plot(IndicatorNames::BOX_BME_Humidity, "Humidity");
-
-						// We need to call SetAxes before ImPlot::PlotLines to let the API know
-						// the axis of our data
-						ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-						_indicatorReceiver.plot(IndicatorNames::BOX_BME_Temps, "Temperature");
-
-						ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
-						_indicatorReceiver.plot(IndicatorNames::BOX_BME_Pressure, "Pressure");
-							
-						ImPlot::EndPlot();
-					}
-
-					ImGui::EndTabItem();
-				}
-
 				if (ImGui::BeginTabItem("Pressures")) {
 					if(ImPlot::BeginPlot("Pressures", ImVec2(-1, 0))) {
 						ImPlot::SetupAxes("time [s]", "P [Bar]", g_axis_flags, g_axis_flags);
 						_indicatorReceiver.plot(IndicatorNames::VACUUM_PRESS, "Vacuum line");
-						_indicatorReceiver.plot(IndicatorNames::NTWO_PRESS, "N2 line");
 
 						ImPlot::EndPlot();
 					}
@@ -331,7 +294,6 @@ public:
 				_indicatorReceiver.clear_plot(IndicatorNames::PELTIER_CURR);
 
 				_indicatorReceiver.clear_plot(IndicatorNames::VACUUM_PRESS);
-				_indicatorReceiver.clear_plot(IndicatorNames::NTWO_PRESS);
 			}
 
 			if (ImPlot::BeginPlot("PIDs", ImVec2(-1,0))) {
@@ -373,17 +335,16 @@ public:
 
 			ImGui::Begin("Indicators");
 
+			ImGui::Text("File Statistics");
+			_indicatorReceiver.indicator(IndicatorNames::SAVED_WAVEFORMS, "Saved SiPM Pulses");
+
 			// Teensy
 			ImGui::Text("Teensy");
 			_indicatorReceiver.indicator(IndicatorNames::LATEST_RTD1_TEMP, "RTD1 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
 			_indicatorReceiver.indicator(IndicatorNames::LATEST_RTD2_TEMP, "RTD2 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
 			_indicatorReceiver.indicator(IndicatorNames::LATEST_Peltier_CURR, "Peltier"); ImGui::SameLine(); ImGui::Text("[A]");
 
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_VACUUM_PRESS, "Vacuum"); ImGui::SameLine(); ImGui::Text("[???]");
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_N2_PRESS, "N2 Line"); ImGui::SameLine(); ImGui::Text("[???]");
-
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_BOX_BME_HUM, "BOX BME Humidity"); ImGui::SameLine();ImGui::Text("[%%]");
-			_indicatorReceiver.indicator(IndicatorNames::LATEST_BOX_BME_TEMP, "BOX BME Temperature"); ImGui::SameLine(); ImGui::Text("[degC]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_VACUUM_PRESS, "Vacuum"); ImGui::SameLine(); ImGui::Text("[Bar]");
 			// End Teensy
 
 			// CAEN
@@ -436,7 +397,7 @@ public:
 				CAENControlFac.ComboBox("Model", cgui_state.Model,
 					CAENDigitizerModels_map, [](){ return false; }, [](){ return true; });
 
-				static int caen_port = 0;
+				static int caen_port = cgui_state.PortNum;
 				ImGui::InputInt("CAEN port", &caen_port);
 		        if (ImGui::IsItemHovered()) {
         			ImGui::SetTooltip("Usually 0 as long as there is no "
@@ -462,6 +423,9 @@ public:
 						state = cgui_state;
 						state.RunDir = i_run_dir;
 						state.RunName = i_run_name;
+						state.PortNum = caen_port;
+						state.GlobalConfig = cgui_state.GlobalConfig;
+						state.GroupConfigs = cgui_state.GroupConfigs;
 						state.CurrentState =
 							CAENInterfaceStates::AttemptConnection;
 						return true;
@@ -704,25 +668,25 @@ public:
 					}
 				);
 
-				TeensyControlFac.Checkbox("Pressure Relief Valve",
-					tgui_state.ReliefValveState,
-					ImGui::IsItemEdited,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetReleaseValve;
-						oldState.ReliefValveState = tgui_state.ReliefValveState;
-						return true;
-					}
-				);
+				// TeensyControlFac.Checkbox("Pressure Relief Valve",
+				// 	tgui_state.ReliefValveState,
+				// 	ImGui::IsItemEdited,
+				// 	[=](TeensyControllerState& oldState) {
+				// 		oldState.CommandToSend = TeensyCommands::SetReleaseValve;
+				// 		oldState.ReliefValveState = tgui_state.ReliefValveState;
+				// 		return true;
+				// 	}
+				// );
 
-				TeensyControlFac.Checkbox("N2 Release Relay",
-					tgui_state.N2ValveState,
-					ImGui::IsItemEdited,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetN2Valve;
-						oldState.N2ValveState = tgui_state.N2ValveState;
-						return true;
-					}
-				);
+				// TeensyControlFac.Checkbox("N2 Release Relay",
+				// 	tgui_state.N2ValveState,
+				// 	ImGui::IsItemEdited,
+				// 	[=](TeensyControllerState& oldState) {
+				// 		oldState.CommandToSend = TeensyCommands::SetN2Valve;
+				// 		oldState.N2ValveState = tgui_state.N2ValveState;
+				// 		return true;
+				// 	}
+				// );
 
 				ImGui::EndTabItem();
 			}
@@ -761,6 +725,16 @@ public:
 				// 	}
 				// );
 
+				TeensyControlFac.InputFloat("Peltier trip point",
+					tgui_state.PIDTempTripPoint,
+					0.01f, 6.0f, "%.6f °C",
+					ImGui::IsItemDeactivated,
+					[=](TeensyControllerState& oldState) {
+						oldState.CommandToSend = TeensyCommands::SetPPIDTripPoint;
+						oldState.PIDTempTripPoint = tgui_state.PIDTempTripPoint;
+						return true;
+					}
+				);
 
 				TeensyControlFac.InputFloat("Peltier T Setpoint",
 					tgui_state.PIDTempValues.SetPoint,
@@ -812,70 +786,6 @@ public:
 					}
 				);
 
-				ImGui::Text("LN2 Line PID");
-				TeensyControlFac.Checkbox(
-					"LN2 ON/OFF",
-					tgui_state.LN2PIDState,
-					ImGui::IsItemEdited,
-					[=](TeensyControllerState& oldState) {
-
-						oldState.CommandToSend = TeensyCommands::SetNPID;
-						oldState.LN2PIDState = tgui_state.LN2PIDState;
-
-						return true;
-					}
-				);
-
-				TeensyControlFac.InputFloat("LN2 T Setpoint",
-					tgui_state.NTempValues.SetPoint,
-					0.01f, 6.0f, "%.6f °C",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetNPIDTempSetpoint;
-						oldState.NTempValues.SetPoint = tgui_state.NTempValues.SetPoint;
-						return true;
-					}
-				);
-
-				TeensyControlFac.InputFloat("NKp",
-					tgui_state.NTempValues.Kp,
-					0.01f, 6.0f, "%.6f",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetNPIDTempKp;
-						oldState.NTempValues.Kp = tgui_state.NTempValues.Kp;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("NTi",
-					tgui_state.NTempValues.Ti,
-					0.01f, 6.0f, "%.6f ms",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetNPIDTempTi;
-						oldState.NTempValues.Ti = tgui_state.NTempValues.Ti;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("NTd",
-					tgui_state.NTempValues.Td,
-					0.01f, 6.0f, "%.6f ms",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetNPIDTempTd;
-						oldState.NTempValues.Td = tgui_state.NTempValues.Td;
-						return true;
-					}
-				);
-
-				TeensyControlFac.Button("Reset NPID",
-					[=](TeensyControllerState& oldState) {
-
-						oldState.CommandToSend = TeensyCommands::ResetNPID;
-
-						return true;
-					}
-				);
 
 				ImGui::EndTabItem();
 			}

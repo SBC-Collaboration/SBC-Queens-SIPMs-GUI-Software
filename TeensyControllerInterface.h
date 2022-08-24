@@ -100,7 +100,6 @@ namespace SBCQueens {
 	struct Pressures {
 		double time;
 		PressureValues Vacuum;
-		PressureValues N2Line;
 	};
 
 	// The BMEs return their values as registers
@@ -115,7 +114,6 @@ namespace SBCQueens {
 	struct BMEs {
 		double time;
 		BMEValues LocalBME;
-		BMEValues BoxBME;
 	};
 
 	struct BME_COMPENSATION_REGISTERS {
@@ -141,7 +139,7 @@ namespace SBCQueens {
 		int8_t dig_H6;
 	};
 
-	enum class BME_TYPE {LOCAL, BOX};
+	enum class BME_TYPE {LOCAL};
 	// These are the constant compensation or calibration parameters for each BME
 	const BME_COMPENSATION_REGISTERS LOCAL_COMPENSATION {
 		// Temps
@@ -162,8 +160,7 @@ namespace SBCQueens {
 	};
 
 	const std::unordered_map<BME_TYPE, BME_COMPENSATION_REGISTERS> bme_comp_map = {
-		{BME_TYPE::LOCAL, LOCAL_COMPENSATION},
-		{BME_TYPE::BOX, BOX_COMPENSATION}
+		{BME_TYPE::LOCAL, LOCAL_COMPENSATION}
 	};
 	
 	// BME Compensation functions
@@ -204,23 +201,14 @@ namespace SBCQueens {
 		Reset,
 
 		SetPPID,
+		SetPPIDTripPoint,
 		SetPPIDTempSetpoint,
 		SetPPIDTempKp,
 		SetPPIDTempTi,
 		SetPPIDTempTd,
 		ResetPPID,
 
-		SetNPID,
-		SetNPIDTempSetpoint,
-		SetNPIDTempKp,
-		SetNPIDTempTi,
-		SetNPIDTempTd,
-		ResetNPID,
-
 		SetPeltierRelay,
-		SetPSILimit,
-		SetReleaseValve,
-		SetN2Valve,
 
 		GetPeltiers,
 		GetRTDs,
@@ -241,23 +229,14 @@ namespace SBCQueens {
 		////
 		/// Hardware specific commands
 		{TeensyCommands::SetPPID, 				"SET_PPID"},
+		{TeensyCommands::SetPPIDTripPoint,		"SET_PTRIPPOINT"},
 		{TeensyCommands::SetPPIDTempSetpoint, 	"SET_PTEMP"},
 		{TeensyCommands::SetPPIDTempKp, 		"SET_PTKP_PID"},
 		{TeensyCommands::SetPPIDTempTi, 		"SET_PTTi_PID"},
 		{TeensyCommands::SetPPIDTempTd, 		"SET_PTTd_PID"},
 		{TeensyCommands::ResetPPID, 			"RESET_PPID"},
 
-		{TeensyCommands::SetNPID, 				"SET_NPID"},
-		{TeensyCommands::SetNPIDTempSetpoint, 	"SET_NTEMP"},
-		{TeensyCommands::SetNPIDTempKp, 		"SET_NTKP_PID"},
-		{TeensyCommands::SetNPIDTempTi, 		"SET_NTTi_PID"},
-		{TeensyCommands::SetNPIDTempTd, 		"SET_NTTd_PID"},
-		{TeensyCommands::ResetNPID, 			"RESET_NPID"},
-
 		{TeensyCommands::SetPeltierRelay, 		"SET_PELTIER_RELAY"},
-		{TeensyCommands::SetPSILimit, 			"SET_PSI_LIMIT"},
-		{TeensyCommands::SetReleaseValve, 		"REL_VALVE_STATE"},
-		{TeensyCommands::SetN2Valve, 			"N2_VALVE_STATE"},
 
 		//// Getters
 		{TeensyCommands::GetError, 				"GETERR"},
@@ -290,16 +269,12 @@ namespace SBCQueens {
 
 		// Relay stuff
 		bool PeltierState 		= false;
-		bool ReliefValveState 	= false;
-		bool N2ValveState 		= false;
 
 		// PID Stuff
 		bool PeltierPIDState 	= false;
-		bool LN2PIDState 		= false;
 
-		double PSILimit 		= 5.0;
+		float PIDTempTripPoint = 5.0;
 		PIDConfig PIDTempValues;
-		PIDConfig NTempValues;
 
 	};
 
@@ -518,14 +493,10 @@ private:
 
 
 			send_ts_cmd_b(TeensyCommands::SetPPIDTempSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTripPoint);
 			send_ts_cmd_b(TeensyCommands::SetPPIDTempKp);
 			send_ts_cmd_b(TeensyCommands::SetPPIDTempTd);
 			send_ts_cmd_b(TeensyCommands::SetPPIDTempTi);
-
-			send_ts_cmd_b(TeensyCommands::SetNPIDTempSetpoint);
-			send_ts_cmd_b(TeensyCommands::SetNPIDTempKp);
-			send_ts_cmd_b(TeensyCommands::SetNPIDTempTd);
-			send_ts_cmd_b(TeensyCommands::SetNPIDTempTi);
 
 			// Flush so there is nothing in the buffer
 			// making everything annoying
@@ -647,11 +618,6 @@ private:
 					TeensyIndicatorSender(IndicatorNames::LATEST_VACUUM_PRESS,
 						press.Vacuum.Pressure);
 
-					TeensyIndicatorSender(IndicatorNames::NTWO_PRESS,
-						dt, press.N2Line.Pressure);
-					TeensyIndicatorSender(IndicatorNames::LATEST_N2_PRESS,
-						press.N2Line.Pressure);
-
 					_PressuresFile->Add(press);
 
 				} catch (... ) {
@@ -683,18 +649,6 @@ private:
 						dt, bmes.LocalBME.Pressure);
 					TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Humidity,
 						dt, bmes.LocalBME.Humidity);
-
-					TeensyIndicatorSender(IndicatorNames::BOX_BME_Temps,
-						dt, bmes.BoxBME.Temperature);
-					TeensyIndicatorSender(IndicatorNames::BOX_BME_Pressure,
-						dt, bmes.BoxBME.Pressure);
-					TeensyIndicatorSender(IndicatorNames::BOX_BME_Humidity,
-						dt, bmes.BoxBME.Humidity);
-
-					TeensyIndicatorSender(IndicatorNames::LATEST_BOX_BME_HUM,
-						bmes.BoxBME.Humidity);
-					TeensyIndicatorSender(IndicatorNames::LATEST_BOX_BME_TEMP,
-						bmes.BoxBME.Temperature);
 
 					_BMEsFile->Add(bmes);
 
@@ -781,8 +735,7 @@ private:
 					async_save(_PressuresFile,
 						[](const Pressures& press) {
 							return 	std::to_string(press.time) + "," +
-									std::to_string(press.Vacuum.Pressure) + "," +
-									std::to_string(press.N2Line.Pressure) + "\n";
+									std::to_string(press.Vacuum.Pressure) + "\n";
 
 						}
 					);
@@ -793,10 +746,7 @@ private:
 							return 	std::to_string(bme.time) + "," +
 									std::to_string(bme.LocalBME.Temperature) + "," +
 									std::to_string(bme.LocalBME.Pressure) + "," +
-									std::to_string(bme.LocalBME.Humidity) + "," +
-									std::to_string(bme.BoxBME.Temperature) + "," +
-									std::to_string(bme.BoxBME.Pressure) + "," +
-									std::to_string(bme.BoxBME.Humidity) + "\n";
+									std::to_string(bme.LocalBME.Humidity) + "\n";
 
 						}
 					);
@@ -848,6 +798,10 @@ private:
 					out << tcs.PIDTempValues.SetPoint;
 				break;
 
+				case TeensyCommands::SetPPIDTripPoint:
+					out << tcs.PIDTempTripPoint;
+				break;
+
 				case TeensyCommands::SetPPIDTempKp:
 					out << tcs.PIDTempValues.Kp;
 				break;
@@ -860,41 +814,6 @@ private:
 					out << tcs.PIDTempValues.Td;
 				break;
 
-				case TeensyCommands::SetNPID:
-					out << tcs.LN2PIDState;
-				break;
-
-				case TeensyCommands::SetNPIDTempSetpoint:
-					out << tcs.NTempValues.SetPoint;
-				break;
-
-				case TeensyCommands::SetNPIDTempKp:
-					out << tcs.NTempValues.Kp;
-				break;
-
-				case TeensyCommands::SetNPIDTempTi:
-					out << tcs.NTempValues.Ti;
-				break;
-
-				case TeensyCommands::SetNPIDTempTd:
-					out << tcs.NTempValues.Td;
-				break;
-
-				case TeensyCommands::SetPeltierRelay:
-					out << tcs.PeltierState;
-				break;
-
-				case TeensyCommands::SetPSILimit:
-					out << tcs.PSILimit;
-				break;
-
-				case TeensyCommands::SetReleaseValve:
-					out << tcs.ReliefValveState;
-				break;
-
-				case TeensyCommands::SetN2Valve:
-					out << tcs.N2ValveState;
-				break;
 
 				// The default case assumes all the commands not mention above
 				// do not have any inputs

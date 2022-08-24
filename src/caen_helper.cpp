@@ -244,7 +244,7 @@ namespace SBCQueens {
 
         uint32_t trg_mask = 0;
         for (auto ch_config : gr_configs) {
-          trg_mask |= 1 << (ch_config.TriggerMask > 0);
+          trg_mask |= (ch_config.TriggerMask > 0) << ch_config.Number;
         }
 
         // Then enable those channels
@@ -571,7 +571,7 @@ namespace SBCQueens {
 	   	}
 	}
 
-	bool retrieve_data_until_n_events(CAEN& res, uint32_t& n) noexcept {
+	bool retrieve_data_until_n_events(CAEN& res, uint32_t& n, bool debug_info) noexcept {
 		int& handle = res->Handle;
 
 		if (not res->start_rate_calculation){
@@ -628,12 +628,14 @@ namespace SBCQueens {
 		res->ts = res->te;
 		res->duration += res->t_us;
 		res->trg_count += res->n_events;
-		spdlog::info(fmt::format("#Triggers: {:7d}, Duration: {:-6.2f}s, Inst Rate:{:-8.2f}Hz, Accl Rate:{:-8.2f}Hz",
-			res->trg_count,
-			res->duration/1e6,
-			res->n_events*1e6/res->t_us,
-			res->trg_count*1e6/res->duration));
 
+		if(debug_info){
+			spdlog::info(fmt::format("#Triggers: {:7d}, Duration: {:-6.2f}s, Inst Rate:{:-8.2f}Hz, Accl Rate:{:-8.2f}Hz",
+				res->trg_count,
+				res->duration/1e6,
+				res->n_events*1e6/res->t_us,
+				res->trg_count*1e6/res->duration));
+		}
 
 		if(res->LatestError.ErrorCode < 0){
 			res->LatestError.isError = true;
@@ -914,17 +916,17 @@ namespace SBCQueens {
 		// a group by using the mask.
 
 		// order of header:
-		// Name				type		length (B) 		is Constant?
-		// sample_rate		double		8 	 			Y
-		// en_chs			uint8		1*ch_size 		Y
-		// trg_mask			uint32		4 		 		Y
+		// Name						type		length (B) 		is Constant?
+		// sample_rate		double		8 	 					Y
+		// en_chs					uint8			1*ch_size 		Y
+		// trg_mask				uint32		4 		 				Y
 		// thresholds 		uint16 		2*ch_size 		Y
 		// dc_offsets 		uint16 		2*ch_size 		Y
 		// dc_corrections	uint8 		1*ch_size 		Y
-		// dc_range 		single 		4*ch_size 		Y
-		// time_stamp 		uint32 		4 				N
-		// trg_source 		uint32 		4 				N
-		// data 			uint16 		2*rl*ch_size 	N
+		// dc_range 			single 		4*ch_size 		Y
+		// time_stamp 		uint32 		4 						N
+		// trg_source 		uint32 		4 						N
+		// data 					uint16 		2*rl*ch_size 	N
 		//
 		// Total length 				20 + ch_size(10 + 2*recordlength)
 

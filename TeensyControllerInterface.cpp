@@ -44,7 +44,6 @@ namespace SBCQueens {
 
     	j = json{{"VACUUMP", p.Vacuum.Pressure}};
 
-    	j = json{{"NTWOP", p.N2Line.Pressure}};
     }
 
     void from_json(const json& j, Pressures& p) {
@@ -57,21 +56,18 @@ namespace SBCQueens {
     	press /= 14.5038; //to bar
     	p.Vacuum.Pressure = press;
 
-    	j.at("NTWOP").get_to(press);
-    	press *= (3.32/exp2(12)) * (1.0/135); // to current
-    	press = 14.6959 + (30/16e-3)*(press - 4e-3); // to psi
-    	press /= 14.5038; //to bar
-    	p.N2Line.Pressure = press;
+    	// j.at("NTWOP").get_to(press);
+    	// press *= (3.32/exp2(12)) * (1.0/135); // to current
+    	// press = 14.6959 + (30/16e-3)*(press - 4e-3); // to psi
+    	// press /= 14.5038; //to bar
+    	// p.N2Line.Pressure = press;
     }
     // I have no reason to use it in the future. I am adding
     // it just in case
     void to_json(json& j, const BMEs& p) {
         j = json{{"BME1T", p.LocalBME.Temperature},
     			{"BME1P", p.LocalBME.Pressure},
-    			{"BME1H", p.LocalBME.Humidity},
-    			{"BME2T", p.BoxBME.Temperature},
-    			{"BME2P", p.BoxBME.Pressure},
-    			{"BME2H", p.BoxBME.Humidity}};
+    			{"BME1H", p.LocalBME.Humidity}};
     }
 
     void from_json(const json& j, BMEs& p) {
@@ -93,17 +89,17 @@ namespace SBCQueens {
     		= BME280_compensate_H_double<BME_TYPE::LOCAL>(temp, t_fine);
 
 
-    	j.at("BME2T").get_to(temp);
-    	t_fine = BME_calculate_t_fine<BME_TYPE::BOX>(temp);
-    	p.BoxBME.Temperature = t_fine_to_temp(t_fine);
+    	// j.at("BME2T").get_to(temp);
+    	// t_fine = BME_calculate_t_fine<BME_TYPE::BOX>(temp);
+    	// p.BoxBME.Temperature = t_fine_to_temp(t_fine);
 
-    	j.at("BME2P").get_to(temp);
-    	p.BoxBME.Pressure
-    		= BME280_compensate_P_double<BME_TYPE::BOX>(temp, t_fine);
+    	// j.at("BME2P").get_to(temp);
+    	// p.BoxBME.Pressure
+    	// 	= BME280_compensate_P_double<BME_TYPE::BOX>(temp, t_fine);
 
-    	j.at("BME2H").get_to(temp);
-    	p.BoxBME.Humidity
-    		= BME280_compensate_H_double<BME_TYPE::BOX>(temp, t_fine);
+    	// j.at("BME2H").get_to(temp);
+    	// p.BoxBME.Humidity
+    	// 	= BME280_compensate_H_double<BME_TYPE::BOX>(temp, t_fine);
 
     }
 
