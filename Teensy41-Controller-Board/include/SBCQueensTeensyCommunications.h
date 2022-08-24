@@ -63,18 +63,9 @@ namespace SBCQueens {
     void SET_PTEMP(float);
     void RESET_PPID(float);
 
-    void SET_NPID(float);
-    void SET_NTKP_PID(float);
-    void SET_NTTd_PID(float);
-    void SET_NTTi_PID(float);
-    void SET_NTEMP(float);
-    void RESET_NPID(float);
-
-    void SET_PSI_LIMIT(float);
-    void REL_VALVE_STATE(float);
-    void N2_VALVE_STATE(float);
     void GET_PRESSURES(float);
     void GET_RTDS(float);
+    void GET_RAW_RTDS(float);
     void GET_PELTIERS_CURRS(float);
     void GET_BMES(float);
     void SET_PELTIER_RELAY(float);
@@ -94,20 +85,10 @@ namespace SBCQueens {
         CMD_KEY(SET_PTEMP),      // Sets PID temperature setpoint
         CMD_KEY(RESET_PPID),      // Reset internal PID variables
 
-        CMD_KEY(SET_NPID),       // Turns ON or OFF this PID
-        CMD_KEY(SET_NTKP_PID),   // Sets Kp for PID temperature control loop
-        CMD_KEY(SET_NTTd_PID),   // Sets Td for PID temperature control loop
-        CMD_KEY(SET_NTTi_PID),   // Sets Ti for PID temperature control loop
-        CMD_KEY(SET_NTEMP),      // Sets PID temperature setpoint
-        CMD_KEY(RESET_NPID),
-
-        CMD_KEY(SET_PSI_LIMIT),
-        CMD_KEY(REL_VALVE_STATE),
-        CMD_KEY(N2_VALVE_STATE),
-
         //// Getters
         CMD_KEY(GET_PRESSURES),
         CMD_KEY(GET_RTDS),
+        CMD_KEY(GET_RAW_RTDS),      // Gets the RTD register values
         CMD_KEY(GET_PELTIERS_CURRS),// Gets all the local PID registers. Avoids shadowing
         CMD_KEY(GET_BMES),          // Gets the BME registers. Avoids shadowing
    

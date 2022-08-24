@@ -4,9 +4,12 @@
 #include "Drivers/SBCQueensMAX31865Driver.h"
 #include "Drivers/SBCQueensPeltierDriver.h"
 #include "Drivers/SBCQueensTeensyAnalog.h"
+#include "Drivers/SBCQueensRTDBoard.h"
 #include "Drivers/SBCQueensRelay.h"
 
 #include "SBCQueensPID.h"
+
+
 
 namespace SBCQueens {
 
@@ -29,24 +32,22 @@ namespace SBCQueens {
 
     ///
 
-    extern uint16_t N2_RELEASE_MAN_REG;
-    extern uint16_t N2_RELEASE_PID_REG;
-    extern Relay N2_RELEASE_RELAY;
-    extern Relay N2_INPUT_RELAY;
-
     extern BME280_t LOCAL_BME280;
-    extern BME280_t BOX_BME280;
 
     extern PeltierDriver PELTIER_DRIVER;
 
+#ifdef NEW_RTD_BOARD
+    const uint8_t NUM_RTD_BOARDS = 1;
+    const uint8_t NUM_RTD_PER_BOARD = 3;
+    extern RTDBoard<NUM_RTD_PER_BOARD> RTD_BOARDS[NUM_RTD_BOARDS];
+#else
     extern MAX31865_t RTD_DAC_01;
     extern MAX31865_t RTD_DAC_02;
+#endif
 
     extern PID PELTIER_PID;
-    extern PID N2_PID;
 
     extern AnalogReadMV VACUUM_PRESSURE_SENSOR;
-    extern AnalogReadMV NTWO_PRESSURE_SENSOR;
 
     // Initializes the internal data structures that are going to be used
     // to control and talk to the external hardware

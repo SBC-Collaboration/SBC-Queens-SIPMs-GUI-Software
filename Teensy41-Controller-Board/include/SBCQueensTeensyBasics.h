@@ -1,5 +1,6 @@
 #pragma once
 
+#define NEW_RTD_BOARD
 #include <arduino_freertos.h>
 #include <timers.h>
 #include <semphr.h>
@@ -16,7 +17,6 @@ namespace SBCQueens {
     extern TimerHandle_t prepare_pid_conversion_handle;
     extern TimerHandle_t init_pid_conversion_handle;
     extern TimerHandle_t retrieve_pid_measurement_handle;
-    extern TimerHandle_t update_ntwo_pid_handle;
 
     extern TimerHandle_t init_bme280_measurement_handle;
     extern TimerHandle_t retrieve_bme280_measurement_handle;

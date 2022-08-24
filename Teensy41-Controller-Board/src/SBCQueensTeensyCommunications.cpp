@@ -60,46 +60,6 @@ namespace SBCQueens {
         TCPID_restart(PELTIER_PID);
     }
 
-    void SET_NPID(float newVal) {
-        if(newVal > 0) {
-            N2_PID.State = PID_STATE::TEMP_MODE;
-        } else {
-            N2_PID.State = PID_STATE::DISABLE;
-        }
-        
-    }
-
-    void SET_NTKP_PID(float newVal) {
-        N2_PID.REGISTERS.CONTROL_KP = newVal;
-    }
-
-    void SET_NTTd_PID(float newVal) {
-        N2_PID.REGISTERS.CONTROL_TD = newVal;
-    }
-
-    void SET_NTTi_PID(float newVal) {
-        N2_PID.REGISTERS.CONTROL_TI = newVal;
-    }
-
-    void SET_NTEMP(float newVal) {
-        N2_PID.REGISTERS.DESIRED_CONTROL_VAL = newVal;
-    }
-
-    void RESET_NPID(float) {
-        TCPID_restart(N2_PID);
-    }
-
-    void SET_PSI_LIMIT(float newVal) {
-
-    }
-
-    void REL_VALVE_STATE(float newVal) {
-        // digitalWrite(TWELVEV_PIN_TWO, newVal == 0);
-    }
-
-    void N2_VALVE_STATE(float newVal) {
-        SBCQueens::N2_RELEASE_MAN_REG = (newVal > 0);
-    }
 
     void GET_PRESSURES(float newVal) {
         char num_buff[11] = "";
@@ -107,13 +67,11 @@ namespace SBCQueens {
         Serial.print("{");
 
         float f_send_vals[] = {
-            VACUUM_PRESSURE_SENSOR.LATEST_VALUE,
-            NTWO_PRESSURE_SENSOR.LATEST_VALUE
+            VACUUM_PRESSURE_SENSOR.LATEST_VALUE
         };
 
         const char* names[] = {
-            "\"VACUUMP\":",
-            "\"NTWOP\":",
+            "\"VACUUMP\":"
         };
 
         const uint16_t size_f_send_vals = (sizeof(f_send_vals) / sizeof(float));
@@ -140,6 +98,17 @@ namespace SBCQueens {
         uint8_t length = 0;
         Serial.print("{");
 
+#ifdef NEW_RTD_BOARD
+        float f_send_vals[NUM_RTD_BOARDS * NUM_RTD_PER_BOARD];
+
+        for(uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
+            for(uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
+                f_send_vals[i] = RTD_BOARDS[i].LAST_TEMP_VAL[j];
+            }
+        }
+
+        Serial.print("\"RTDT\":[");
+#else
         float f_send_vals[] = {
             RTD_DAC_01.REGISTERS.LAST_TEMP_REG,
             RTD_DAC_02.REGISTERS.LAST_TEMP_REG
@@ -149,13 +118,16 @@ namespace SBCQueens {
             "\"RTDT1\":",
             "\"RTDT2\":",
         };
+#endif
 
         const uint16_t size_f_send_vals = (sizeof(f_send_vals) / sizeof(float));
         for(unsigned int i = 0; i < size_f_send_vals; i++) {
 
+#ifndef NEW_RTD_BOARD
             // Send the name first
             length = strlen(names[i]);
             Serial.print(names[i]);
+#endif
 
             // Now the values
             // We limiting the sending of the values to 4 digits after the decimal point
@@ -169,8 +141,44 @@ namespace SBCQueens {
             if((size_f_send_vals - 1) != i) {
                 Serial.print(",");
             }
+            
         }
 
+#ifdef NEW_RTD_BOARD
+        Serial.print("]");
+#endif
+        Serial.println("}");
+    }
+
+    void GET_RAW_RTDS(float) {
+        char num_buff[10] = "";
+        uint8_t length = 0;
+        Serial.print("{");
+
+#ifdef NEW_RTD_BOARD
+        uint16_t i_send_vals[NUM_RTD_BOARDS*NUM_RTD_PER_BOARD];
+
+        for(uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
+            for(uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
+                i_send_vals[i] = RTD_BOARDS[i].LAST_ADC_VAL[j];
+            }
+        }
+
+        Serial.print("\"RTDR\":[");
+
+        const uint16_t size_i_send_vals = sizeof(i_send_vals) / sizeof(uint16_t);
+        for(unsigned int i = 0; i < size_i_send_vals; i++) {
+
+            Serial.print(i_send_vals[i]);
+
+            if((size_i_send_vals - 1) != i) {
+                Serial.print(",");
+            }
+            
+        }
+
+        Serial.print("]");
+#endif
         Serial.println("}");
     }
 
@@ -223,19 +231,13 @@ namespace SBCQueens {
         int32_t i_send_vals[] {
             LOCAL_BME280.REGISTERS.LAST_TEMP_REG,
             LOCAL_BME280.REGISTERS.LAST_PRESSURE_REG,
-            LOCAL_BME280.REGISTERS.LAST_HUM_REG,
-            BOX_BME280.REGISTERS.LAST_TEMP_REG,
-            BOX_BME280.REGISTERS.LAST_PRESSURE_REG,
-            BOX_BME280.REGISTERS.LAST_HUM_REG
+            LOCAL_BME280.REGISTERS.LAST_HUM_REG
         };
 
         const char* names[] = {
             "\"BME1T\":",
             "\"BME1P\":",
-            "\"BME1H\":",
-            "\"BME2T\":",
-            "\"BME2P\":",
-            "\"BME2H\":"
+            "\"BME1H\":"
         };
 
         const uint16_t size_i_send_vals = (sizeof(i_send_vals) / sizeof(int32_t));

@@ -6,75 +6,45 @@
 
 namespace SBCQueens {
 
-    void RTDBoard_init(RTDBoard& controller) {
+    float __rtd_reg_to_temperature(const uint16_t& Rt) {
+        const float c_RTD_NOMINAL = 100.0;
+        const float c_REF_RESISTOR = 120.0;
+        const float c_RTD_A = 3.9083e-3;
+        const float c_RTD_B = -5.775e-7;
 
-        pinMode(controller.MCP23S08_CS, arduino::OUTPUT);
-        pinMode(controller.ADC_CS, arduino::OUTPUT);
-
-        digitalWrite(controller.MCP23S08_CS, arduino::HIGH);
-        digitalWrite(controller.ADC_CS, arduino::HIGH);
-
-        start_spi(controller.MCP23S08_CS);
-        // equivalent to SPI.beginTransaction();
-        SPI.transfer(c_MCP23S08_ADDR);
-        const uint8_t c_MCP23S08_IODIR = 0x00;
-        SPI.transfer(c_MCP23S08_IODIR);
-        SPI.transfer(0x00);
-        // equivalent to SPI.endTransaction();
-        end_spi(controller.MCP23S08_CS);
-
-
-        start_spi(controller.MCP23S08_CS);
-        // equivalent to SPI.beginTransaction();
-        SPI.transfer(c_MCP23S08_ADDR);
-
-        const uint8_t c_MCP23S08_IOCON = 0x05;
-        SPI.transfer(c_MCP23S08_IOCON);
-
-        SPI.transfer(0b00001000);
-
-        // equivalent to SPI.endTransaction();
-        end_spi(controller.MCP23S08_CS);
-
+        const float c_Z1 = -c_RTD_A;
+        const float c_Z2 = c_RTD_A * c_RTD_A - (4 * c_RTD_B);
+        const float c_Z3 = (4 * c_RTD_B) / c_RTD_NOMINAL;
+        const float c_Z4 = 2 * c_RTD_B;
         
-        start_spi(controller.MCP23S08_CS);
-        // equivalent to SPI.beginTransaction();
-        SPI.transfer(c_MCP23S08_ADDR);
-        SPI.transfer(c_MCP23S08_GPIO);
-        SPI.transfer(0x00);
+        float temp, Rtf;
+        Rtf = static_cast<float>(Rt);
+        Rtf = c_REF_RESISTOR*((Rtf / 32768) - 1.0);
 
-        // equivalent to SPI.endTransaction();
-        end_spi(controller.MCP23S08_CS);
+        temp = c_Z2 + (c_Z3 * Rtf);
+        temp = (sqrt(temp) + c_Z1) / c_Z4;
 
-    }
+        if (temp >= 0.0)
+          return temp;
 
-    void RTDBoard_prepare_meas(RTDBoard& controller) {
+        // ugh.
+        Rtf /= c_RTD_NOMINAL;
+        Rtf *= 100; // normalize to 100 ohm
 
-        start_spi(controller.MCP23S08_CS);
+        float rpoly = Rtf;
 
-        SPI.transfer(c_MCP23S08_ADDR);
-        SPI.transfer(c_MCP23S08_GPIO);
-        SPI.transfer(0b00000010);
+        temp = -242.02;
+        temp += 2.2228 * rpoly;
+        rpoly *= Rtf; // square
+        temp += 2.5859e-3 * rpoly;
+        rpoly *= Rtf; // ^3
+        temp -= 4.8260e-6 * rpoly;
+        rpoly *= Rtf; // ^4
+        temp -= 2.8183e-8 * rpoly;
+        rpoly *= Rtf; // ^5
+        temp += 1.5243e-10 * rpoly;
 
-        end_spi(controller.MCP23S08_CS);
-
-
-    }
-
-    void RTDboard_take_meas(RTDBoard& controller) {
-
-        start_spi(controller.MCP23S08_CS);
-
-        SPI.transfer(c_MCP23S08_ADDR);
-        SPI.transfer(c_MCP23S08_GPIO);
-        SPI.transfer(0b00000000);
-
-        end_spi(controller.MCP23S08_CS);
-
-    }
-
-    void RTDboard_retrieve_meas(RTDBoard& controller) {
-
+        return temp;
     }
 
 }; // namespace SBCQueens

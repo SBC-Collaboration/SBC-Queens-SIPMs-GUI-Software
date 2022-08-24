@@ -5,7 +5,6 @@ namespace SBCQueens {
     TimerHandle_t prepare_pid_conversion_handle     = NULL;
     TimerHandle_t init_pid_conversion_handle        = NULL;
     TimerHandle_t retrieve_pid_measurement_handle   = NULL;
-    TimerHandle_t update_ntwo_pid_handle            = NULL;
 
     TimerHandle_t init_bme280_measurement_handle    = NULL;
     TimerHandle_t retrieve_bme280_measurement_handle = NULL;
