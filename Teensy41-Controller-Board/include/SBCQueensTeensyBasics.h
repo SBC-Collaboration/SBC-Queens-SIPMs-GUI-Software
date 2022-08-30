@@ -1,6 +1,8 @@
 #pragma once
 
+#define RTD_ONLY_MODE
 #define NEW_RTD_BOARD
+
 #include <arduino_freertos.h>
 #include <timers.h>
 #include <semphr.h>

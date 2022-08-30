@@ -188,6 +188,10 @@ else()
   message(FATAL_ERROR "TOML++ not found. Make sure to run git submodules init first")
 endif()
 
+find_package(Armadillo 11.2.3 REQUIRED)
+include_directories("${ARMADILLO_INCLUDE_DIR}")
+# target_link_libraries(${PROJECT_NAME} PUBLIC ${ARMADILLO_LIBRARIES})
+
 # CAEN comm library
 
 ## First VME as it is the main component
@@ -242,7 +246,8 @@ file(GLOB GUI_CONFIG_FILE gui_setup.toml)
 file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 
 # setupapi -> for serial
-target_link_libraries(SiPMControlGUI ${LIBRARIES} ${IMGUI_LIBRARIES} 
+target_link_libraries(SiPMControlGUI ${LIBRARIES} ${IMGUI_LIBRARIES}
+  ${ARMADILLO_LIBRARIES}
   glfw imgui implot
   serial atomic spdlog
   CAENVME

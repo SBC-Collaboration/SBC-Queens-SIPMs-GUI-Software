@@ -13,6 +13,7 @@
 #include <cmath>
 
 //
+#include "spdlog/spdlog.h"
 #include "timing_events.h"
 
 namespace SBCQueens {
@@ -38,6 +39,11 @@ namespace SBCQueens {
     	p.time = get_current_time_epoch();
     	j.at("RTDT1").get_to(p.RTD_1.Temperature);
     	j.at("RTDT2").get_to(p.RTD_2.Temperature);
+    }
+
+    void from_json(const json& j, RawRTDs& p) {
+    	p.time = get_current_time_epoch();
+    	j.at("RTDR").get_to(p.RTDS);
     }
 
     void to_json(json& j, const Pressures& p) {
@@ -170,6 +176,64 @@ namespace SBCQueens {
 
 		return var_H;
 
+    }
+
+    double __calibrate_curve(const size_t& i, const uint16_t& count) {
+
+    	const double cal_pars[3][7] = {{5.58740460e-24, -6.28859314e-19,
+    	2.89813596e-14, -7.11010600e-10, 1.00457336e-05, -8.17906779e-02,
+    	3.37583449e+02}, {8.40079885e-24, -9.57155346e-19,  4.40061387e-14,
+    	-1.05319202e-09, 1.40972855e-05, -1.05041807e-01,  3.86061981e+02},
+    	{2.47242828e-23, -2.55552972e-18,  1.05335428e-13, -2.23119506e-09,
+        2.59211509e-05, -1.62308481e-01,  4.83620434e+02}};
+
+        arma::vec::fixed<7> curret_par = cal_pars[i];
+        arma::vec::fixed<1> x = {static_cast<double>(count)};
+
+        arma::vec out = arma::polyval(curret_par, x);
+
+        return out(0);
+
+    }
+
+    double __res_to_temperature(const double& res) {
+        const double c_RTD_NOMINAL = 100.0;
+        const double c_REF_RESISTOR = 120.0;
+        const double c_RTD_A = 3.9083e-3;
+        const double c_RTD_B = -5.775e-7;
+
+        const double c_Z1 = -c_RTD_A;
+        const double c_Z2 = c_RTD_A * c_RTD_A - (4 * c_RTD_B);
+        const double c_Z3 = (4 * c_RTD_B) / c_RTD_NOMINAL;
+        const double c_Z4 = 2 * c_RTD_B;
+
+        double temp, Rtf;
+        Rtf = res;
+
+        temp = c_Z2 + (c_Z3 * Rtf);
+        temp = (sqrt(temp) + c_Z1) / c_Z4;
+
+        if (temp >= 0.0)
+          return temp;
+
+        // ugh.
+        Rtf /= c_RTD_NOMINAL;
+        Rtf *= 100; // normalize to 100 ohm
+
+        double rpoly = Rtf;
+
+        temp = -242.02;
+        temp += 2.2228 * rpoly;
+        rpoly *= Rtf; // square
+        temp += 2.5859e-3 * rpoly;
+        rpoly *= Rtf; // ^3
+        temp -= 4.8260e-6 * rpoly;
+        rpoly *= Rtf; // ^4
+        temp -= 2.8183e-8 * rpoly;
+        rpoly *= Rtf; // ^5
+        temp += 1.5243e-10 * rpoly;
+
+        return temp;
     }
 
 } // namespace SBCQueens

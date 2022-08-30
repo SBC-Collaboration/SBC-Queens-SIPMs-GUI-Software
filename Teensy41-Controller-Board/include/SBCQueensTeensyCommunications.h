@@ -63,6 +63,9 @@ namespace SBCQueens {
     void SET_PTEMP(float);
     void RESET_PPID(float);
 
+    void SET_RTD_SP(float);
+    void RTD_BANK_MASK(float);
+
     void GET_PRESSURES(float);
     void GET_RTDS(float);
     void GET_RAW_RTDS(float);
@@ -84,6 +87,9 @@ namespace SBCQueens {
         CMD_KEY(SET_PTTi_PID),   // Sets Ti for PID temperature control loop
         CMD_KEY(SET_PTEMP),      // Sets PID temperature setpoint
         CMD_KEY(RESET_PPID),      // Reset internal PID variables
+
+        CMD_KEY(SET_RTD_SP),        // Sets the RTD sampling period
+        CMD_KEY(RTD_BANK_MASK),     // Enables/disabled specific RTDs
 
         //// Getters
         CMD_KEY(GET_PRESSURES),

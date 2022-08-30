@@ -3,6 +3,7 @@
 #include <CRC32.h>
 
 #include "SBCQueensTeensyHardware.h"
+#include "SBCQueensTiming.h"
 
 namespace SBCQueens {
 
@@ -60,6 +61,51 @@ namespace SBCQueens {
         TCPID_restart(PELTIER_PID);
     }
 
+    void SET_RTD_SP(float newVal ) { 
+        RTDSamplingTime = static_cast<uint16_t>(newVal);
+
+        // Ceil it to the constants. It should never be faster than this!
+        if ( RTDSamplingTime < c_RTDAcquisitionTime + c_RTDPrepareTime + 1) {
+            RTDSamplingTime = c_RTDAcquisitionTime + c_RTDPrepareTime + 1;
+        }
+
+        xTimerChangePeriod(prepare_pid_conversion_handle, 
+            pdMS_TO_TICKS(RTDSamplingTime), 
+            portMAX_DELAY);
+    }
+
+    void RTD_BANK_MASK(float newVal) {
+        auto mask = static_cast<uint32_t>(newVal);
+
+        for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
+            // 2^n = ...0001000...
+            // the one will be in the n position, so if we subtract by 1
+            // 2^n - 1 = ...0000111...
+            // we get the mask we need!
+            uint8_t individual_mask = exp2(NUM_RTD_PER_BOARD) - 1;
+            // We then shift it depending on how many RTD boards we have
+            // These are the bits that correspond to the rtd board i with n rtds
+            individual_mask = individual_mask << NUM_RTD_PER_BOARD*i;
+
+            // So all is left is to mask this to the real mask and shifted back. 
+            RTD_BOARDS[i].MASK = (mask & individual_mask) >> NUM_RTD_PER_BOARD*i;
+
+            // To make these operations clearer, lets assume we have 2 boards (i = 2) with 2 rtds (n = 2)
+            // and we send a mask with binary representation equal to (ignoring the first 24 MSB)
+            //      0b00001010
+            // Means we want the 2nd RTD of each board to be one
+            // The individual mask for each board is 
+            //      (2^2 - 1 << 0) = 0b00000011 for board 1
+            //      (2^2 - 1 << 2) = 0b00001100 for board 2
+            // So then the mask for board 1 is 
+            //      0b000000011 & 0b0001010 = 0b00000010 (no shift as X >> 0 = X)
+            // the mask for board 2 is
+            //      0b000001100 & 0b0001010 = 0b00001000 (but needs to be shifted)
+            //      0b00001000 >> 2 = 0b00000010
+            //
+            // Hope this made it clearer.
+        }   
+    }
 
     void GET_PRESSURES(float newVal) {
         char num_buff[11] = "";
@@ -156,17 +202,17 @@ namespace SBCQueens {
         Serial.print("{");
 
 #ifdef NEW_RTD_BOARD
-        uint16_t i_send_vals[NUM_RTD_BOARDS*NUM_RTD_PER_BOARD];
+        uint16_t i_send_vals[NUM_RTD_BOARDS*NUM_RTD_PER_BOARD] = {0};
 
         for(uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
             for(uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
-                i_send_vals[i] = RTD_BOARDS[i].LAST_ADC_VAL[j];
+                i_send_vals[NUM_RTD_PER_BOARD*i + j] = RTD_BOARDS[i].LAST_ADC_VAL[j];
             }
         }
 
         Serial.print("\"RTDR\":[");
 
-        const uint16_t size_i_send_vals = sizeof(i_send_vals) / sizeof(uint16_t);
+        const uint16_t size_i_send_vals = NUM_RTD_BOARDS*NUM_RTD_PER_BOARD;
         for(unsigned int i = 0; i < size_i_send_vals; i++) {
 
             Serial.print(i_send_vals[i]);

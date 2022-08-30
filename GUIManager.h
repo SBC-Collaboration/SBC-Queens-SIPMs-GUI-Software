@@ -79,6 +79,10 @@ public:
 			tgui_state.RunDir 		= i_run_dir;
 			tgui_state.RunName 		= i_run_name;
 
+			tgui_state.RTDOnlyMode = t_conf["RTDMode"].value_or(false);
+			tgui_state.RTDSamplingPeriod = t_conf["RTDSamplingPeriod"].value_or(100Lu);
+			tgui_state.RTDMask = t_conf["RTDMask"].value_or(0xFFFFLu);
+
 			// Send initial states of the PIDs
 			tgui_state.PeltierState = false;
 
@@ -291,6 +295,7 @@ public:
 			if(ImGui::Button("Clear")) {
 				_indicatorReceiver.clear_plot(IndicatorNames::RTD_TEMP_ONE);
 				_indicatorReceiver.clear_plot(IndicatorNames::RTD_TEMP_TWO);
+				_indicatorReceiver.clear_plot(IndicatorNames::RTD_TEMP_THREE);
 				_indicatorReceiver.clear_plot(IndicatorNames::PELTIER_CURR);
 
 				_indicatorReceiver.clear_plot(IndicatorNames::VACUUM_PRESS);
@@ -307,6 +312,9 @@ public:
 
 				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 				_indicatorReceiver.plot(IndicatorNames::RTD_TEMP_TWO, "RTD2");
+
+				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+				_indicatorReceiver.plot(IndicatorNames::RTD_TEMP_THREE, "RTD3");
 
 				ImPlot::EndPlot();
 			}
@@ -342,6 +350,7 @@ public:
 			ImGui::Text("Teensy");
 			_indicatorReceiver.indicator(IndicatorNames::LATEST_RTD1_TEMP, "RTD1 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
 			_indicatorReceiver.indicator(IndicatorNames::LATEST_RTD2_TEMP, "RTD2 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
+			_indicatorReceiver.indicator(IndicatorNames::LATEST_RTD3_TEMP, "RTD3 Temp"); ImGui::SameLine(); ImGui::Text("[degC]");
 			_indicatorReceiver.indicator(IndicatorNames::LATEST_Peltier_CURR, "Peltier"); ImGui::SameLine(); ImGui::Text("[A]");
 
 			_indicatorReceiver.indicator(IndicatorNames::LATEST_VACUUM_PRESS, "Vacuum"); ImGui::SameLine(); ImGui::Text("[Bar]");
@@ -658,15 +667,37 @@ public:
 				ImGui::PopStyleColor(3);
 				ImGui::PopItemWidth();
 
-				TeensyControlFac.Checkbox("Peltier Relay",
-					tgui_state.PeltierState,
+				TeensyControlFac.InputScalar("RTD Sampling Period (ms)",
+					tgui_state.RTDSamplingPeriod,
 					ImGui::IsItemEdited,
 					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPeltierRelay;
-						oldState.PeltierState = tgui_state.PeltierState;
-						return true;
+							oldState.CommandToSend = TeensyCommands::SetRTDSamplingPeriod;
+							oldState.RTDSamplingPeriod = tgui_state.RTDSamplingPeriod;
+							return true;
 					}
 				);
+
+				TeensyControlFac.InputScalar("RTD Mask",
+					tgui_state.RTDMask,
+					ImGui::IsItemEdited,
+					[=](TeensyControllerState& oldState) {
+							oldState.CommandToSend = TeensyCommands::SetRTDMask;
+							oldState.RTDMask = tgui_state.RTDMask;
+							return true;
+					}
+				);
+
+				if (not tgui_state.RTDOnlyMode) {
+					TeensyControlFac.Checkbox("Peltier Relay",
+						tgui_state.PeltierState,
+						ImGui::IsItemEdited,
+						[=](TeensyControllerState& oldState) {
+							oldState.CommandToSend = TeensyCommands::SetPeltierRelay;
+							oldState.PeltierState = tgui_state.PeltierState;
+							return true;
+						}
+					);
+				}
 
 				// TeensyControlFac.Checkbox("Pressure Relief Valve",
 				// 	tgui_state.ReliefValveState,
@@ -691,103 +722,105 @@ public:
 				ImGui::EndTabItem();
 			}
 
-			if (ImGui::BeginTabItem("PID")) {
-				ImGui::PushItemWidth(180);
+			if (not tgui_state.RTDOnlyMode) {
+				if (ImGui::BeginTabItem("PID") ) {
+					ImGui::PushItemWidth(180);
 
-				ImGui::Text("Peltier PID");
-				TeensyControlFac.Checkbox(
-					"Peltier ON/OFF",
-					tgui_state.PeltierPIDState,
-					ImGui::IsItemEdited,
-					[=](TeensyControllerState& oldState) {
+					ImGui::Text("Peltier PID");
+					TeensyControlFac.Checkbox(
+						"Peltier ON/OFF",
+						tgui_state.PeltierPIDState,
+						ImGui::IsItemEdited,
+						[=](TeensyControllerState& oldState) {
 
-						oldState.CommandToSend = TeensyCommands::SetPPID;
-						oldState.PeltierPIDState = tgui_state.PeltierPIDState;
+							oldState.CommandToSend = TeensyCommands::SetPPID;
+							oldState.PeltierPIDState = tgui_state.PeltierPIDState;
 
-						return true;
-					}
-				);
+							return true;
+						}
+					);
 
-				// TeensyControlFac.ComboBox("PID State",
-				// 	tgui_state.PIDState,
-				// 	{{PIDState::Running, "Running"}, {PIDState::Standby, "Standby"}},
-				// 	ImGui::IsItemDeactivated,
-				// 	[=](TeensyControllerState& oldState) {
+					// TeensyControlFac.ComboBox("PID State",
+					// 	tgui_state.PIDState,
+					// 	{{PIDState::Running, "Running"}, {PIDState::Standby, "Standby"}},
+					// 	ImGui::IsItemDeactivated,
+					// 	[=](TeensyControllerState& oldState) {
 
-				// 		oldState.PIDState = tgui_state.PIDState;
-				// 		if(oldState.PIDState == PIDState::Standby) {
-				// 			oldState.CommandToSend = TeensyCommands::StopPID;
-				// 		} else {
-				// 			oldState.CommandToSend = TeensyCommands::StartPID;
-				// 		}
+					// 		oldState.PIDState = tgui_state.PIDState;
+					// 		if(oldState.PIDState == PIDState::Standby) {
+					// 			oldState.CommandToSend = TeensyCommands::StopPID;
+					// 		} else {
+					// 			oldState.CommandToSend = TeensyCommands::StartPID;
+					// 		}
 
-				// 		return true;
-				// 	}
-				// );
+					// 		return true;
+					// 	}
+					// );
 
-				TeensyControlFac.InputFloat("Peltier trip point",
-					tgui_state.PIDTempTripPoint,
-					0.01f, 6.0f, "%.6f °C",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPPIDTripPoint;
-						oldState.PIDTempTripPoint = tgui_state.PIDTempTripPoint;
-						return true;
-					}
-				);
+					TeensyControlFac.InputFloat("Peltier trip point",
+						tgui_state.PIDTempTripPoint,
+						0.01f, 6.0f, "%.6f °C",
+						ImGui::IsItemDeactivated,
+						[=](TeensyControllerState& oldState) {
+							oldState.CommandToSend = TeensyCommands::SetPPIDTripPoint;
+							oldState.PIDTempTripPoint = tgui_state.PIDTempTripPoint;
+							return true;
+						}
+					);
 
-				TeensyControlFac.InputFloat("Peltier T Setpoint",
-					tgui_state.PIDTempValues.SetPoint,
-					0.01f, 6.0f, "%.6f °C",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPPIDTempSetpoint;
-						oldState.PIDTempValues.SetPoint = tgui_state.PIDTempValues.SetPoint;
-						return true;
-					}
-				);
+					TeensyControlFac.InputFloat("Peltier T Setpoint",
+						tgui_state.PIDTempValues.SetPoint,
+						0.01f, 6.0f, "%.6f °C",
+						ImGui::IsItemDeactivated,
+						[=](TeensyControllerState& oldState) {
+							oldState.CommandToSend = TeensyCommands::SetPPIDTempSetpoint;
+							oldState.PIDTempValues.SetPoint = tgui_state.PIDTempValues.SetPoint;
+							return true;
+						}
+					);
 
-				TeensyControlFac.InputFloat("PKp",
-					tgui_state.PIDTempValues.Kp,
-					0.01f, 6.0f, "%.6f",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPPIDTempKp;
-						oldState.PIDTempValues.Kp = tgui_state.PIDTempValues.Kp;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("PTi",
-					tgui_state.PIDTempValues.Ti,
-					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPPIDTempTi;
-						oldState.PIDTempValues.Ti = tgui_state.PIDTempValues.Ti;
-						return true;
-					}
-				);
-				TeensyControlFac.InputFloat("PTd",
-					tgui_state.PIDTempValues.Td,
-					0.01f, 6.0f, "%.6f ms",
-					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
-						oldState.CommandToSend = TeensyCommands::SetPPIDTempTd;
-						oldState.PIDTempValues.Td = tgui_state.PIDTempValues.Td;
-						return true;
-					}
-				);
+					TeensyControlFac.InputFloat("PKp",
+						tgui_state.PIDTempValues.Kp,
+						0.01f, 6.0f, "%.6f",
+						ImGui::IsItemDeactivated,
+						[=](TeensyControllerState& oldState) {
+							oldState.CommandToSend = TeensyCommands::SetPPIDTempKp;
+							oldState.PIDTempValues.Kp = tgui_state.PIDTempValues.Kp;
+							return true;
+						}
+					);
+					TeensyControlFac.InputFloat("PTi",
+						tgui_state.PIDTempValues.Ti,
+						0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
+						[=](TeensyControllerState& oldState) {
+							oldState.CommandToSend = TeensyCommands::SetPPIDTempTi;
+							oldState.PIDTempValues.Ti = tgui_state.PIDTempValues.Ti;
+							return true;
+						}
+					);
+					TeensyControlFac.InputFloat("PTd",
+						tgui_state.PIDTempValues.Td,
+						0.01f, 6.0f, "%.6f ms",
+						ImGui::IsItemDeactivated,
+						[=](TeensyControllerState& oldState) {
+							oldState.CommandToSend = TeensyCommands::SetPPIDTempTd;
+							oldState.PIDTempValues.Td = tgui_state.PIDTempValues.Td;
+							return true;
+						}
+					);
 
-				TeensyControlFac.Button("Reset PPID",
-					[=](TeensyControllerState& oldState) {
+					TeensyControlFac.Button("Reset PPID",
+						[=](TeensyControllerState& oldState) {
 
-						oldState.CommandToSend = TeensyCommands::ResetPPID;
+							oldState.CommandToSend = TeensyCommands::ResetPPID;
 
-						return true;
-					}
-				);
+							return true;
+						}
+					);
 
 
-				ImGui::EndTabItem();
+					ImGui::EndTabItem();
+				}
 			}
 
 		}
