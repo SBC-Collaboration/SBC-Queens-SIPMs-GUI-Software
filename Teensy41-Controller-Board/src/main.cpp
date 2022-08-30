@@ -14,10 +14,13 @@
 #include <CRC32.h>
 
 // My libraries includes
+#define RTD_ONLY_MODE
 #define NEW_RTD_BOARD
+
 #include "SBCQueensTeensyBasics.h"
 #include "SBCQueensTeensyCommunications.h"
 #include "SBCQueensTeensyHardware.h"
+#include "SBCQueensTiming.h"
 
 #include "SBCQueensPID.h"
 
@@ -43,17 +46,9 @@
 // All SPI are critical (!)
 // but I2C ARE NOT critical!
 
-// Updates the PIDs, then changes the output related to those PIDs
-// then prepares new temperature measurements and triggers the next
-// timer
-// This is called every 100ms
-void prepare_pid_conversion_callback(TimerHandle_t xTimer) {
-
-    // We update the PIDs before anything because
-    // this callback is always called every 100ms so the timings
-    // is always the same (10Hz)
-    SBCQueens::TCPID_update(SBCQueens::PELTIER_PID);
-    SBCQueens::peltierdriver_set_dac(SBCQueens::PELTIER_DRIVER);
+// It turns on the current sources for the RTDs.
+// It is the start of the RTD measurement chain.
+void prepare_rtd_conversion_cb(TimerHandle_t xTimer) {
 
 #ifdef NEW_RTD_BOARD
     for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
@@ -61,73 +56,90 @@ void prepare_pid_conversion_callback(TimerHandle_t xTimer) {
     }
 #else
     // The temperature sensor needs an extra step to take
-    // a measurement. We require to enable Vbias
-    // and wait 10 ms
+    // a measurement. We require to enable Vbias and wait 10 ms
     SBCQueens::max31865_prepare_measurement(SBCQueens::RTD_DAC_01);
     SBCQueens::max31865_prepare_measurement(SBCQueens::RTD_DAC_02);
 #endif
 
-    xTimerReset(SBCQueens::init_pid_conversion_handle, 0);
+    // Trigger the new timer
+    xTimerReset(SBCQueens::retrieve_rtd_conversion_h, 0);
 
 }
 
 // Called 10ms after prepare_pid_conversion_callback
 // Starts a RTD and current measurement
 // then triggers the callback to retrieve the data in 52 ms
-void init_pid_conversion_callback(TimerHandle_t xTimer) {
+void retrieve_rtd_conversion_cb(TimerHandle_t xTimer) {
     
-    /// Current sensor ///
-    SBCQueens::peltierdriver_start_current_meas(SBCQueens::PELTIER_DRIVER);
-
     /// Temperature sensor ////
 #ifdef NEW_RTD_BOARD
     for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
         SBCQueens::RTDboard_take_meas(SBCQueens::RTD_BOARDS[i]);
-    }
-
-    for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
-        SBCQueens::RTDboard_translate_meas(SBCQueens::RTD_BOARDS[i]);
     }
 #else
     SBCQueens::max31865_start_measurement(SBCQueens::RTD_DAC_01);
     SBCQueens::max31865_start_measurement(SBCQueens::RTD_DAC_02);
 #endif
 
-   
-    // Now we wait for 52 ms
-    xTimerReset(SBCQueens::retrieve_pid_measurement_handle, 0);
+    /// Current sensor ///
+#ifndef RTD_ONLY_MODE
+    SBCQueens::peltierdriver_start_current_meas(SBCQueens::PELTIER_DRIVER);
+#endif
+    // Now we wait for acquisiton time ms
+    xTimerReset(SBCQueens::sleep_rtd_h, 0);
 
 }
 
 // Retrieves the measuremnts from the RTDs and current.
 // It does not trigger another callback
-void retrieve_pid_measurement_callback(TimerHandle_t xTimer) {
+void sleep_rtd_cb(TimerHandle_t xTimer) {
 
     /// Temperature sensor ///
-#ifndef NEW_RTD_BOARD
+
+#ifdef NEW_RTD_BOARD
+    for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
+        SBCQueens::RTDboard_standby(SBCQueens::RTD_BOARDS[i]);
+    }
+
+    // for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
+    //     SBCQueens::RTDboard_translate_meas(SBCQueens::RTD_BOARDS[i]);
+    // }
+#else 
     SBCQueens::max31865_retrieve_measurement(SBCQueens::RTD_DAC_01);
     SBCQueens::max31865_retrieve_measurement(SBCQueens::RTD_DAC_02);
 #endif
 
     /// Current sensor ///
+#ifndef RTD_ONLY_MODE
     SBCQueens::peltierdriver_retrieve_current_meas(SBCQueens::PELTIER_DRIVER);
-
+#endif
 }
 
 // Reads the latest BME280 measurements every 114 ms
-void retrieve_bme280_measurement_callback(TimerHandle_t xTimer) {
+void retrieve_bme280_measurement_cb(TimerHandle_t xTimer) {
     
-    // SBCQueens::bme280_read_measurements(SBCQueens::LOCAL_BME280);
+#ifndef RTD_ONLY_MODE
+    SBCQueens::bme280_read_measurements(SBCQueens::LOCAL_BME280);
+#endif
 
 }
 
 // Reads from the analog ports the latest pressures. This happens every 5ms
 // However, a measurement is only ready 5ms*32 = 160ms because of the moving
 // average
-void take_pressures_meas(TimerHandle_t xTimer) {
+void take_pressures_meas_cb(TimerHandle_t xTimer) {
 
+#ifndef RTD_ONLY_MODE
     SBCQueens::AnalogReadMV_acquire(SBCQueens::VACUUM_PRESSURE_SENSOR);
+#endif
 
+}
+
+void update_pid_cb(TimerHandle_t xTimer) {
+    #ifndef RTD_ONLY_MODE
+        SBCQueens::TCPID_update(SBCQueens::PELTIER_PID);
+        SBCQueens::peltierdriver_set_dac(SBCQueens::PELTIER_DRIVER);
+    #endif
 }
 
 // Listens to the serial, parses the texts and executes if valid.
@@ -237,60 +249,71 @@ FLASHMEM __attribute__((noinline)) void setup()
 
     /// Timer initializations
 
-    SBCQueens::prepare_pid_conversion_handle = xTimerCreate(
-        "prepare_pid_covnersion_1",        // Name
-        pdMS_TO_TICKS(100),                     // Timer period in ticks
-        pdTRUE,                                 // true for auto reload
-        (void*)0,                               // Timer ID
-        prepare_pid_conversion_callback         // Callback function
+    SBCQueens::prepare_rtd_conversion_h = xTimerCreate(
+        "prepare_pid_covnersion_1",                 // Name
+        pdMS_TO_TICKS(SBCQueens::RTDSamplingTime),  // Timer period in ticks
+        pdTRUE,                                     // true for auto reload, false is manual reload
+        (void*)0,                                   // Timer ID
+        prepare_rtd_conversion_cb                   // Callback function
     );
 
-    if (SBCQueens::prepare_pid_conversion_handle != NULL) {
-        xTimerStart(SBCQueens::prepare_pid_conversion_handle, portMAX_DELAY);
+    if (SBCQueens::prepare_rtd_conversion_h != NULL) {
+        xTimerStart(SBCQueens::prepare_rtd_conversion_h, portMAX_DELAY);
     }
 
-    SBCQueens::init_pid_conversion_handle = xTimerCreate(
-        "init_pid_conversion_1", 
-        pdMS_TO_TICKS(10), 
+    SBCQueens::retrieve_rtd_conversion_h = xTimerCreate(
+        "init_pid_conversion_1",
+        pdMS_TO_TICKS(SBCQueens::c_RTDPrepareTime), 
         pdFALSE, 
         (void*)2,
-        init_pid_conversion_callback
+        retrieve_rtd_conversion_cb
     );
 
-    SBCQueens::retrieve_pid_measurement_handle = xTimerCreate(
+    SBCQueens::sleep_rtd_h = xTimerCreate(
         "retrieve_pid_conversion_1", 
-        pdMS_TO_TICKS(52), 
+        pdMS_TO_TICKS(SBCQueens::c_RTDAcquisitionTime), 
         pdFALSE, 
         (void*)3,
-        retrieve_pid_measurement_callback
+        sleep_rtd_cb
     );
 
-    SBCQueens::retrieve_bme280_measurement_handle = xTimerCreate(
+    SBCQueens::retrieve_bme280_measurement_h = xTimerCreate(
         "retrieve_bme280_conversion", 
-        pdMS_TO_TICKS(114), 
+        pdMS_TO_TICKS(SBCQueens::BMESamplingTime), 
         pdTRUE, 
         (void*)4,
-        retrieve_bme280_measurement_callback
+        retrieve_bme280_measurement_cb
     );
 
-    if(SBCQueens::retrieve_bme280_measurement_handle != NULL) {
-        xTimerStart(SBCQueens::retrieve_bme280_measurement_handle, portMAX_DELAY);
+    if(SBCQueens::retrieve_bme280_measurement_h != NULL) {
+        xTimerStart(SBCQueens::retrieve_bme280_measurement_h, portMAX_DELAY);
     }
 
-    SBCQueens::take_pressures_meas_handle = xTimerCreate(
+    SBCQueens::take_pressures_meas_h = xTimerCreate(
         "take_pressures_meas", 
-        pdMS_TO_TICKS(5), 
+        pdMS_TO_TICKS(SBCQueens::PressureTransSamplingTime), 
         pdTRUE, 
         (void*)5,
-        take_pressures_meas
+        take_pressures_meas_cb
     );
 
-    if(SBCQueens::take_pressures_meas_handle != NULL) {
-        xTimerStart(SBCQueens::take_pressures_meas_handle, portMAX_DELAY);
+    if(SBCQueens::take_pressures_meas_h != NULL) {
+        xTimerStart(SBCQueens::take_pressures_meas_h, portMAX_DELAY);
+    }
+
+    SBCQueens::update_pid_h = xTimerCreate(
+        "take_pressures_meas", 
+        pdMS_TO_TICKS(SBCQueens::PIDUpdateTime), 
+        pdTRUE, 
+        (void*)6,
+        update_pid_cb
+    );
+
+    if(SBCQueens::update_pid_h != NULL) {
+        xTimerStart(SBCQueens::update_pid_h, portMAX_DELAY);
     }
 
     /// !Timer initialization
-
     vTaskStartScheduler();
 
     // Deletes setup and loop tasks

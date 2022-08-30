@@ -56,6 +56,8 @@ namespace SBCQueens {
     void GETERR(float);
     void RESET(float);
 
+    void SET_PPID_UP(float);
+    void SET_PPID_RTD(float);
     void SET_PPID(float);
     void SET_PTKP_PID(float);
     void SET_PTTd_PID(float);
@@ -63,6 +65,10 @@ namespace SBCQueens {
     void SET_PTEMP(float);
     void RESET_PPID(float);
 
+    void SET_RTD_SP(float);
+    void RTD_BANK_MASK(float);
+
+    void GET_SYS_PARAMETERS(float);
     void GET_PRESSURES(float);
     void GET_RTDS(float);
     void GET_RAW_RTDS(float);
@@ -78,6 +84,8 @@ namespace SBCQueens {
         /// !General system commands
         ////
         /// Hardware specific commands
+        CMD_KEY(SET_PPID_UP),       // Update time for the PID
+        CMD_KEY(SET_PPID_RTD),      // Sets which RTD to use for the PID
         CMD_KEY(SET_PPID),       // Turns ON or OFF this PID
         CMD_KEY(SET_PTKP_PID),   // Sets Kp for PID temperature control loop
         CMD_KEY(SET_PTTd_PID),   // Sets Td for PID temperature control loop
@@ -85,7 +93,11 @@ namespace SBCQueens {
         CMD_KEY(SET_PTEMP),      // Sets PID temperature setpoint
         CMD_KEY(RESET_PPID),      // Reset internal PID variables
 
+        CMD_KEY(SET_RTD_SP),        // Sets the RTD sampling period
+        CMD_KEY(RTD_BANK_MASK),     // Enables/disabled specific RTDs
+
         //// Getters
+        CMD_KEY(GET_SYS_PARAMETERS),
         CMD_KEY(GET_PRESSURES),
         CMD_KEY(GET_RTDS),
         CMD_KEY(GET_RAW_RTDS),      // Gets the RTD register values

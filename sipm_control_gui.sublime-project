@@ -15,7 +15,7 @@
 			"name": "Build GUI",
 			"shell" : true,
 			"working_dir" : "$project_path/build",
-			"shell_cmd": "cmake ../ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -G \"MinGW Makefiles\" -DCAEN_DIR=\"C:/Program Files/CAEN\" && mingw32-make -j8",
+			"shell_cmd": "cmake ../ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && make -j8",
 			"syntax" : "Packages/Makefile/Make Output.sublime-syntax",
 		}
 

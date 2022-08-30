@@ -15,7 +15,6 @@
 */
 
 // STD includes
-#include "include/timing_events.h"
 #include <cstdint>
 #include <inttypes.h>
 #include <string>
@@ -29,6 +28,8 @@
 #include <optional>
 #include <future>
 #include <map>
+
+#include <armadillo>
 
 // We need this because chrono has long names...
 namespace chrono = std::chrono; 
@@ -93,6 +94,11 @@ namespace SBCQueens {
 		RTDValues RTD_2;
 	};
 
+	struct RawRTDs {
+		double time;
+		std::vector<uint16_t> RTDS;
+	};
+
 	struct PressureValues {
 		double Pressure;
 	};
@@ -100,6 +106,13 @@ namespace SBCQueens {
 	struct Pressures {
 		double time;
 		PressureValues Vacuum;
+	};
+
+
+	struct TeensySystemPars {
+		uint32_t NumRtdBoards = 0;
+		uint32_t NumRtdsPerBoard = 0;
+		bool InRTDOnlyMode = false;
 	};
 
 	// The BMEs return their values as registers
@@ -177,6 +190,9 @@ namespace SBCQueens {
 	template<BME_TYPE T>
 	double BME280_compensate_H_double(const int32_t& adc_H, const int32_t& t_fine);
 
+	double __calibrate_curve(const size_t& i, const uint16_t& count);
+	double __res_to_temperature(const double& res);
+
 	// These functions are required for json to convert to our types.
 	// Turns PIDs type to Json. 
     void to_json(json& j, const Peltiers& p);
@@ -185,6 +201,13 @@ namespace SBCQueens {
 
     void to_json(json& j, const RTDs& p);
     void from_json(const json& j, RTDs& p);
+
+    void to_json(json& j, const RawRTDs& p);
+    void from_json(const json& j, RawRTDs& p);
+
+    void to_json(json& j, const TeensySystemPars& p);
+    void from_json(const json& j, TeensySystemPars& p);
+
 
     void to_json(json& j, const Pressures& p);
     void from_json(const json& j, Pressures& p);
@@ -200,6 +223,8 @@ namespace SBCQueens {
 		GetError,
 		Reset,
 
+		SetPPIDUpdatePeriod,
+		SetPPIDRTD,
 		SetPPID,
 		SetPPIDTripPoint,
 		SetPPIDTempSetpoint,
@@ -208,10 +233,15 @@ namespace SBCQueens {
 		SetPPIDTempTd,
 		ResetPPID,
 
+		SetRTDSamplingPeriod,
+		SetRTDMask,
+
 		SetPeltierRelay,
 
+		GetSystemParameters,
 		GetPeltiers,
 		GetRTDs,
+		GetRawRTDs,
 		GetPressures,
 		GetBMEs,
 
@@ -228,6 +258,8 @@ namespace SBCQueens {
 		/// !General system commands
 		////
 		/// Hardware specific commands
+		{TeensyCommands::SetPPIDUpdatePeriod, 	"SET_PPID_UP"},
+		{TeensyCommands::SetPPIDRTD, 				"SET_PPID_RTD"},
 		{TeensyCommands::SetPPID, 				"SET_PPID"},
 		{TeensyCommands::SetPPIDTripPoint,		"SET_PTRIPPOINT"},
 		{TeensyCommands::SetPPIDTempSetpoint, 	"SET_PTEMP"},
@@ -236,12 +268,17 @@ namespace SBCQueens {
 		{TeensyCommands::SetPPIDTempTd, 		"SET_PTTd_PID"},
 		{TeensyCommands::ResetPPID, 			"RESET_PPID"},
 
+		{TeensyCommands::SetRTDSamplingPeriod, 	"SET_RTD_SP"},
+		{TeensyCommands::SetRTDMask, 			"RTD_BANK_MASK"},
+
 		{TeensyCommands::SetPeltierRelay, 		"SET_PELTIER_RELAY"},
 
 		//// Getters
+		{TeensyCommands::GetSystemParameters, 	"GET_SYS_PARAMETERS"},
 		{TeensyCommands::GetError, 				"GETERR"},
 		{TeensyCommands::GetPeltiers, 			"GET_PELTIERS_CURRS"},
 		{TeensyCommands::GetRTDs, 				"GET_RTDS"},
+		{TeensyCommands::GetRawRTDs, 			"GET_RAW_RTDS"},
 		{TeensyCommands::GetPressures, 			"GET_PRESSURES"},
 		{TeensyCommands::GetBMEs, 				"GET_BMES"},
 		//// !Getters
@@ -267,14 +304,22 @@ namespace SBCQueens {
 		TeensyCommands CommandToSend
 			= TeensyCommands::None;
 
+		TeensySystemPars SystemParameters;
+
 		// Relay stuff
 		bool PeltierState 		= false;
 
 		// PID Stuff
+		uint32_t PeltierPidUpdatePeriod = 100;
+		uint32_t PeltierPidRTD = 0;
 		bool PeltierPIDState 	= false;
 
 		float PIDTempTripPoint = 5.0;
 		PIDConfig PIDTempValues;
+
+		bool RTDOnlyMode = false;
+		uint32_t RTDSamplingPeriod = 100;
+		uint32_t RTDMask = 0xFFFF;
 
 	};
 
@@ -301,14 +346,14 @@ namespace SBCQueens {
 
 		DataFile<Peltiers> _PeltiersFile;
 		DataFile<Pressures> _PressuresFile;
-		DataFile<RTDs> _RTDsFile;
+		DataFile<RawRTDs> _RTDsFile;
 		DataFile<BMEs> _BMEsFile;
 
 		serial_ptr port;
 
 	public:
 
-		explicit TeensyControllerInterface(Queues&... queues) 
+	explicit TeensyControllerInterface(Queues&... queues)
 			: _queues(forward_as_tuple(queues...)),
 			TeensyIndicatorSender(std::get<SiPMsPlotQueue&>(_queues)) { }
 
@@ -400,17 +445,11 @@ namespace SBCQueens {
 								_init_time = get_current_time_epoch();
 
 								// Open files to start saving!
-								open(_PeltiersFile,
-									state_of_everything.RunDir
-									+ "/" + state_of_everything.RunName
-									+ "/Peltiers.txt");
-						 		bool s = _PeltiersFile > 0;
-
 								open(_PressuresFile,
 									state_of_everything.RunDir
 									+ "/" + state_of_everything.RunName
 									+ "/Pressures.txt");
-						 		s &= _PeltiersFile > 0;
+						 		bool s = _PeltiersFile > 0;
 
 								open(_RTDsFile,
 									state_of_everything.RunDir
@@ -418,13 +457,21 @@ namespace SBCQueens {
 									+ "/RTDs.txt");
 						 		s &= _RTDsFile > 0;
 
-								open(_BMEsFile,
-									state_of_everything.RunDir
-									+ "/" + state_of_everything.RunName
-									+ "/BMEs.txt");
-								s &= _BMEsFile > 0;
+								if (not state_of_everything.RTDOnlyMode) {
+									open(_PeltiersFile,
+										state_of_everything.RunDir
+										+ "/" + state_of_everything.RunName
+										+ "/Peltiers.txt");
+							 		s &= _PeltiersFile > 0;
 
-								if(!s) {
+									open(_BMEsFile,
+										state_of_everything.RunDir
+										+ "/" + state_of_everything.RunName
+										+ "/BMEs.txt");
+									s &= _BMEsFile > 0;
+								}
+
+								if(s) {
 									spdlog::error("Failed to open files.");
 									state_of_everything.CurrentState =
 										TeensyControllerStates::Standby;
@@ -482,26 +529,6 @@ namespace SBCQueens {
 		} // here port should get deleted
 
 private:
-		void send_initial_config() {
-
-			auto send_ts_cmd_b = make_blocking_total_timed_event(
-				std::chrono::milliseconds(10),
-					[&](auto cmd){
-						return send_teensy_cmd(cmd);
-					}
-				);
-
-
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempSetpoint);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTripPoint);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempKp);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempTd);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempTi);
-
-			// Flush so there is nothing in the buffer
-			// making everything annoying
-			flush(port);
-		}
 
 		template <class T>
 		void retrieve_data(TeensyControllerState& teensyState,
@@ -537,6 +564,47 @@ private:
 
 		}
 
+		void send_initial_config() {
+
+			auto send_ts_cmd_b = make_blocking_total_timed_event(
+				std::chrono::milliseconds(10),
+					[&](auto cmd){
+						return send_teensy_cmd(cmd);
+					}
+				);
+
+			send_ts_cmd_b(TeensyCommands::SetRTDSamplingPeriod);
+			send_ts_cmd_b(TeensyCommands::SetRTDMask);
+
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempSetpoint);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTripPoint);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempKp);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempTd);
+			send_ts_cmd_b(TeensyCommands::SetPPIDTempTi);
+
+			retrieve_data(state_of_everything, TeensyCommands::GetSystemParameters,
+			[&](json& parse, auto& msg) {
+				try{
+
+					auto system_pars = parse.get<TeensySystemPars>();
+
+					state_of_everything.SystemParameters = system_pars;
+
+				} catch (... ) {
+					spdlog::warn("Failed to parse system data from {0}. "
+						"Message received from Teensy: {1}",
+						cTeensyCommands.at(TeensyCommands::GetSystemParameters),
+						msg.value());
+					flush(port);
+				}
+
+			});
+
+			// Flush so there is nothing in the buffer
+			// making everything annoying
+			flush(port);
+		}
+
 		void retrieve_pids(TeensyControllerState& teensyState) {
 
 			retrieve_data(teensyState, TeensyCommands::GetPeltiers,
@@ -569,32 +637,45 @@ private:
 		}
 
 		void retrieve_rtds(TeensyControllerState& teensyState) {
-			retrieve_data(teensyState, TeensyCommands::GetRTDs,
+			retrieve_data(teensyState, TeensyCommands::GetRawRTDs,
 			[&](json& parse, auto& msg) {
 				try {
 
-					auto rtds = parse.get<RTDs>();
+					auto rtds = parse.get<RawRTDs>();
 
 					// Time since communication with the Teensy
 					double dt = (rtds.time - _init_time) / 1000.0;
 
+					auto rtd_one = __res_to_temperature(
+						__calibrate_curve(0, rtds.RTDS[0])
+					);
+					auto rtd_two = __res_to_temperature(
+						__calibrate_curve(1, rtds.RTDS[1])
+					);
+					auto rtd_three = __res_to_temperature(
+						__calibrate_curve(2, rtds.RTDS[2])
+					);
+
 					// Send them to GUI to draw them
 					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_ONE,
-						dt, rtds.RTD_1.Temperature);
+						dt, rtd_one);
 					TeensyIndicatorSender(IndicatorNames::LATEST_RTD1_TEMP,
-						rtds.RTD_1.Temperature);
+						rtd_one);
 
 					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_TWO,
-						dt, rtds.RTD_2.Temperature);
+						dt, rtd_two);
 					TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
-						rtds.RTD_2.Temperature);
+						rtd_two);
+
+					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_THREE,
+						dt, rtd_three);
 
 					_RTDsFile->Add(rtds);
 
 				} catch (... ) {
 					spdlog::warn("Failed to parse latest data from {0}. "
 								"Message received from Teensy: {1}",
-								cTeensyCommands.at(TeensyCommands::GetRTDs),
+								cTeensyCommands.at(TeensyCommands::GetRawRTDs),
 								msg.value());
 					flush(port);
 				}
@@ -715,41 +796,53 @@ private:
 				[&]() {
 
 					spdlog::info("Saving teensy data...");
-					async_save(_PeltiersFile,
-						[](const Peltiers& pid) {
-							return 	std::to_string(pid.time) + "," +
-									std::to_string(pid.PID.Current) + "\n";
-
-						}
-					);
 
 					async_save(_RTDsFile,
-						[](const RTDs& rtds) {
-							return 	std::to_string(rtds.time) + "," +
-									std::to_string(rtds.RTD_1.Temperature) + "," +
-									std::to_string(rtds.RTD_2.Temperature) + "\n";
+						[](const RawRTDs& rtds) {
+							std::string out = "";
+							for (const auto& rtd : rtds.RTDS) {
+								out += std::to_string(rtd);
+
+								if ( &rtd == &rtds.RTDS.back()) {
+									out += '\n';
+								} else {
+									out += ',';
+								}
+							}
+
+							return 	std::to_string(rtds.time) + "," + out;
 
 						}
 					);
 
-					async_save(_PressuresFile,
-						[](const Pressures& press) {
-							return 	std::to_string(press.time) + "," +
-									std::to_string(press.Vacuum.Pressure) + "\n";
+					if(not state_of_everything.RTDOnlyMode){
+						async_save(_PeltiersFile,
+							[](const Peltiers& pid) {
+								return 	std::to_string(pid.time) + "," +
+										std::to_string(pid.PID.Current) + "\n";
 
-						}
-					);
+							}
+						);
 
-					async_save(_BMEsFile, 
-						[](const BMEs& bme) {
+						async_save(_PressuresFile,
+							[](const Pressures& press) {
+								return 	std::to_string(press.time) + "," +
+										std::to_string(press.Vacuum.Pressure) + "\n";
 
-							return 	std::to_string(bme.time) + "," +
-									std::to_string(bme.LocalBME.Temperature) + "," +
-									std::to_string(bme.LocalBME.Pressure) + "," +
-									std::to_string(bme.LocalBME.Humidity) + "\n";
+							}
+						);
 
-						}
-					);
+						async_save(_BMEsFile,
+							[](const BMEs& bme) {
+
+								return 	std::to_string(bme.time) + "," +
+										std::to_string(bme.LocalBME.Temperature) + "," +
+										std::to_string(bme.LocalBME.Pressure) + "," +
+										std::to_string(bme.LocalBME.Humidity) + "\n";
+
+							}
+						);
+					}
 				}
 			);
 
@@ -757,12 +850,19 @@ private:
 			// Checks the status of the Teensy and sees if there are any errors
 
 			// This should be called every 100ms
-			retrieve_pids_nb(teensyState);
-			retrieve_rtds_nb(teensyState);
-			retrieve_pres_nb(teensyState);
+			if(not state_of_everything.RTDOnlyMode) {
+				retrieve_pids_nb(teensyState);
+				retrieve_pres_nb(teensyState);
 
-			// This should be called every 114ms
-			retrieve_bmes_nb(teensyState);
+				// This should be called every 114ms
+				retrieve_bmes_nb(teensyState);
+			}
+
+			retrieve_rtds_nb(teensyState);
+
+			retrieve_rtds_nb.ChangeWaitTime(
+				std::chrono::milliseconds(state_of_everything.RTDSamplingPeriod)
+			);
 
 			// These should be called every 30 seconds
 			save_files();
@@ -790,6 +890,14 @@ private:
 			out << std::defaultfloat;
 
 			switch(cmd) {
+				case TeensyCommands::SetPPIDUpdatePeriod:
+					out << tcs.PeltierPidUpdatePeriod;
+				break;
+
+				case TeensyCommands::SetPPIDRTD:
+					out << tcs.PeltierPidRTD;
+				break;
+
 				case TeensyCommands::SetPPID:
 					out << tcs.PeltierPIDState;
 				break;
@@ -814,6 +922,13 @@ private:
 					out << tcs.PIDTempValues.Td;
 				break;
 
+				case TeensyCommands::SetRTDSamplingPeriod:
+					out << tcs.RTDSamplingPeriod;
+				break;
+
+				case TeensyCommands::SetRTDMask:
+					out << tcs.RTDMask;
+				break;
 
 				// The default case assumes all the commands not mention above
 				// do not have any inputs
@@ -822,8 +937,10 @@ private:
 
 			}
 
-			if(cmd != TeensyCommands::GetBMEs
+			if(cmd != TeensyCommands::GetSystemParameters
+				&& cmd != TeensyCommands::GetBMEs
 				&& cmd != TeensyCommands::GetRTDs
+				&& cmd != TeensyCommands::GetRawRTDs
 				&& cmd != TeensyCommands::GetPeltiers
 				&& cmd != TeensyCommands::GetPressures) {
 				spdlog::info("Sending command {0} to teensy!", str_cmd);

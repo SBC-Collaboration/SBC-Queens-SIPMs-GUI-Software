@@ -2,14 +2,15 @@
 
 namespace SBCQueens {
 
-    TimerHandle_t prepare_pid_conversion_handle     = NULL;
-    TimerHandle_t init_pid_conversion_handle        = NULL;
-    TimerHandle_t retrieve_pid_measurement_handle   = NULL;
+    TimerHandle_t prepare_rtd_conversion_h      = NULL;
+    TimerHandle_t retrieve_rtd_conversion_h     = NULL;
+    TimerHandle_t sleep_rtd_h                   = NULL;
 
-    TimerHandle_t init_bme280_measurement_handle    = NULL;
-    TimerHandle_t retrieve_bme280_measurement_handle = NULL;
+    TimerHandle_t update_pid_h = NULL;
 
-    TimerHandle_t take_pressures_meas_handle        = NULL;
+    TimerHandle_t retrieve_bme280_measurement_h = NULL;
+
+    TimerHandle_t take_pressures_meas_h         = NULL;
 
     SemaphoreHandle_t  SPI_mutex = NULL;
     SemaphoreHandle_t  Wire1_mutex  = NULL;

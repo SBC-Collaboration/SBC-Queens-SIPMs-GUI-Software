@@ -9,6 +9,7 @@ namespace SBCQueens {
 		PELTIER_CURR,
 		RTD_TEMP_ONE,
 		RTD_TEMP_TWO,
+		RTD_TEMP_THREE,
 
 		VACUUM_PRESS,
 
@@ -25,6 +26,7 @@ namespace SBCQueens {
 		// Teeensy Indicators
 		LATEST_RTD1_TEMP,
 		LATEST_RTD2_TEMP,
+		LATEST_RTD3_TEMP,
 		LATEST_Peltier_CURR,
 
 		LATEST_VACUUM_PRESS,

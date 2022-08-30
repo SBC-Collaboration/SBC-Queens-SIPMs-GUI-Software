@@ -5,13 +5,22 @@ RunName = "TESTING"
 [Teensy]
 Port = "/dev/ttyACM0"
 
+# If true, the Teensy is in RTD only mode.
+# cannot be changed during GUI
+RTDMode = true
+# RTD sampling period in ms
+RTDSamplingPeriod = 100
+# If bit n is set, it enabled the RTD at position (i, k)
+# where i is the board and k is the RTD
+# Depends on how many boards and RTDs are in each board.
+RTDMask = 0xFFFF
+
 PIDEnable = false
 PeltierTempSetpoint = -30
 
 PeltierTKp = -100
 PeltierTTi = 1e6
 PeltierTTd = 0
-
 
 [CAEN]
 # DT5730B or DT5740D
@@ -54,3 +63,9 @@ Threshold = 8000
 # Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
 # Range = 1
 # Threshold = 2075
+
+[Other]
+[Other.PFEIFFERSingleGauge]
+Enabled = true
+# 0 = 100ms, 1 = 1s, 2 = 1min
+Rate = 2

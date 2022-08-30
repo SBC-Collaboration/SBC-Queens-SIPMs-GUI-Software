@@ -171,6 +171,46 @@ public:
 		}
 
 		template<typename T, typename Condition, typename Callback>
+		bool InputScalar(const std::string& label, T& value,
+			Condition&& condition, Callback&& callback) {
+
+			ImGuiDataType_ type = ImGuiDataType_S8;
+			if constexpr ( std::is_same_v<T, int8_t>) {
+				type = ImGuiDataType_S8;
+			} else if constexpr ( std::is_same_v<T, uint8_t>) {
+				type = ImGuiDataType_U8;
+			} else if constexpr ( std::is_same_v<T, int16_t>) {
+				type = ImGuiDataType_S16;
+			} else if constexpr ( std::is_same_v<T, uint16_t>) {
+				type = ImGuiDataType_U16;
+			} else if constexpr ( std::is_same_v<T, int32_t>) {
+				type = ImGuiDataType_S32;
+			} else if constexpr ( std::is_same_v<T, uint32_t>) {
+				type = ImGuiDataType_U32;
+			} else if constexpr ( std::is_same_v<T, int64_t>) {
+				type = ImGuiDataType_S64;
+			} else if constexpr ( std::is_same_v<T, uint64_t>) {
+				type = ImGuiDataType_U64;
+			} else {
+				assert(false);
+			}
+
+			bool u = ImGui::InputScalar(label.c_str(), type, &value);
+
+			// The if must come after the ImGUI API call if not, it will not work
+			if(condition()) {
+				if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
+					_q.try_enqueue(std::forward<Callback>(callback));
+				} else {
+					callback();
+				}
+
+			}
+
+			return u;
+		}
+
+		template<typename T, typename Condition, typename Callback>
 		bool ComboBox(const std::string& label,
 			T& state,
 			const std::unordered_map<T, std::string>& map,

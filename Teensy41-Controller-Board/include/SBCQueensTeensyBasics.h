@@ -1,6 +1,8 @@
 #pragma once
 
+#define RTD_ONLY_MODE
 #define NEW_RTD_BOARD
+
 #include <arduino_freertos.h>
 #include <timers.h>
 #include <semphr.h>
@@ -14,14 +16,15 @@ namespace SBCQueens {
     /// !Mutex
 
     /// Timer Handles
-    extern TimerHandle_t prepare_pid_conversion_handle;
-    extern TimerHandle_t init_pid_conversion_handle;
-    extern TimerHandle_t retrieve_pid_measurement_handle;
+    extern TimerHandle_t prepare_rtd_conversion_h;
+    extern TimerHandle_t retrieve_rtd_conversion_h;
+    extern TimerHandle_t sleep_rtd_h;
 
-    extern TimerHandle_t init_bme280_measurement_handle;
-    extern TimerHandle_t retrieve_bme280_measurement_handle;
+    extern TimerHandle_t update_pid_h;
 
-    extern TimerHandle_t take_pressures_meas_handle;
+    extern TimerHandle_t retrieve_bme280_measurement_h;
+
+    extern TimerHandle_t take_pressures_meas_h;
     /// !Timer Handles
 
     // Initializes all the mutexes, put in setup()
