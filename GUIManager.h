@@ -736,6 +736,17 @@ public:
 							oldState.CommandToSend = TeensyCommands::SetPPID;
 							oldState.PeltierPIDState = tgui_state.PeltierPIDState;
 
+
+					ImGui::Text("Peltier PID");
+					TeensyControlFac.Checkbox(
+						"Peltier ON/OFF",
+						tgui_state.PeltierPIDState,
+						ImGui::IsItemEdited,
+						[=](TeensyControllerState& oldState) {
+
+							oldState.CommandToSend = TeensyCommands::SetPPID;
+							oldState.PeltierPIDState = tgui_state.PeltierPIDState;
+
 							return true;
 						}
 					);

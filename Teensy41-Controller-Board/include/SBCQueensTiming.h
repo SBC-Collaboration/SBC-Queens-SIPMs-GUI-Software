@@ -21,6 +21,7 @@ namespace SBCQueens {
     const uint16_t c_RTDAcquisitionTime = 52; //ms
 #endif
 
+
 	extern uint16_t PIDUpdateTime;
 	extern uint16_t BMESamplingTime;
 	extern uint16_t PressureTransSamplingTime;
