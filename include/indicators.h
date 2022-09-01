@@ -5,6 +5,11 @@
 namespace SBCQueens {
 
 	enum class IndicatorNames {
+
+		NUM_RTD_BOARDS,
+		NUM_RTDS_PER_BOARD,
+		IS_RTD_ONLY,
+
 		// For plots:
 		PELTIER_CURR,
 		RTD_TEMP_ONE,
@@ -42,6 +47,7 @@ namespace SBCQueens {
 
 
 	using SiPMsPlotQueue = IndicatorsQueue<IndicatorNames, double>;
+	using RTDIndicator = Indicator<uint16_t>;
 	using TeensyIndicator = Indicator<IndicatorNames>;
 	using SiPMIndicator = Indicator<IndicatorNames>;
 	using SiPMPlot = Plot<IndicatorNames>;

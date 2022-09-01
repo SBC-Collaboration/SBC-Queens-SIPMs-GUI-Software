@@ -529,29 +529,6 @@ namespace SBCQueens {
 		} // here port should get deleted
 
 private:
-		void send_initial_config() {
-
-			auto send_ts_cmd_b = make_blocking_total_timed_event(
-				std::chrono::milliseconds(10),
-					[&](auto cmd){
-						return send_teensy_cmd(cmd);
-					}
-				);
-
-			send_ts_cmd_b(TeensyCommands::SetRTDSamplingPeriod);
-			send_ts_cmd_b(TeensyCommands::SetRTDMask);
-
-
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempSetpoint);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTripPoint);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempKp);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempTd);
-			send_ts_cmd_b(TeensyCommands::SetPPIDTempTi);
-
-			// Flush so there is nothing in the buffer
-			// making everything annoying
-			flush(port);
-		}
 
 		template <class T>
 		void retrieve_data(TeensyControllerState& teensyState,

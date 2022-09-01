@@ -69,6 +69,10 @@ protected:
 	// programs, and QueueType is the function type that sends information around
 	template<typename Queue>
 	class ControlLink {
+
+private:
+		Queue& _q;
+
 public:
 		using QueueType = typename Queue::value_type;
 		using QueueFunc = std::function<bool(QueueType&&)>;
@@ -323,8 +327,6 @@ public:
 
 		}
 
-private:
-		Queue& _q;
 
 	};
 } // namespace SBCQueens

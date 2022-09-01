@@ -7,7 +7,7 @@ Port = "/dev/ttyACM0"
 
 # If true, the Teensy is in RTD only mode.
 # cannot be changed during GUI
-RTDMode = true
+RTDMode = false
 # RTD sampling period in ms
 RTDSamplingPeriod = 100
 # If bit n is set, it enabled the RTD at position (i, k)
