@@ -34,8 +34,16 @@ namespace SBCQueens {
 			= PFEIFFERSingleGaugeSP::SLOW;
 	};
 
+	using OtherQueueType
+		= std::function < bool(OtherDevicesData&) >;
+
+	using OtherQueue
+		= moodycamel::ReaderWriterQueue< OtherQueueType >;
+
 	template<typename... Queues>
 	class OtherDevicesInterface {
+
+		std::tuple<Queues&...> _queues;
 
 
 	};

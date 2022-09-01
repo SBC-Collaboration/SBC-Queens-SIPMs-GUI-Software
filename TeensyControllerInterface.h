@@ -259,7 +259,7 @@ namespace SBCQueens {
 		////
 		/// Hardware specific commands
 		{TeensyCommands::SetPPIDUpdatePeriod, 	"SET_PPID_UP"},
-		{TeensyCommands::SetPPIDRTD, 				"SET_PPID_RTD"},
+		{TeensyCommands::SetPPIDRTD, 			"SET_PPID_RTD"},
 		{TeensyCommands::SetPPID, 				"SET_PPID"},
 		{TeensyCommands::SetPPIDTripPoint,		"SET_PTRIPPOINT"},
 		{TeensyCommands::SetPPIDTempSetpoint, 	"SET_PTEMP"},
@@ -306,10 +306,15 @@ namespace SBCQueens {
 
 		TeensySystemPars SystemParameters;
 
+		bool RTDOnlyMode = false;
+		uint32_t RTDSamplingPeriod = 100;
+		uint32_t RTDMask = 0xFFFF;
+
 		// Relay stuff
 		bool PeltierState 		= false;
 
 		// PID Stuff
+		uint16_t PidRTD = 0;
 		uint32_t PeltierPidUpdatePeriod = 100;
 		uint32_t PeltierPidRTD = 0;
 		bool PeltierPIDState 	= false;
@@ -317,9 +322,7 @@ namespace SBCQueens {
 		float PIDTempTripPoint = 5.0;
 		PIDConfig PIDTempValues;
 
-		bool RTDOnlyMode = false;
-		uint32_t RTDSamplingPeriod = 100;
-		uint32_t RTDMask = 0xFFFF;
+
 
 	};
 

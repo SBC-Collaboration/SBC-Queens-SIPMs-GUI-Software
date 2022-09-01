@@ -66,105 +66,11 @@ public:
 			_indicatorReceiver 	(std::get<SiPMsPlotQueue&>(_queues)),
 			TeensyControlFac 	(std::get<TeensyInQueue&>(_queues)),
 			CAENControlFac 		(std::get<CAENQueue&>(_queues)),
+
 			indicatorWindow 	(_indicatorReceiver),
-			controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state, other_state) {
+			controlWindow		(TeensyControlFac, tgui_state, CAENControlFac,
+								cgui_state, other_state) {
 
-			// Controls
-			// When config_file goes out of scope, everything
-			// including the daughters get cleared
-			// config_file = toml::parse_file("gui_setup.toml");
-			// auto t_conf = config_file["Teensy"];
-			// auto CAEN_conf = config_file["CAEN"];
-			// auto file_conf = config_file["File"];
-
-			// indicatorWindow.init(config_file);
-			// controlWindow.init(config_file);
-
-			// // These two guys are shared between CAEN and Teensy
-			// i_run_dir 		= config_file["File"]["RunDir"].value_or("./RUNS");
-			// i_run_name 		= config_file["File"]["RunName"].value_or("Testing");
-
-			// // Teensy initial state
-			// tgui_state.CurrentState = TeensyControllerStates::Standby;
-			// tgui_state.Port 		= t_conf["Port"].value_or("COM4");
-			// tgui_state.RunDir 		= i_run_dir;
-			// tgui_state.RunName 		= i_run_name;
-
-			// tgui_state.RTDOnlyMode = t_conf["RTDMode"].value_or(false);
-			// tgui_state.RTDSamplingPeriod = t_conf["RTDSamplingPeriod"].value_or(100Lu);
-			// tgui_state.RTDMask = t_conf["RTDMask"].value_or(0xFFFFLu);
-
-			// // Send initial states of the PIDs
-			// tgui_state.PeltierState = false;
-
-			// tgui_state.PIDTempTripPoint = t_conf["PeltierTempTripPoint"].value_or(0.0f);
-			// tgui_state.PIDTempValues.SetPoint = t_conf["PeltierTempSetpoint"].value_or(0.0f);
-			// tgui_state.PIDTempValues.Kp = t_conf["PeltierTKp"].value_or(0.0f);
-			// tgui_state.PIDTempValues.Ti = t_conf["PeltierTTi"].value_or(0.0f);
-			// tgui_state.PIDTempValues.Td = t_conf["PeltierTTd"].value_or(0.0f);
-
-			// // CAEN initial state
-			// cgui_state.CurrentState = CAENInterfaceStates::Standby;
-			// cgui_state.RunDir = i_run_dir;
-			// cgui_state.RunName = i_run_name;
-			// cgui_state.SiPMParameters = file_conf["SiPMParameters"].value_or("default");
-
-			// cgui_state.Model = CAENDigitizerModels_map.at(CAEN_conf["Model"].value_or("DT5730B"));
-			// cgui_state.PortNum = CAEN_conf["Port"].value_or(0u);
-
-			// cgui_state.GlobalConfig.MaxEventsPerRead
-			// 	= CAEN_conf["MaxEventsPerRead"].value_or(512Lu);
-			// cgui_state.GlobalConfig.RecordLength
-			// 	= CAEN_conf["RecordLength"].value_or(2048Lu);
-			// cgui_state.GlobalConfig.PostTriggerPorcentage
-			// 	= CAEN_conf["PostBufferPorcentage"].value_or(50u);
-			// cgui_state.GlobalConfig.TriggerOverlappingEn
-			// 	= CAEN_conf["OverlappingRejection"].value_or(false);
-			// cgui_state.GlobalConfig.EXTasGate
-			// 	= CAEN_conf["TRGINasGate"].value_or(false);
-			// cgui_state.GlobalConfig.EXTTriggerMode
-			// 	= static_cast<CAEN_DGTZ_TriggerMode_t>(CAEN_conf["ExternalTrigger"].value_or(0L));
-			// cgui_state.GlobalConfig.SWTriggerMode
-			// 	= static_cast<CAEN_DGTZ_TriggerMode_t>(CAEN_conf["SoftwareTrigger"].value_or(0L));
-			// cgui_state.GlobalConfig.TriggerPolarity
-			// 	= static_cast<CAEN_DGTZ_TriggerPolarity_t>(CAEN_conf["Polarity"].value_or(0L));
-			// cgui_state.GlobalConfig.IOLevel
-			// 	= static_cast<CAEN_DGTZ_IOLevel_t>(CAEN_conf["IOLevel"].value_or(0));
-			// // We check how many CAEN.groupX there are and create that many
-			// // groups.
-			// const uint8_t MAX_CHANNELS = 64;
-			// for(uint8_t ch = 0; ch < MAX_CHANNELS; ch++) {
-			// 	std::string ch_toml = "group" + std::to_string(ch);
-			// 	if(auto ch_conf = CAEN_conf[ch_toml].as_table()) {
-
-			// 		cgui_state.GroupConfigs.emplace_back(
-			// 			CAENGroupConfig{
-			// 				.Number = ch,
-			// 				.TriggerMask = CAEN_conf[ch_toml]["TrgMask"].value_or<uint8_t>(0),
-			// 				.AcquisitionMask = CAEN_conf[ch_toml]["AcqMask"].value_or<uint8_t>(0),
-			// 				.DCOffset = CAEN_conf[ch_toml]["Offset"].value_or<uint16_t>(0x8000u),
-			// 				.DCRange = CAEN_conf[ch_toml]["Range"].value_or<uint8_t>(0u),
-			// 				.TriggerThreshold = CAEN_conf[ch_toml]["Threshold"].value_or<uint16_t>(0x8000u)
-			// 			}
-			// 		);
-
-			// 		if(toml::array* arr = CAEN_conf[ch_toml]["Corrections"].as_array()) {
-			// 			spdlog::info("Corrections exist");
-			// 			size_t j = 0;
-			// 			CAENGroupConfig& last_config = cgui_state.GroupConfigs.back();
-			// 			for(toml::node& elem : *arr) {
-			// 				// Max number of channels there can be is 8
-			// 				if(j < 8){
-			// 					last_config.DCCorrections.emplace_back(
-			// 						elem.value_or(0u)
-			// 					);
-			// 					j++;
-			// 				}
-			// 			}
-			// 		}
-
-			// 	}
-			// }
 		}
 
 		// No copying
@@ -176,76 +82,6 @@ public:
 
 			ImPlot::StyleColorsDark();
 
-			// ImGui::Begin("Control Window");
-
-			// if (ImGui::BeginTabBar("ControlTabs")) {
-
-			// 	if(ImGui::BeginTabItem("Run")) {
-
-			// 		ImGui::InputText("Runs Directory", &i_run_dir);
-			// 		if(ImGui::IsItemHovered()) {
-			// 			ImGui::SetTooltip("Directory of where all the run "
-			// 				"files are going to be saved at.\n"
-			// 				"Fixed when the connect buttons are pressed.");
-			// 		}
-
-			// 		ImGui::InputText("Run name", &i_run_name);
-			// 		if(ImGui::IsItemHovered()) {
-			// 			ImGui::SetTooltip("Name of the run.\n"
-			// 				"Fixed when the connect buttons are pressed.");
-			// 		}
-
-			// 		ImGui::InputText("SiPM run name", &cgui_state.SiPMParameters);
-			// 		if(ImGui::IsItemHovered()) {
-			// 			ImGui::SetTooltip("This will appended to the name "
-			// 				"of the SiPM pulse file to denote that the these "
-			// 				"SiPM pulses where taken during this run but "
-			// 				"with different parameters (OV for example).\n"
-			// 				"Fixed when the Start SiPM data taking buttons "
-			// 				"is pressed.");
-			// 		}
-
-			// 		// This is the only button that does send a task to all
-			// 		// (so far) threads.
-			// 		// TODO(Hector): generalize this in the future
-			// 		CAENControlFac.Button(
-			// 			"Start Data Taking",
-			// 			[=](CAENInterfaceData& state) {
-			// 			// Only change state if its in a work related
-			// 			// state, i.e oscilloscope mode
-			// 			if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-			// 				state.CurrentState == CAENInterfaceStates::StatisticsMode) {
-			// 				state.CurrentState = CAENInterfaceStates::RunMode;
-			// 				state.SiPMParameters = cgui_state.SiPMParameters;
-			// 			}
-			// 			return true;
-			// 		});
-
-			// 		CAENControlFac.Button(
-			// 			"Stop Data Taking",
-			// 			[=](CAENInterfaceData& state) {
-			// 			if(state.CurrentState == CAENInterfaceStates::RunMode) {
-			// 				state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
-			// 				state.SiPMParameters = cgui_state.SiPMParameters;
-			// 			}
-			// 			return true;
-			// 		});
-			// 			// _teensyQueueF([=](TeensyControllerState& oldState) {
-			// 			// 	// There is nothing to do here technically
-			// 			// 	// but I am including it just in case
-			// 			// 	return true;
-			// 			// });
-			// 			// _caenQueueF();
-
-
-			// 		ImGui::EndTabItem();
-			// 	}
-
-			// 	teensy_tabs();
-			// 	caen_tabs();
-			// 	ImGui::EndTabBar();
-			// }
-			// ImGui::End();
 			controlWindow();
 
 			//// Plots

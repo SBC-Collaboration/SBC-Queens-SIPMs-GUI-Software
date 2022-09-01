@@ -93,6 +93,7 @@ public:
 
 
 				if (not tgui_state.RTDOnlyMode) {
+					ImGui::Separator();
 					ImGui::PushItemWidth(180);
 
 					ImGui::Text("Peltier PID");
@@ -106,6 +107,16 @@ public:
 							oldState.PeltierPIDState = tgui_state.PeltierPIDState;
 
 							return true;
+						}
+					);
+
+					TeensyControlFac.InputScalar("PID RTD",
+						tgui_state.PidRTD,
+						ImGui::IsItemEdited,
+						[=](TeensyControllerState& oldState) {
+								oldState.CommandToSend = TeensyCommands::SetPPIDRTD;
+								oldState.PidRTD = tgui_state.PidRTD;
+								return true;
 						}
 					);
 

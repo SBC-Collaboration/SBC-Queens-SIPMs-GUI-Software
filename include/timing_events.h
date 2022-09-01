@@ -200,6 +200,10 @@ namespace SBCQueens {
 			}
 		}
 
+		void ChangeWaitTime(const time_format& _new_time) {
+			_total_wait_time = _new_time;
+		}
+
 	private:
 		time_format _total_wait_time;
 		FuncName _f;
@@ -255,6 +259,10 @@ namespace SBCQueens {
 			}
 			
 
+		}
+
+		void ChangeWaitTime(const time_format& _new_time) {
+			_total_wait_time = _new_time;
 		}
 
 	private:
