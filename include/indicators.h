@@ -18,6 +18,7 @@ namespace SBCQueens {
 		RTD_TEMP_THREE,
 
 		VACUUM_PRESS,
+		PFEIFFER_PRESS,
 
 		LOCAL_BME_Temps,
 		LOCAL_BME_Pressure,

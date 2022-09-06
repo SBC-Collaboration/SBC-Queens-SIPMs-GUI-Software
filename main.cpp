@@ -17,6 +17,7 @@
 
 #include "TeensyControllerInterface.h"
 #include "CAENDigitizerInterface.h"
+#include "OtherDevicesInterface.h"
 #include "GUIManager.h"
 
 int main(int argc, char *argv[])
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
 	spdlog::info("Starting software");
 	SBCQueens::TeensyInQueue guiQueueOut;
 	SBCQueens::CAENQueue caenQueue;
+	SBCQueens::OtherInQueue otherQueue;
 	SBCQueens::GeneralIndicatorQueue giQueue;
 	SBCQueens::MultiplePlotQueue mpQueue;
 
@@ -34,6 +36,8 @@ int main(int argc, char *argv[])
 		guiQueueOut, 
 		// From GUI -> CAEN
 		caenQueue,
+		// From GUI -> slow DAQ
+		otherQueue,
 		// From Anyone -> GUI
 		giQueue,
 		// From Anyone -> GUI, auxiliary queue for dynamic plots
@@ -74,10 +78,19 @@ int main(int argc, char *argv[])
 
 	std::thread caen_thread(std::ref(caenc));
 
+	SBCQueens::OtherDevicesInterface otherc(
+		giQueue,
+		otherQueue,
+		mpQueue
+	);
+
+	std::thread other_thread(std::ref(otherc));
+
 	spdlog::info("Starting threads");
 
 	tc_thread.detach();
 	caen_thread.detach();
+	other_thread.detach();
 	gui_wrapper();
 
 	spdlog::info("Closing software");

@@ -2,6 +2,7 @@
 
 // std includes
 #include <algorithm>
+#include <functional>
 #include <ios>
 #include <memory>
 #include <string>
@@ -141,14 +142,16 @@ public:
 			}
 		}
 
-		virtual void operator()(const std::string& label, double& out,
+		template<typename OFFDATA>
+		void operator()(const std::string& label, OFFDATA& out,
 			const float& offset = 0) {
 			ImGui::Text(label.c_str()); ImGui::SameLine(offset);
 			ImGui::Button(_display.c_str());
-			out = val;
+			out = static_cast<OFFDATA>(val);
 		}
 
-		virtual void Draw(const std::string& label, double& out,
+		template<typename OFFDATA>
+		void Draw(const std::string& label, OFFDATA& out,
 			const float& offset = 0) {
 			this->operator()(label, out, offset);
 		}
@@ -169,17 +172,17 @@ public:
 
 	};
 
-	template<typename T, typename EqualityFunc>
+	template<typename T>
 	class BooleanIndicator : public Indicator<T> {
 
-		EqualityFunc _f;
+		std::function<bool(const double&)> _f;
 		ImVec4 offColor;
 		ImVec4 onColor;
 		ImVec4 currentColor;
 		bool isOn;
 
 public:
-		explicit BooleanIndicator(const T& id, EqualityFunc&& f)
+		explicit BooleanIndicator(const T& id, std::function<bool(const double&)>&& f)
 			: Indicator<T>(id), _f(f),
 			offColor(static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f))),
 			onColor(static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, 0.6f))),
@@ -197,13 +200,14 @@ public:
 		// Uses newVal.x to indicate the equality
 		void add(const IndicatorVector<T, OFFDATA>& newVal) {
 
-			isOn = _f(newVal);
+			isOn = _f(static_cast<double>(newVal.x));
 			currentColor = isOn ? onColor : offColor;
 
 		}
 
-		void operator()(const std::string& label, const float& offset = 0) {
+		void operator()(const std::string& label, bool& out, const float& offset = 0) {
 
+			out = isOn;
 			ImGui::Text(label.c_str()); ImGui::SameLine(offset);
 
 			ImGui::PushStyleColor(ImGuiCol_Button, currentColor);
@@ -216,23 +220,9 @@ public:
 
 		}
 
-		void operator()(const std::string& label, bool& ison, const float& offset = 0) {
 
-			ison = isOn;
-			ImGui::Text(label.c_str()); ImGui::SameLine(offset);
-
-			ImGui::PushStyleColor(ImGuiCol_Button, currentColor);
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, currentColor);
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, currentColor);
-
-			ImGui::Button(Indicator<T>::_imgui_stack.c_str(), ImVec2(15, 15));
-
-			ImGui::PopStyleColor(3);
-
-		}
-
-		void Draw(const std::string& label, const float& offset = 0) {
-			this->operator()(label, offset);
+		void Draw(const std::string& label, bool& out, const float& offset = 0) {
+			this->operator()(label, out, offset);
 		}
 	};
 
@@ -361,8 +351,11 @@ public:
 					indicator->ExecuteAttributes();
 
 					Plot<T>* plt = dynamic_cast<Plot<T>*>(indicator.get());
+					BooleanIndicator<T>* bind = dynamic_cast<BooleanIndicator<T>*>(indicator.get());
 					if(plt) {
 						plt->add(item);
+					} else if(bind) {
+						bind->add(item);
 					} else {
 						indicator->add(item);
 					}
@@ -380,9 +373,10 @@ public:
 			_q.enqueue(newP);
 		}
 
+		template<typename OFFDATA>
 		auto& indicator(const T& id,
 			const std::string& label,
-			double& out,
+			OFFDATA& out,
 			const float& offset = 0,
 			const unsigned int& precision = 6,
 			const NumericFormat& format = NumericFormat::Default) {
@@ -415,17 +409,16 @@ public:
 
 		}
 
-		template<typename EqualityFunc>
 		auto& booleanIndicator(const T& id, const std::string& label,
-			EqualityFunc&& f, const float& offset = 0) {
+			std::function<bool(const double&)>&& f, const float& offset = 0) {
 
 			_indicators.try_emplace(id,
-				std::make_unique<BooleanIndicator<T, EqualityFunc>>(id,
-					std::forward<EqualityFunc>(f)));
+				std::make_unique<BooleanIndicator<T>>(id,
+					std::forward<std::function<bool(const double&)>>(f)));
 
 			auto& ind = _indicators.at(id);
 
-			auto b = dynamic_cast<BooleanIndicator<T, EqualityFunc>*>(ind.get());
+			auto b = dynamic_cast<BooleanIndicator<T>*>(ind.get());
 			if(b) {
 				b->Draw(label, offset);
 			}
@@ -434,17 +427,16 @@ public:
 
 		}
 
-		template<typename EqualityFunc>
 		auto& booleanIndicator(const T& id, const std::string& label, bool& out,
-			EqualityFunc&& f, const float& offset = 0) {
+			std::function<bool(const double&)>&& f, const float& offset = 0) {
 
 			_indicators.try_emplace(id,
-				std::make_unique<BooleanIndicator<T, EqualityFunc>>(id,
-					std::forward<EqualityFunc>(f)));
+				std::make_unique<BooleanIndicator<T>>(id,
+					std::forward<std::function<bool(const double&)>>(f)));
 
 			auto& ind = _indicators.at(id);
 
-			auto b = dynamic_cast<BooleanIndicator<T, EqualityFunc>*>(ind.get());
+			auto b = dynamic_cast<BooleanIndicator<T>*>(ind.get());
 			if(b) {
 				b->Draw(label, out, offset);
 			}

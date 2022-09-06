@@ -15,7 +15,7 @@
 
 // My libraries includes
 #define RTD_ONLY_MODE
-#define NEW_RTD_BOARD
+// #define NEW_RTD_BOARD
 
 #include "SBCQueensTeensyBasics.h"
 #include "SBCQueensTeensyCommunications.h"
@@ -57,8 +57,9 @@ void prepare_rtd_conversion_cb(TimerHandle_t xTimer) {
 #else
     // The temperature sensor needs an extra step to take
     // a measurement. We require to enable Vbias and wait 10 ms
-    SBCQueens::max31865_prepare_measurement(SBCQueens::RTD_DAC_01);
-    SBCQueens::max31865_prepare_measurement(SBCQueens::RTD_DAC_02);
+    for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
+        SBCQueens::max31865_prepare_measurement(SBCQueens::RTD_BOARDS[i]);
+    }
 #endif
 
     // Trigger the new timer
@@ -77,8 +78,9 @@ void retrieve_rtd_conversion_cb(TimerHandle_t xTimer) {
         SBCQueens::RTDboard_take_meas(SBCQueens::RTD_BOARDS[i]);
     }
 #else
-    SBCQueens::max31865_start_measurement(SBCQueens::RTD_DAC_01);
-    SBCQueens::max31865_start_measurement(SBCQueens::RTD_DAC_02);
+    for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
+        SBCQueens::max31865_start_measurement(SBCQueens::RTD_BOARDS[i]);
+    }
 #endif
 
     /// Current sensor ///
@@ -105,8 +107,9 @@ void sleep_rtd_cb(TimerHandle_t xTimer) {
     //     SBCQueens::RTDboard_translate_meas(SBCQueens::RTD_BOARDS[i]);
     // }
 #else 
-    SBCQueens::max31865_retrieve_measurement(SBCQueens::RTD_DAC_01);
-    SBCQueens::max31865_retrieve_measurement(SBCQueens::RTD_DAC_02);
+    for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
+        SBCQueens::max31865_retrieve_measurement(SBCQueens::RTD_BOARDS[i]);
+    }
 #endif
 
     /// Current sensor ///

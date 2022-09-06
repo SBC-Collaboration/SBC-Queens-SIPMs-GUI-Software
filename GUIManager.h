@@ -103,8 +103,6 @@ public:
 
 			}
 
-
-
 		}
 
 		// No copying
@@ -123,6 +121,7 @@ public:
 
 			// This functor updates the plots values from the queue.
 			GeneralIndicatorReceiver();
+			MultiPlotReceiver();
 
 			const auto g_axis_flags = ImPlotAxisFlags_AutoFit;
 			// /// Teensy-BME280 Plots
@@ -133,35 +132,39 @@ public:
 			}
 
 			if (ImGui::BeginTabBar("Other Plots")) {
-				if (ImGui::BeginTabItem("Local BME")) {
-					if (ImPlot::BeginPlot("Local BME", ImVec2(-1,0))) {
+				if(not tgui_state.SystemParameters.InRTDOnlyMode) {
+					if (ImGui::BeginTabItem("Local BME")) {
+						if (ImPlot::BeginPlot("Local BME", ImVec2(-1,0))) {
 
-						// We setup the axis
-						ImPlot::SetupAxes("time [s]", "Humidity [%]", g_axis_flags, g_axis_flags);
-						ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]", g_axis_flags | ImPlotAxisFlags_Opposite);
-						ImPlot::SetupAxis(ImAxis_Y2, "Temperature [degC]", g_axis_flags | ImPlotAxisFlags_Opposite);
+							// We setup the axis
+							ImPlot::SetupAxes("time [s]", "Humidity [%]", g_axis_flags, g_axis_flags);
+							ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]", g_axis_flags | ImPlotAxisFlags_Opposite);
+							ImPlot::SetupAxis(ImAxis_Y2, "Temperature [degC]", g_axis_flags | ImPlotAxisFlags_Opposite);
 
-						// This one does not need an SetAxes as it takes the default
-						// This functor is almost the same as calling ImPlot
-						GeneralIndicatorReceiver.plot(IndicatorNames::LOCAL_BME_Humidity, "Humidity");
+							// This one does not need an SetAxes as it takes the default
+							// This functor is almost the same as calling ImPlot
+							GeneralIndicatorReceiver.plot(IndicatorNames::LOCAL_BME_Humidity, "Humidity");
 
-						// We need to call SetAxes before ImPlot::PlotLines to let the API know
-						// the axis of our data
-						ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-						GeneralIndicatorReceiver.plot(IndicatorNames::LOCAL_BME_Temps, "Temperature");
+							// We need to call SetAxes before ImPlot::PlotLines to let the API know
+							// the axis of our data
+							ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+							GeneralIndicatorReceiver.plot(IndicatorNames::LOCAL_BME_Temps, "Temperature");
 
-						ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
-						GeneralIndicatorReceiver.plot(IndicatorNames::LOCAL_BME_Pressure, "Pressure");
+							ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
+							GeneralIndicatorReceiver.plot(IndicatorNames::LOCAL_BME_Pressure, "Pressure");
 
-						ImPlot::EndPlot();
+							ImPlot::EndPlot();
+						}
+
+						ImGui::EndTabItem();
 					}
-
-					ImGui::EndTabItem();
 				}
 
 				if (ImGui::BeginTabItem("Pressures")) {
 					if(ImPlot::BeginPlot("Pressures", ImVec2(-1, 0))) {
 						ImPlot::SetupAxes("time [s]", "P [Bar]", g_axis_flags, g_axis_flags);
+
+						GeneralIndicatorReceiver.plot(IndicatorNames::PFEIFFER_PRESS, "PFEIFFER");
 						GeneralIndicatorReceiver.plot(IndicatorNames::VACUUM_PRESS, "Vacuum line");
 
 						ImPlot::EndPlot();
@@ -187,22 +190,12 @@ public:
 				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::VACUUM_PRESS);
 			}
 
-			if (ImPlot::BeginPlot("PIDs", ImVec2(-1,0))) {
-				ImPlot::SetupAxes("time [s]", "Temperature [degC]", g_axis_flags, g_axis_flags);
-				ImPlot::SetupAxis(ImAxis_Y2, "Current [A]", g_axis_flags | ImPlotAxisFlags_Opposite);
+			if(not tgui_state.SystemParameters.InRTDOnlyMode) {
+				if (ImPlot::BeginPlot("PIDs", ImVec2(-1,0))) {
+					ImPlot::SetupAxes("time [s]", "Current [A]", g_axis_flags, g_axis_flags);
 
-				GeneralIndicatorReceiver.plot(IndicatorNames::RTD_TEMP_ONE, "RTD1");
-
-				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-				GeneralIndicatorReceiver.plot(IndicatorNames::PELTIER_CURR, "Peltier");
-
-				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
-				GeneralIndicatorReceiver.plot(IndicatorNames::RTD_TEMP_TWO, "RTD2");
-
-				ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
-				GeneralIndicatorReceiver.plot(IndicatorNames::RTD_TEMP_THREE, "RTD3");
-
-				ImPlot::EndPlot();
+					ImPlot::EndPlot();
+				}
 			}
 
 			if (ImPlot::BeginPlot("RTDs", ImVec2(-1,0))) {
@@ -211,7 +204,7 @@ public:
 				for(uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
 					for(uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
 
-						auto k = i*tgui_state.SystemParameters.NumRtdBoards +j;
+						auto k = i*tgui_state.SystemParameters.NumRtdsPerBoard +j;
 
 						if(k < rtd_names.size()) {
 							MultiPlotReceiver.plot(k, rtd_names[k]);
@@ -222,6 +215,8 @@ public:
 
 					}
 				}
+
+				ImPlot::EndPlot();
 
 			}
 
@@ -266,6 +261,14 @@ public:
 			cq.try_enqueue(
 				[](CAENInterfaceData& state) {
 					state.CurrentState = CAENInterfaceStates::Closing;
+					return true;
+				}
+			);
+
+		 	OtherInQueue& oq = std::get<OtherInQueue&>(_queues);
+			oq.try_enqueue(
+				[](OtherDevicesData& state) {
+					state.PFEIFFERState = PFEIFFERSSGState::Closing;
 					return true;
 				}
 			);

@@ -23,8 +23,8 @@ namespace SBCQueens {
 
 		_indicatorReceiver.booleanIndicator(IndicatorNames::IS_RTD_ONLY, "Is RTD only",
 			TeensyData.SystemParameters.InRTDOnlyMode,
-			[=](const auto& newVal) {
-				return newVal.x > 0;
+			[=](const double& newVal) -> bool {
+				return newVal > 0;
 			}, 200
 		);
 

@@ -30,15 +30,13 @@ namespace SBCQueens {
     }
 
     void to_json(json& j, const RTDs& p) {
-    	j = json{{"RTDT1", p.RTD_1.Temperature}};
-    	j = json{{"RTDT2", p.RTD_2.Temperature}};
+
     }
 
 
     void from_json(const json& j, RTDs& p) {
     	p.time = get_current_time_epoch();
-    	j.at("RTDT1").get_to(p.RTD_1.Temperature);
-    	j.at("RTDT2").get_to(p.RTD_2.Temperature);
+    	j.at("RTDT").get_to(p.RTDS);
     }
 
     void to_json(json& j, const RawRTDs& p) {

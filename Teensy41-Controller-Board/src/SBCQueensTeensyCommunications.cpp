@@ -55,7 +55,11 @@ namespace SBCQueens {
         board_index = board_index >= NUM_RTD_BOARDS ? NUM_RTD_BOARDS - 1 : board_index;
 
         uint16_t rtd_index = index % NUM_RTD_PER_BOARD;
+    #ifdef NEW_RTD_BOARD
         PELTIER_PID.REGISTERS.LATEST_CONTROL = &RTD_BOARDS[board_index].LAST_TEMP_VAL[rtd_index];
+    #else 
+        PELTIER_PID.REGISTERS.LATEST_CONTROL = &RTD_BOARDS[board_index].REGISTERS.LAST_TEMP_REG;
+    #endif
     }
 
     void SET_PPID(float newVal) {
@@ -100,6 +104,7 @@ namespace SBCQueens {
     }
 
     void RTD_BANK_MASK(float newVal) {
+    #ifdef NEW_RTD_BOARD
         auto mask = static_cast<uint32_t>(newVal);
 
         for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
@@ -130,23 +135,24 @@ namespace SBCQueens {
             //
             // Hope this made it clearer.
         }   
+    #endif
     }
 
     void GET_SYS_PARAMETERS(float) {
         Serial.print("{");
-        Serial.print("\"NUM_RTD_BOARDS\"");
+        Serial.print("\"NUM_RTD_BOARDS\":");
         Serial.print(NUM_RTD_BOARDS);
         Serial.print(",");
 
-        Serial.print("\"NUM_RTDS_PER_BOARD\"");
+        Serial.print("\"NUM_RTDS_PER_BOARD\":");
         Serial.print(NUM_RTD_PER_BOARD);
         Serial.print(",");
 
-        Serial.print("\"RTD_ONLY_MODE\"");
+        Serial.print("\"RTD_ONLY_MODE\":");
     #ifdef RTD_ONLY_MODE
-        Serial.print(1);
+        Serial.print("true");
     #else
-        Serial.print(0);
+        Serial.print("false");
     #endif;
         Serial.println("}");
     }
@@ -197,27 +203,20 @@ namespace SBCQueens {
             }
         }
 
-        Serial.print("\"RTDT\":[");
+        
 #else
-        float f_send_vals[] = {
-            RTD_DAC_01.REGISTERS.LAST_TEMP_REG,
-            RTD_DAC_02.REGISTERS.LAST_TEMP_REG
-        };
-
-        const char* names[] = {
-            "\"RTDT1\":",
-            "\"RTDT2\":",
-        };
+        float f_send_vals[NUM_RTD_BOARDS * NUM_RTD_PER_BOARD];
+        for(uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
+            for(uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
+                f_send_vals[i] = RTD_BOARDS[i].REGISTERS.LAST_TEMP_REG;
+            }
+        }
 #endif
+
+        Serial.print("\"RTDT\":[");
 
         const uint16_t size_f_send_vals = (sizeof(f_send_vals) / sizeof(float));
         for(unsigned int i = 0; i < size_f_send_vals; i++) {
-
-#ifndef NEW_RTD_BOARD
-            // Send the name first
-            length = strlen(names[i]);
-            Serial.print(names[i]);
-#endif
 
             // Now the values
             // We limiting the sending of the values to 4 digits after the decimal point
@@ -234,9 +233,7 @@ namespace SBCQueens {
             
         }
 
-#ifdef NEW_RTD_BOARD
         Serial.print("]");
-#endif
         Serial.println("}");
     }
 

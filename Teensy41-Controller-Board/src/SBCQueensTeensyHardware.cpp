@@ -12,8 +12,7 @@ namespace SBCQueens {
 #ifdef NEW_RTD_BOARD
 	RTDBoard<NUM_RTD_PER_BOARD> RTD_BOARDS[NUM_RTD_BOARDS];
 #else 
-	MAX31865_t RTD_DAC_01;
-	MAX31865_t RTD_DAC_02;
+	MAX31865_t RTD_BOARDS[NUM_RTD_BOARDS];
 #endif
 
 	PID PELTIER_PID;
@@ -45,13 +44,13 @@ namespace SBCQueens {
 		RTD_BOARDS[0].ADC_CS[1]							= 22;
 		RTD_BOARDS[0].ADC_CS[2]							= 21;
 #else
-		RTD_DAC_01.CS_PIN                           = RTD_ONE_CS;
-		RTD_DAC_01.State                            = MAX31865_STATES::SLEEP;
-		RTD_DAC_01.Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
+		RTD_BOARDS[0].CS_PIN                           = RTD_ONE_CS;
+		RTD_BOARDS[0].State                            = MAX31865_STATES::SLEEP;
+		RTD_BOARDS[0].Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
 
-		RTD_DAC_02.CS_PIN                           = RTD_TWO_CS;
-		RTD_DAC_02.State                            = MAX31865_STATES::SLEEP;
-		RTD_DAC_02.Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
+		RTD_BOARDS[1].CS_PIN                           = RTD_TWO_CS;
+		RTD_BOARDS[1].State                            = MAX31865_STATES::SLEEP;
+		RTD_BOARDS[1].Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
 #endif
 
 		PELTIER_PID.State                        	= PID_STATE::SLEEP; // starts at sleep
@@ -61,7 +60,11 @@ namespace SBCQueens {
 		PELTIER_PID.OutputMin                   	= 0;				// 0 min
 		PELTIER_PID.DeltaTime                   	= 100.0;			// ms
 		PELTIER_PID.Ouput               			= &PELTIER_DRIVER.REGISTERS.LAST_DAC_REG;
+#ifdef NEW_RTD_BOARD
 		PELTIER_PID.REGISTERS.LATEST_CONTROL 		= &RTD_BOARDS[0].LAST_TEMP_VAL[0];
+#else
+		PELTIER_PID.REGISTERS.LATEST_CONTROL 		= &RTD_BOARDS[0].REGISTERS.LAST_TEMP_REG;
+#endif
 		PELTIER_PID.REGISTERS.LATEST_SET 			= &PELTIER_DRIVER.REGISTERS.LAST_CURRENT_REG;
 		PELTIER_PID.REGISTERS.DESIRED_SET_VAL 		= 5.0;	// amps max
 		PELTIER_PID.REGISTERS.SET_KP 				= 100;	// pid values have been tested and proven

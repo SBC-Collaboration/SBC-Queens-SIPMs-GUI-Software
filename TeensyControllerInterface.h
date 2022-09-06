@@ -83,14 +83,9 @@ namespace SBCQueens {
 		PeltierValues PID;
 	};
 
-	struct RTDValues {
-		double Temperature;
-	};
-
 	struct RTDs {
 		double time;
-		RTDValues RTD_1;
-		RTDValues RTD_2;
+		std::vector<double> RTDS;
 	};
 
 	struct RawRTDs {
@@ -343,12 +338,13 @@ namespace SBCQueens {
 
 		TeensyControllerState state_of_everything;
 		IndicatorSender<IndicatorNames> TeensyIndicatorSender;
+		IndicatorSender<uint16_t> MultiPlotSender;
 
 		double _init_time;
 
 		DataFile<Peltiers> _PeltiersFile;
 		DataFile<Pressures> _PressuresFile;
-		DataFile<RawRTDs> _RTDsFile;
+		DataFile<RTDs> _RTDsFile;
 		DataFile<BMEs> _BMEsFile;
 
 		serial_ptr port;
@@ -357,7 +353,8 @@ namespace SBCQueens {
 
 	explicit TeensyControllerInterface(Queues&... queues)
 			: _queues(forward_as_tuple(queues...)),
-			TeensyIndicatorSender(std::get<GeneralIndicatorQueue&>(_queues)) { }
+			TeensyIndicatorSender(std::get<GeneralIndicatorQueue&>(_queues)),
+			MultiPlotSender(std::get<MultiplePlotQueue&>(_queues)) { }
 
 		// No copying
 		TeensyControllerInterface(const TeensyControllerInterface&) = delete;
@@ -413,9 +410,9 @@ namespace SBCQueens {
 				switch(state_of_everything.CurrentState) {
 
 					case TeensyControllerStates::Standby:
-						// do nothing
-						// only way to get out of this state is by the GUI
-						// starting a connection
+					// do nothing
+					// only way to get out of this state is by the GUI
+					// starting a connection
 						std::this_thread::sleep_for(
 							std::chrono::milliseconds(100));
 						break;
@@ -505,6 +502,7 @@ namespace SBCQueens {
 
 					case TeensyControllerStates::Closing:
 						spdlog::info("Going to close the Teensy thread.");
+						disconnect(port);
 						return false;
 
 					case TeensyControllerStates::NullState:
@@ -584,6 +582,8 @@ private:
 			send_ts_cmd_b(TeensyCommands::SetPPIDTempTd);
 			send_ts_cmd_b(TeensyCommands::SetPPIDTempTi);
 
+			flush(port);
+
 			retrieve_data(state_of_everything, TeensyCommands::GetSystemParameters,
 			[&](json& parse, auto& msg) {
 				try{
@@ -591,6 +591,9 @@ private:
 					auto system_pars = parse.get<TeensySystemPars>();
 
 					state_of_everything.SystemParameters = system_pars;
+
+					spdlog::info("{0}, {1}, {2}", system_pars.NumRtdBoards,
+						system_pars.NumRtdsPerBoard, system_pars.InRTDOnlyMode);
 
 					TeensyIndicatorSender(IndicatorNames::NUM_RTD_BOARDS,
 						state_of_everything.SystemParameters.NumRtdBoards );
@@ -648,45 +651,26 @@ private:
 		}
 
 		void retrieve_rtds(TeensyControllerState& teensyState) {
-			retrieve_data(teensyState, TeensyCommands::GetRawRTDs,
+			retrieve_data(teensyState, TeensyCommands::GetRTDs,
 			[&](json& parse, auto& msg) {
 				try {
 
-					auto rtds = parse.get<RawRTDs>();
+					auto rtds = parse.get<RTDs>();
 
 					// Time since communication with the Teensy
 					double dt = (rtds.time - _init_time) / 1000.0;
 
-					auto rtd_one = __res_to_temperature(
-						__calibrate_curve(0, rtds.RTDS[0])
-					);
-					auto rtd_two = __res_to_temperature(
-						__calibrate_curve(1, rtds.RTDS[1])
-					);
-					auto rtd_three = __res_to_temperature(
-						__calibrate_curve(2, rtds.RTDS[2])
-					);
-
 					// Send them to GUI to draw them
-					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_ONE,
-						dt, rtd_one);
-					TeensyIndicatorSender(IndicatorNames::LATEST_RTD1_TEMP,
-						rtd_one);
-
-					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_TWO,
-						dt, rtd_two);
-					TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
-						rtd_two);
-
-					TeensyIndicatorSender(IndicatorNames::RTD_TEMP_THREE,
-						dt, rtd_three);
+					for(uint16_t i = 0; i < rtds.RTDS.size(); i++) {
+						MultiPlotSender(i, dt, rtds.RTDS[i]);
+					}
 
 					_RTDsFile->Add(rtds);
 
 				} catch (... ) {
 					spdlog::warn("Failed to parse latest data from {0}. "
 								"Message received from Teensy: {1}",
-								cTeensyCommands.at(TeensyCommands::GetRawRTDs),
+								cTeensyCommands.at(TeensyCommands::GetRTDs),
 								msg.value());
 					flush(port);
 				}
@@ -809,7 +793,7 @@ private:
 					spdlog::info("Saving teensy data...");
 
 					async_save(_RTDsFile,
-						[](const RawRTDs& rtds) {
+						[](const RTDs& rtds) {
 							std::string out = "";
 							for (const auto& rtd : rtds.RTDS) {
 								out += std::to_string(rtd);
@@ -948,8 +932,7 @@ private:
 
 			}
 
-			if(cmd != TeensyCommands::GetSystemParameters
-				&& cmd != TeensyCommands::GetBMEs
+			if(cmd != TeensyCommands::GetBMEs
 				&& cmd != TeensyCommands::GetRTDs
 				&& cmd != TeensyCommands::GetRawRTDs
 				&& cmd != TeensyCommands::GetPeltiers
