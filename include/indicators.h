@@ -1,6 +1,7 @@
 #pragma once
 
 #include "implot_helpers.h"
+#include <cstdint>
 
 namespace SBCQueens {
 
@@ -46,10 +47,13 @@ namespace SBCQueens {
 	};
 
 
-	using SiPMsPlotQueue = IndicatorsQueue<IndicatorNames, double>;
-	using RTDIndicator = Indicator<uint16_t>;
-	using TeensyIndicator = Indicator<IndicatorNames>;
-	using SiPMIndicator = Indicator<IndicatorNames>;
-	using SiPMPlot = Plot<IndicatorNames>;
+	using GeneralIndicatorQueue = IndicatorsQueue<IndicatorNames, double>;
+	using MultiplePlotQueue = IndicatorsQueue<uint16_t, double>;
+	// using SiPMQueue = IndicatorsQueue<uint16_t, double>;
+
+	// using RTDIndicator = Indicator<uint16_t>;
+	// using TeensyIndicator = Indicator<IndicatorNames>;
+	// using SiPMIndicator = Indicator<IndicatorNames>;
+	// using SiPMPlot = Plot<IndicatorNames>;
 
 } // namespace SBCQueens

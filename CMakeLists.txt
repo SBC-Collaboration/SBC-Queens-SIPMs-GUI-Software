@@ -233,8 +233,9 @@ include_directories(./include)
 file(GLOB sources *.cpp)
 file(GLOB srcsources ./src/*.cpp)
 file(GLOB renderers ./src/rendering_wrappers/*.cpp)
+file(GLOB guis ./src/GUI/*.cpp)
 
-add_executable(SiPMControlGUI ${sources} ${srcsources} ${renderers})
+add_executable(SiPMControlGUI ${sources} ${srcsources} ${renderers} ${guis})
 
 target_compile_features(SiPMControlGUI PUBLIC cxx_std_17)
 

@@ -20,8 +20,6 @@
 #include "file_helpers.h"
 #include "caen_helper.h"
 #include "implot_helpers.h"
-#include "include/caen_helper.h"
-#include "include/timing_events.h"
 #include "indicators.h"
 #include "spdlog/spdlog.h"
 #include "timing_events.h"
@@ -111,7 +109,7 @@ namespace SBCQueens {
 public:
 		explicit CAENDigitizerInterface(Queues&... queues) : 
 			_queues(forward_as_tuple(queues...)),
-			_plotSender(std::get<SiPMsPlotQueue&>(_queues)) {
+			_plotSender(std::get<GeneralIndicatorQueue&>(_queues)) {
 			// This is possible because std::function can be assigned
 			// to whatever std::bind returns
 			standby_state = std::make_shared<CAENInterfaceState>(

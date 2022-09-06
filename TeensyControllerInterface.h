@@ -29,12 +29,11 @@
 #include <future>
 #include <map>
 
-#include <armadillo>
-
 // We need this because chrono has long names...
 namespace chrono = std::chrono; 
 
 // Third party includes
+#include <armadillo>
 #include <readerwriterqueue.h>
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
@@ -358,7 +357,7 @@ namespace SBCQueens {
 
 	explicit TeensyControllerInterface(Queues&... queues)
 			: _queues(forward_as_tuple(queues...)),
-			TeensyIndicatorSender(std::get<SiPMsPlotQueue&>(_queues)) { }
+			TeensyIndicatorSender(std::get<GeneralIndicatorQueue&>(_queues)) { }
 
 		// No copying
 		TeensyControllerInterface(const TeensyControllerInterface&) = delete;
@@ -574,7 +573,7 @@ private:
 					[&](auto cmd){
 						return send_teensy_cmd(cmd);
 					}
-				);
+			);
 
 			send_ts_cmd_b(TeensyCommands::SetRTDSamplingPeriod);
 			send_ts_cmd_b(TeensyCommands::SetRTDMask);
@@ -592,6 +591,15 @@ private:
 					auto system_pars = parse.get<TeensySystemPars>();
 
 					state_of_everything.SystemParameters = system_pars;
+
+					TeensyIndicatorSender(IndicatorNames::NUM_RTD_BOARDS,
+						state_of_everything.SystemParameters.NumRtdBoards );
+
+					TeensyIndicatorSender(IndicatorNames::NUM_RTDS_PER_BOARD,
+						state_of_everything.SystemParameters.NumRtdsPerBoard );
+
+					TeensyIndicatorSender(IndicatorNames::IS_RTD_ONLY,
+						state_of_everything.SystemParameters.InRTDOnlyMode );
 
 				} catch (... ) {
 					spdlog::warn("Failed to parse system data from {0}. "

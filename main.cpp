@@ -24,7 +24,8 @@ int main(int argc, char *argv[])
 	spdlog::info("Starting software");
 	SBCQueens::TeensyInQueue guiQueueOut;
 	SBCQueens::CAENQueue caenQueue;
-	SBCQueens::SiPMsPlotQueue plotQueue;
+	SBCQueens::GeneralIndicatorQueue giQueue;
+	SBCQueens::MultiplePlotQueue mpQueue;
 
 	// This is our GUI function which actually holds all of our buttons
 	// labels, inputs, graphs and ect
@@ -34,7 +35,9 @@ int main(int argc, char *argv[])
 		// From GUI -> CAEN
 		caenQueue,
 		// From Anyone -> GUI
-		plotQueue
+		giQueue,
+		// From Anyone -> GUI, auxiliary queue for dynamic plots
+		mpQueue
 	);
 	// This function just holds the rendering framework we are using
 	// all of them found under rendering_wrappers
@@ -56,14 +59,17 @@ int main(int argc, char *argv[])
 		// GUI -> Teensy
 		guiQueueOut,
 		// From Anyone -> GUI
-		plotQueue
+		giQueue,
+
+		mpQueue
 	);
 
 	std::thread tc_thread(std::ref(tc));
 
 	SBCQueens::CAENDigitizerInterface caenc(
-		plotQueue,
-		caenQueue
+		giQueue,
+		caenQueue,
+		mpQueue
 	);
 
 	std::thread caen_thread(std::ref(caenc));

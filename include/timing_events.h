@@ -108,9 +108,9 @@ namespace SBCQueens {
 
 		}
 
-	void ChangeWaitTime(const time_format& _new_time) {
-		_total_wait_time = _new_time;
-	}
+		void ChangeWaitTime(const time_format& _new_time) {
+			_total_wait_time = _new_time;
+		}
 
 	private:
 		bool _needToCall;

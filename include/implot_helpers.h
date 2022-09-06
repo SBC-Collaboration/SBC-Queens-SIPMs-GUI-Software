@@ -176,6 +176,7 @@ public:
 		ImVec4 offColor;
 		ImVec4 onColor;
 		ImVec4 currentColor;
+		bool isOn;
 
 public:
 		explicit BooleanIndicator(const T& id, EqualityFunc&& f)
@@ -196,12 +197,28 @@ public:
 		// Uses newVal.x to indicate the equality
 		void add(const IndicatorVector<T, OFFDATA>& newVal) {
 
-			currentColor = _f(newVal) ? onColor : offColor;
+			isOn = _f(newVal);
+			currentColor = isOn ? onColor : offColor;
 
 		}
 
 		void operator()(const std::string& label, const float& offset = 0) {
 
+			ImGui::Text(label.c_str()); ImGui::SameLine(offset);
+
+			ImGui::PushStyleColor(ImGuiCol_Button, currentColor);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, currentColor);
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, currentColor);
+
+			ImGui::Button(Indicator<T>::_imgui_stack.c_str(), ImVec2(15, 15));
+
+			ImGui::PopStyleColor(3);
+
+		}
+
+		void operator()(const std::string& label, bool& ison, const float& offset = 0) {
+
+			ison = isOn;
 			ImGui::Text(label.c_str()); ImGui::SameLine(offset);
 
 			ImGui::PushStyleColor(ImGuiCol_Button, currentColor);
@@ -272,12 +289,12 @@ public:
 
 		// Returns the start of the X values
 		auto begin() const {
-			_x.begin();
+			return _x.begin();
 		}
 
 		// Returns the end of the X values
 		auto end() const {
-			_x.begin();
+			return _x.end();
 		}
 
 		// Executes attributes. For plots, it clears on new data.
@@ -417,6 +434,25 @@ public:
 
 		}
 
+		template<typename EqualityFunc>
+		auto& booleanIndicator(const T& id, const std::string& label, bool& out,
+			EqualityFunc&& f, const float& offset = 0) {
+
+			_indicators.try_emplace(id,
+				std::make_unique<BooleanIndicator<T, EqualityFunc>>(id,
+					std::forward<EqualityFunc>(f)));
+
+			auto& ind = _indicators.at(id);
+
+			auto b = dynamic_cast<BooleanIndicator<T, EqualityFunc>*>(ind.get());
+			if(b) {
+				b->Draw(label, out, offset);
+			}
+
+			return ind;
+
+		}
+
 		// auto& make_plot(const T& id) {
 		// 	_indicators.try_emplace(id,
 		// 		std::make_unique<Plot<T>>(id));
@@ -443,7 +479,7 @@ public:
 
 		}
 
-		void clear_plot(const T& id) {
+		void ClearPlot(const T& id) {
 			auto search = _indicators.find(id);
 			if(search != _indicators.end()) {
 				Plot<T>* plt = dynamic_cast<Plot<T>*>(
