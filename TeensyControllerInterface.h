@@ -448,29 +448,28 @@ namespace SBCQueens {
 									state_of_everything.RunDir
 									+ "/" + state_of_everything.RunName
 									+ "/Pressures.txt");
-						 		bool s = _PeltiersFile > 0;
+						 		bool s = (_PressuresFile != nullptr);
 
 								open(_RTDsFile,
 									state_of_everything.RunDir
 									+ "/" + state_of_everything.RunName
 									+ "/RTDs.txt");
-						 		s &= _RTDsFile > 0;
+						 		s = (_RTDsFile != nullptr) && s;
 
-								if (not state_of_everything.RTDOnlyMode) {
-									open(_PeltiersFile,
-										state_of_everything.RunDir
-										+ "/" + state_of_everything.RunName
-										+ "/Peltiers.txt");
-							 		s &= _PeltiersFile > 0;
+								open(_PeltiersFile,
+									state_of_everything.RunDir
+									+ "/" + state_of_everything.RunName
+									+ "/Peltiers.txt");
+						 		s = (_PeltiersFile != nullptr)  && s;
 
-									open(_BMEsFile,
-										state_of_everything.RunDir
-										+ "/" + state_of_everything.RunName
-										+ "/BMEs.txt");
-									s &= _BMEsFile > 0;
-								}
+								open(_BMEsFile,
+									state_of_everything.RunDir
+									+ "/" + state_of_everything.RunName
+									+ "/BMEs.txt");
+								s = (_BMEsFile != nullptr)  && s;
 
-								if(s) {
+
+								if(not s) {
 									spdlog::error("Failed to open files.");
 									state_of_everything.CurrentState =
 										TeensyControllerStates::Standby;

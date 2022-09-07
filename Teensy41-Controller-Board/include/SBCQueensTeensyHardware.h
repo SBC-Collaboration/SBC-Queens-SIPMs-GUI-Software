@@ -41,7 +41,7 @@ namespace SBCQueens {
     const uint8_t NUM_RTD_PER_BOARD = 3;
     extern RTDBoard<NUM_RTD_PER_BOARD> RTD_BOARDS[NUM_RTD_BOARDS];
 #else
-    const uint8_t NUM_RTD_BOARDS = 2;
+    const uint8_t NUM_RTD_BOARDS = 4;
     const uint8_t NUM_RTD_PER_BOARD = 1;
     extern MAX31865_t RTD_BOARDS[NUM_RTD_BOARDS];
 #endif

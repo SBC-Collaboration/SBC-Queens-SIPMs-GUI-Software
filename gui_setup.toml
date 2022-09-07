@@ -14,6 +14,7 @@ RTDSamplingPeriod = 100
 # where i is the board and k is the RTD
 # Depends on how many boards and RTDs are in each board.
 RTDMask = 0xFFFF
+RTDNames = ["SiPM1", "Block", "SiPM2"]
 
 PIDEnable = false
 PeltierTempSetpoint = -30

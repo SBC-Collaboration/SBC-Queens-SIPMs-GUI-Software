@@ -83,7 +83,7 @@ public:
 			indicatorWindow.init(config_file);
 			controlWindow.init(config_file);
 
-			if(toml::array* arr = t_conf["RTD_NAMES"].as_array()) {
+			if(toml::array* arr = t_conf["RTDNames"].as_array()) {
 
 				for(toml::node& elem : *arr) {
 
@@ -93,7 +93,7 @@ public:
 
 			}
 
-			if(toml::array* arr = t_conf["SIPM_NAMES"].as_array()) {
+			if(toml::array* arr = t_conf["SiPMNames"].as_array()) {
 
 				for(toml::node& elem : *arr) {
 
@@ -182,12 +182,15 @@ public:
 			// /// Teensy-PID Plots
 			ImGui::Begin("Teensy-PID Plots"); 
 			if(ImGui::Button("Clear")) {
-				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::RTD_TEMP_ONE);
-				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::RTD_TEMP_TWO);
-				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::RTD_TEMP_THREE);
-				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::PELTIER_CURR);
+				for(uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
+					for(uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
 
-				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::VACUUM_PRESS);
+						auto k = i*tgui_state.SystemParameters.NumRtdsPerBoard +j;
+
+						MultiPlotReceiver.ClearPlot(k);
+
+					}
+				}
 			}
 
 			if(not tgui_state.SystemParameters.InRTDOnlyMode) {

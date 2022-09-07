@@ -78,7 +78,7 @@ namespace ImGUIWrappers {
         }
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+Vulkan example", NULL, NULL);
+        GLFWwindow* window = glfwCreateWindow(1920, 1080, "SBC-Queens", NULL, NULL);
 
         // Setup Vulkan
         if (!glfwVulkanSupported())
