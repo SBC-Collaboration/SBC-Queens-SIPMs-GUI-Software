@@ -67,6 +67,7 @@ Threshold = 8000
 
 [Other]
 [Other.PFEIFFERSingleGauge]
+Port = "COM4"
 Enabled = true
 # 0 = 100ms, 1 = 1s, 2 = 1min
 Rate = 2

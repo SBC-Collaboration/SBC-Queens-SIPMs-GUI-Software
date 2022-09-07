@@ -1,4 +1,5 @@
 #include "GUI/ControlWindow.h"
+#include "misc/cpp/imgui_stdlib.h"
 
 namespace SBCQueens {
 
@@ -78,7 +79,7 @@ namespace SBCQueens {
 		const uint8_t c_MAX_CHANNELS = 64;
 		for(uint8_t ch = 0; ch < c_MAX_CHANNELS; ch++) {
 			std::string ch_toml = "group" + std::to_string(ch);
-			if(auto ch_conf = CAEN_conf[ch_toml].as_table()) {
+			if(CAEN_conf[ch_toml].as_table()) {
 
 				cgui_state.GroupConfigs.emplace_back(
 					CAENGroupConfig{
@@ -114,6 +115,7 @@ namespace SBCQueens {
 		other_state.RunName = i_run_name;
 
 		/// Other PFEIFFERSingleGauge
+		other_state.PFEIFFERPort = other_conf["PFEIFFERSingleGauge"]["Port"].value_or("");
 		other_state.PFEIFFERSingleGaugeEnable
 			= other_conf["PFEIFFERSingleGauge"]["Enabled"].value_or(false);
 		other_state.PFEIFFERSingleGaugeUpdateSpeed
@@ -177,9 +179,14 @@ namespace SBCQueens {
 				// The operator () carries the ImGUI drawing functions
 				// and the task it sends to its associated queue/thread
 				// is the lambda (callback) we pass
-				if(TeensyControlFac.Button("Connect",
+				//
+				// The double ## and the name is necessary if several
+				// controls share a same name in the same context/scope
+				// otherwise, ImGUI will not differentiate between them
+				// and causes issues.
+				if(TeensyControlFac.Button("Connect##teensy",
 					// To make things secure, we pass everything by value
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						// We copy the local state.
 						oldState = tgui_state;
 						oldState.RunDir = i_run_dir;
@@ -192,6 +199,7 @@ namespace SBCQueens {
 				// This is code that is run locally to this thread
 				// when the button is pressed
 				)) {
+					spdlog::info("Hello");
 					connected_mod = 0.5;
 				}
 
@@ -207,8 +215,8 @@ namespace SBCQueens {
 				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
 					static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
 
-				if(TeensyControlFac.Button("Disconnect",
-					[=](TeensyControllerState& oldState) {
+				if(TeensyControlFac.Button("Disconnect##teensy",
+					[=](TeensyControllerData& oldState) {
 						// No need to disconnect if its not connected
 						if(oldState.CurrentState == TeensyControllerStates::Connected) {
 							oldState.CurrentState
@@ -224,8 +232,6 @@ namespace SBCQueens {
 				ImGui::Separator();
 
 				static float c_connected_mod = 1.5;
-
-
 				static int caen_port = cgui_state.PortNum;
 				ImGui::InputInt("CAEN port", &caen_port);
 		        if (ImGui::IsItemHovered()) {
@@ -246,7 +252,7 @@ namespace SBCQueens {
 
 				// This button starts the CAEN communication and sends all
 				// the setup configuration
-				if(CAENControlFac.Button("Connect",
+				if(CAENControlFac.Button("Connect##caen",
 					[=](CAENInterfaceData& state) {
 
 						state = cgui_state;
@@ -261,7 +267,8 @@ namespace SBCQueens {
 
 					}
 				)) {
-					connected_mod = 0.5;
+					spdlog::info("Hello");
+					c_connected_mod = 0.5;
 				}
 
 				ImGui::PopStyleColor(3);
@@ -276,7 +283,7 @@ namespace SBCQueens {
 				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
 					static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, c_disconnected_mod*0.8f)));
 
-				if(CAENControlFac.Button("Disconnect",
+				if(CAENControlFac.Button("Disconnect##caen",
 					[=](CAENInterfaceData& state) {
 						// Only change the state if any of these states
 						if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
@@ -290,9 +297,75 @@ namespace SBCQueens {
 					}
 				)) {
 					// Local stuff
-					connected_mod = 1.5;
+					c_connected_mod = 1.5;
 				}
 
+				ImGui::PopStyleColor(3);
+				ImGui::Separator();
+
+
+				static float o_connected_mod = 1.5;
+				static std::string other_port = other_state.PFEIFFERPort;
+				ImGui::InputText("PFEIFFER port", &other_port);
+
+				ImGui::SameLine(300);
+				// Colors to pop up or shadow it depending on the conditions
+				ImGui::PushStyleColor(ImGuiCol_Button,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, o_connected_mod*0.6f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, o_connected_mod*0.7f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, o_connected_mod*0.8f)));
+
+				// This button starts the CAEN communication and sends all
+				// the setup configuration
+				if(SlowDAQControlFac.Button("Connect##sdaq",
+					[=](OtherDevicesData& state) {
+
+						state = other_state;
+						state.RunDir = i_run_dir;
+						state.RunName = i_run_name;
+
+						// Pfeiffer
+						state.PFEIFFERPort = other_port;
+						state.PFEIFFERState =
+							PFEIFFERSSGState::AttemptConnection;
+
+						return true;
+
+					}
+				)) {
+					spdlog::info("Hello");
+					o_connected_mod = 0.5;
+				}
+
+				ImGui::PopStyleColor(3);
+
+								/// Disconnect button
+				float o_disconnected_mod = 1.5 - o_connected_mod;
+				ImGui::SameLine();
+				ImGui::PushStyleColor(ImGuiCol_Button,
+					static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, o_disconnected_mod*0.6f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+					static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, o_disconnected_mod*0.7f)));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+					static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, o_disconnected_mod*0.8f)));
+
+				if(SlowDAQControlFac.Button("Disconnect##sdaq",
+					[=](OtherDevicesData& state) {
+						// Only change the state if any of these states
+						if(state.PFEIFFERState == PFEIFFERSSGState::AttemptConnection ||
+							state.PFEIFFERState == PFEIFFERSSGState::Connected){
+								spdlog::info("Going to disconnect the PFEIFFER");
+								state.PFEIFFERState = PFEIFFERSSGState::Disconnected;
+						}
+						return true;
+
+					}
+				)) {
+					// Local stuff
+					o_connected_mod = 1.5;
+				}
 				ImGui::PopStyleColor(3);
 
 				ImGui::PopItemWidth();

@@ -42,15 +42,15 @@ private:
 		IndicatorReceiver<uint16_t> MultiPlotReceiver;
 
 		// Teensy Controls
-		ControlLink<TeensyInQueue> TeensyControlFac;
-		TeensyControllerState tgui_state;
+		ControlLink<TeensyQueue> TeensyControlFac;
+		TeensyControllerData tgui_state;
 
 		// CAEN Controls
 		ControlLink<CAENQueue> CAENControlFac;
 		CAENInterfaceData cgui_state;
 
 		// Other controls
-
+		ControlLink<OtherQueue> SlowDAQControlFac;
 		OtherDevicesData other_state;
 
 		std::string i_run_dir;
@@ -65,13 +65,15 @@ private:
 
 public:
 		explicit GUIManager(QueueFuncs&... queues) : 
-			_queues(forward_as_tuple(queues...)),
+			_queues(std::forward_as_tuple(queues...)),
 			GeneralIndicatorReceiver 	(std::get<GeneralIndicatorQueue&>(_queues)),
 			MultiPlotReceiver 			(std::get<MultiplePlotQueue&>(_queues)),
-			TeensyControlFac 			(std::get<TeensyInQueue&>(_queues)),
+			TeensyControlFac 			(std::get<TeensyQueue&>(_queues)),
 			CAENControlFac 				(std::get<CAENQueue&>(_queues)),
+			SlowDAQControlFac 			(std::get<OtherQueue&>(_queues)),
 			indicatorWindow 			(GeneralIndicatorReceiver, tgui_state, other_state),
-			controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state, other_state) {
+			controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state,
+				SlowDAQControlFac, other_state) {
 
 			// When config_file goes out of scope, everything
 			// including the daughters get cleared
@@ -252,9 +254,9 @@ public:
 		void closing() {
 			// The only action to take is that we let the 
 			// Teensy Thread to close, too.
-			TeensyInQueue& tq = std::get<TeensyInQueue&>(_queues);
+			TeensyQueue& tq = std::get<TeensyQueue&>(_queues);
 		 	tq.try_enqueue(
-		 		[](TeensyControllerState& oldState) {
+		 		[](TeensyControllerData& oldState) {
 					oldState.CurrentState = TeensyControllerStates::Closing;
 					return true;
 				}
@@ -268,7 +270,7 @@ public:
 				}
 			);
 
-		 	OtherInQueue& oq = std::get<OtherInQueue&>(_queues);
+		 	OtherQueue& oq = std::get<OtherQueue&>(_queues);
 			oq.try_enqueue(
 				[](OtherDevicesData& state) {
 					state.PFEIFFERState = PFEIFFERSSGState::Closing;

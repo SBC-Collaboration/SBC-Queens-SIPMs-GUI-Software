@@ -22,14 +22,15 @@ namespace SBCQueens {
 		toml::table _config_table;
 
 		// Teensy Controls
-		ControlLink<TeensyInQueue>& TeensyControlFac;
-		TeensyControllerState& tgui_state;
+		ControlLink<TeensyQueue>& TeensyControlFac;
+		TeensyControllerData& tgui_state;
 
 		// CAEN Controls
 		ControlLink<CAENQueue>& CAENControlFac;
 		CAENInterfaceData& cgui_state;
 
 		//
+		ControlLink<OtherQueue>& SlowDAQControlFac;
 		OtherDevicesData& other_state;
 
 		std::string i_run_dir;
@@ -40,12 +41,12 @@ namespace SBCQueens {
 
 public:
 
-		ControlWindow(ControlLink<TeensyInQueue>& tc, TeensyControllerState& ts,
+		ControlWindow(ControlLink<TeensyQueue>& tc, TeensyControllerData& ts,
 			ControlLink<CAENQueue>& cc, CAENInterfaceData& cd,
-			OtherDevicesData& od) :
+			ControlLink<OtherQueue>& oc, OtherDevicesData& od) :
 			 TeensyControlFac(tc), tgui_state(ts),
 			 CAENControlFac(cc), cgui_state(cd),
-			 other_state(od),
+			 SlowDAQControlFac(oc), other_state(od),
 			 ttabs(tc, ts), ctabs(cc, cd)
 		{}
 

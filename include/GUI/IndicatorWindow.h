@@ -18,13 +18,13 @@ namespace SBCQueens {
 
 		toml::table _config_table;
 		IndicatorReceiver<IndicatorNames>& _indicatorReceiver;
-		TeensyControllerState& TeensyData;
+		TeensyControllerData& TeensyData;
 		OtherDevicesData& OtherDevData;
 
 public:
 
 		IndicatorWindow(IndicatorReceiver<IndicatorNames>& ir,
-			TeensyControllerState& td, OtherDevicesData& od)
+			TeensyControllerData& td, OtherDevicesData& od)
 			: _indicatorReceiver(ir), TeensyData(td), OtherDevData(od) {}
 
 		// Moving allowed

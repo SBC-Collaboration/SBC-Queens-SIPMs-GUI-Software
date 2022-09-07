@@ -23,9 +23,9 @@
 int main(int argc, char *argv[])
 {
 	spdlog::info("Starting software");
-	SBCQueens::TeensyInQueue guiQueueOut;
+	SBCQueens::TeensyQueue teensyQueue;
 	SBCQueens::CAENQueue caenQueue;
-	SBCQueens::OtherInQueue otherQueue;
+	SBCQueens::OtherQueue otherQueue;
 	SBCQueens::GeneralIndicatorQueue giQueue;
 	SBCQueens::MultiplePlotQueue mpQueue;
 
@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	// labels, inputs, graphs and ect
 	SBCQueens::GUIManager guiManager(
 		// From GUI -> Teensy
-		guiQueueOut, 
+		teensyQueue,
 		// From GUI -> CAEN
 		caenQueue,
 		// From GUI -> slow DAQ
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	// to read and write to the queue
 	SBCQueens::TeensyControllerInterface tc(
 		// GUI -> Teensy
-		guiQueueOut,
+		teensyQueue,
 		// From Anyone -> GUI
 		giQueue,
 

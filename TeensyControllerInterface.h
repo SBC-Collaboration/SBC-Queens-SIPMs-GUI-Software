@@ -285,7 +285,7 @@ namespace SBCQueens {
 
 	// It holds everything the outside world can modify or use.
 	// So far, I do not like teensy_serial is here.
-	struct TeensyControllerState {
+	struct TeensyControllerData {
 
 		std::string RunDir 		= "";
 		std::string RunName 	= "";
@@ -320,13 +320,13 @@ namespace SBCQueens {
 
 	};
 
-	using TeensyQueueInType
-		= std::function < bool(TeensyControllerState&) >;
+	using TeensyQueueType
+		= std::function < bool(TeensyControllerData&) >;
 
 	// single consumer, single sender queue for Tasks of the type
-	// bool(TeensyControllerState&) A.K.A TeensyQueueInType
-	using TeensyInQueue
-		= moodycamel::ReaderWriterQueue< TeensyQueueInType >;
+	// bool(TeensyControllerState&) A.K.A TeensyQueueType
+	using TeensyQueue
+		= moodycamel::ReaderWriterQueue< TeensyQueueType >;
 
 	template<typename... Queues>
 	class TeensyControllerInterface {
@@ -336,7 +336,7 @@ namespace SBCQueens {
 		std::tuple<Queues&...> _queues;
 		std::map<std::string, std::string> _crc_cmds;
 
-		TeensyControllerState state_of_everything;
+		TeensyControllerData state_of_everything;
 		IndicatorSender<IndicatorNames> TeensyIndicatorSender;
 		IndicatorSender<uint16_t> MultiPlotSender;
 
@@ -351,8 +351,8 @@ namespace SBCQueens {
 
 	public:
 
-	explicit TeensyControllerInterface(Queues&... queues)
-			: _queues(forward_as_tuple(queues...)),
+		explicit TeensyControllerInterface(Queues&... queues)
+			: _queues(std::forward_as_tuple(queues...)),
 			TeensyIndicatorSender(std::get<GeneralIndicatorQueue&>(_queues)),
 			MultiPlotSender(std::get<MultiplePlotQueue&>(_queues)) { }
 
@@ -374,23 +374,24 @@ namespace SBCQueens {
 			spdlog::info("Initializing teensy thread");
 
 			// GUI -> Teensy
-			TeensyInQueue& guiQueueOut = std::get<TeensyInQueue&>(_queues);
-			auto guiQueueFunc = [&guiQueueOut]() -> SBCQueens::TeensyQueueInType {
+			TeensyQueue& guiQueueOut = std::get<TeensyQueue&>(_queues);
+			auto guiQueueFunc = [&guiQueueOut]() -> SBCQueens::TeensyQueueType {
 
-				SBCQueens::TeensyQueueInType new_task;
+				SBCQueens::TeensyQueueType new_task;
 				bool success = guiQueueOut.try_dequeue(new_task);
 
 				if(success) {
+					spdlog::info("Received new teensy task");
 					return new_task;
 				} else { 
-					return [](SBCQueens::TeensyControllerState&) { return true; }; 
+					return [](SBCQueens::TeensyControllerData&) { return true; };
 				}
 			};
 
 
 			// Main loop lambda
 			auto main_loop = [&]() -> bool {
-				TeensyQueueInType task = guiQueueFunc();
+				TeensyQueueType task = guiQueueFunc();
 
 				// If the queue does not return a valid function, this call will
 				// do nothing and should return true always.
@@ -530,7 +531,7 @@ namespace SBCQueens {
 private:
 
 		template <class T>
-		void retrieve_data(TeensyControllerState& teensyState,
+		void retrieve_data(TeensyControllerData& teensyState,
 			const TeensyCommands& cmd, T&& f) {
 
 			if(!send_teensy_cmd(cmd)) {
@@ -618,7 +619,7 @@ private:
 			flush(port);
 		}
 
-		void retrieve_pids(TeensyControllerState& teensyState) {
+		void retrieve_pids(TeensyControllerData& teensyState) {
 
 			retrieve_data(teensyState, TeensyCommands::GetPeltiers,
 			[&](json& parse, auto& msg) {
@@ -649,7 +650,7 @@ private:
 
 		}
 
-		void retrieve_rtds(TeensyControllerState& teensyState) {
+		void retrieve_rtds(TeensyControllerData& teensyState) {
 			retrieve_data(teensyState, TeensyCommands::GetRTDs,
 			[&](json& parse, auto& msg) {
 				try {
@@ -677,7 +678,7 @@ private:
 			});
 		}
 
-		void retrieve_pressures(TeensyControllerState& teensyState) {
+		void retrieve_pressures(TeensyControllerData& teensyState) {
 			retrieve_data(teensyState, TeensyCommands::GetPressures,
 			[&](json& parse, auto& msg) {
 				try {
@@ -707,7 +708,7 @@ private:
 			});
 		}
 
-		void retrieve_bmes(TeensyControllerState& teensyState) {
+		void retrieve_bmes(TeensyControllerData& teensyState) {
 
 			retrieve_data(teensyState, TeensyCommands::GetBMEs,
 			[&](json& parse, auto& msg) {
@@ -740,7 +741,7 @@ private:
 
 		// It continuosly polls the Teensy for the latest data and saves it
 		// to the file and updates the GUI graphs
-		void update(TeensyControllerState& teensyState) {
+		void update(TeensyControllerData& teensyState) {
 
 			// We do not need this function to be out of this scope
 			// and make it static to call it once
@@ -748,7 +749,7 @@ private:
 				std::chrono::milliseconds(500),
 				// Lambda hacking to allow the class function to be pass to 
 				// make_total_timed_event. Is there any other way?
-				[&](TeensyControllerState& teensyState) {
+				[&](TeensyControllerData& teensyState) {
 					retrieve_pids(teensyState);
 				}
 			);
@@ -757,7 +758,7 @@ private:
 				std::chrono::milliseconds(100),
 				// Lambda hacking to allow the class function to be pass to
 				// make_total_timed_event. Is there any other way?
-				[&](TeensyControllerState& teensyState) {
+				[&](TeensyControllerData& teensyState) {
 					retrieve_rtds(teensyState);
 				}
 			);
@@ -766,7 +767,7 @@ private:
 				std::chrono::milliseconds(500),
 				// Lambda hacking to allow the class function to be pass to
 				// make_total_timed_event. Is there any other way?
-				[&](TeensyControllerState& teensyState) {
+				[&](TeensyControllerData& teensyState) {
 					retrieve_pressures(teensyState);
 				}
 			);
@@ -775,7 +776,7 @@ private:
 				std::chrono::milliseconds(114),  
 				// Lambda hacking to allow the class function to be pass to 
 				// make_total_timed_event. Is there any other way?
-				[&](TeensyControllerState& teensyState) {
+				[&](TeensyControllerData& teensyState) {
 					retrieve_bmes(teensyState);
 				}
 			);

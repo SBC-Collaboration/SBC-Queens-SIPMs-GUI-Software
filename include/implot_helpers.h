@@ -145,7 +145,7 @@ public:
 		template<typename OFFDATA>
 		void operator()(const std::string& label, OFFDATA& out,
 			const float& offset = 0) {
-			ImGui::Text(label.c_str()); ImGui::SameLine(offset);
+			ImGui::Text("%s", label.c_str()); ImGui::SameLine(offset);
 			ImGui::Button(_display.c_str());
 			out = static_cast<OFFDATA>(val);
 		}
@@ -208,7 +208,7 @@ public:
 		void operator()(const std::string& label, bool& out, const float& offset = 0) {
 
 			out = isOn;
-			ImGui::Text(label.c_str()); ImGui::SameLine(offset);
+			ImGui::Text("%s", label.c_str()); ImGui::SameLine(offset);
 
 			ImGui::PushStyleColor(ImGuiCol_Button, currentColor);
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, currentColor);

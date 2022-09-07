@@ -13,7 +13,7 @@ namespace SBCQueens {
 			TeensyControlFac.InputScalar("RTD Sampling Period (ms)",
 				tgui_state.RTDSamplingPeriod,
 				ImGui::IsItemEdited,
-				[=](TeensyControllerState& oldState) {
+				[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetRTDSamplingPeriod;
 						oldState.RTDSamplingPeriod = tgui_state.RTDSamplingPeriod;
 						return true;
@@ -23,7 +23,7 @@ namespace SBCQueens {
 			TeensyControlFac.InputScalar("RTD Mask",
 				tgui_state.RTDMask,
 				ImGui::IsItemEdited,
-				[=](TeensyControllerState& oldState) {
+				[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetRTDMask;
 						oldState.RTDMask = tgui_state.RTDMask;
 						return true;
@@ -34,7 +34,7 @@ namespace SBCQueens {
 				TeensyControlFac.Checkbox("Peltier Relay",
 					tgui_state.PeltierState,
 					ImGui::IsItemEdited,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPeltierRelay;
 						oldState.PeltierState = tgui_state.PeltierState;
 						return true;
@@ -75,7 +75,7 @@ namespace SBCQueens {
 					"Peltier ON/OFF",
 					tgui_state.PeltierPIDState,
 					ImGui::IsItemEdited,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 
 						oldState.CommandToSend = TeensyCommands::SetPPID;
 						oldState.PeltierPIDState = tgui_state.PeltierPIDState;
@@ -87,7 +87,7 @@ namespace SBCQueens {
 				TeensyControlFac.InputScalar("PID RTD",
 					tgui_state.PidRTD,
 					ImGui::IsItemEdited,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 							oldState.CommandToSend = TeensyCommands::SetPPIDRTD;
 							oldState.PidRTD = tgui_state.PidRTD;
 							return true;
@@ -114,7 +114,7 @@ namespace SBCQueens {
 				TeensyControlFac.InputScalar("Update Period (ms)",
 					tgui_state.PeltierPidUpdatePeriod,
 					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPPIDUpdatePeriod;
 						oldState.PeltierPidUpdatePeriod = tgui_state.PeltierPidUpdatePeriod;
 						return true;
@@ -125,7 +125,7 @@ namespace SBCQueens {
 					tgui_state.PIDTempTripPoint,
 					0.01f, 6.0f, "%.6f °C",
 					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPPIDTripPoint;
 						oldState.PIDTempTripPoint = tgui_state.PIDTempTripPoint;
 						return true;
@@ -136,7 +136,7 @@ namespace SBCQueens {
 					tgui_state.PIDTempValues.SetPoint,
 					0.01f, 6.0f, "%.6f °C",
 					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPPIDTempSetpoint;
 						oldState.PIDTempValues.SetPoint = tgui_state.PIDTempValues.SetPoint;
 						return true;
@@ -147,7 +147,7 @@ namespace SBCQueens {
 					tgui_state.PIDTempValues.Kp,
 					0.01f, 6.0f, "%.6f",
 					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPPIDTempKp;
 						oldState.PIDTempValues.Kp = tgui_state.PIDTempValues.Kp;
 						return true;
@@ -156,7 +156,7 @@ namespace SBCQueens {
 				TeensyControlFac.InputFloat("PTi",
 					tgui_state.PIDTempValues.Ti,
 					0.01f, 6.0f, "%.6f ms", ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPPIDTempTi;
 						oldState.PIDTempValues.Ti = tgui_state.PIDTempValues.Ti;
 						return true;
@@ -166,7 +166,7 @@ namespace SBCQueens {
 					tgui_state.PIDTempValues.Td,
 					0.01f, 6.0f, "%.6f ms",
 					ImGui::IsItemDeactivated,
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 						oldState.CommandToSend = TeensyCommands::SetPPIDTempTd;
 						oldState.PIDTempValues.Td = tgui_state.PIDTempValues.Td;
 						return true;
@@ -174,7 +174,7 @@ namespace SBCQueens {
 				);
 
 				TeensyControlFac.Button("Reset PPID",
-					[=](TeensyControllerState& oldState) {
+					[=](TeensyControllerData& oldState) {
 
 						oldState.CommandToSend = TeensyCommands::ResetPPID;
 

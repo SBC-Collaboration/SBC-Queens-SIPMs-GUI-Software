@@ -13,12 +13,12 @@ namespace SBCQueens {
 
 	class TeensyTabs {
 
-		ControlLink<TeensyInQueue>& TeensyControlFac;
-		TeensyControllerState& tgui_state;
+		ControlLink<TeensyQueue>& TeensyControlFac;
+		TeensyControllerData& tgui_state;
 
 public:
 
-		TeensyTabs(ControlLink<TeensyInQueue>& tc, TeensyControllerState& ts) :
+		TeensyTabs(ControlLink<TeensyQueue>& tc, TeensyControllerData& ts) :
 			TeensyControlFac(tc), tgui_state(ts) {}
 
 

@@ -56,11 +56,11 @@ namespace SBCQueens {
 	};
 
 
-	using OtherInQueueType
+	using OtherQueueType
 		= std::function < bool(OtherDevicesData&) >;
 
-	using OtherInQueue
-		= moodycamel::ReaderWriterQueue< OtherInQueueType >;
+	using OtherQueue
+		= moodycamel::ReaderWriterQueue< OtherQueueType >;
 
 	template<typename... Queues>
 	class OtherDevicesInterface {
@@ -96,10 +96,10 @@ namespace SBCQueens {
 			spdlog::info("Slow DAQ components: PFEIFFERSingleGauge");
 
 			// GUI -> Slow Daq
-			OtherInQueue& guiQueueOut = std::get<OtherInQueue&>(_queues);
-			auto guiQueueFunc = [&guiQueueOut]() -> SBCQueens::OtherInQueueType {
+			OtherQueue& guiQueueOut = std::get<OtherQueue&>(_queues);
+			auto guiQueueFunc = [&guiQueueOut]() -> SBCQueens::OtherQueueType {
 
-				SBCQueens::OtherInQueueType new_task;
+				SBCQueens::OtherQueueType new_task;
 				bool success = guiQueueOut.try_dequeue(new_task);
 
 				if(success) {
@@ -110,7 +110,7 @@ namespace SBCQueens {
 			};
 
 			auto main_loop = [&]() -> bool {
-				OtherInQueueType task = guiQueueFunc();
+				OtherQueueType task = guiQueueFunc();
 
 				// If the queue does not return a valid function, this call will
 				// do nothing and should return true always.
@@ -222,6 +222,8 @@ namespace SBCQueens {
 
 			// Actual loop!
 			while(main_loop_block_time());
+
+			spdlog::info("Closing");
 		}
 
 		void PFEIFFER_update() {
