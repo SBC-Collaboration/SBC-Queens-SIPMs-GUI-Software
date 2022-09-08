@@ -11,12 +11,73 @@ namespace SBCQueens {
 
 				port = std::make_unique<serial::Serial>(
 					port_name, 
-					2500000, 
+					2500000,
 					serial::Timeout::simpleTimeout(10),
 					serial::bytesize_t::eightbits,
 					serial::parity_t::parity_none,
 					serial::stopbits_t::stopbits_one,
 					serial::flowcontrol_t::flowcontrol_hardware
+				);
+
+			} catch(serial::IOException& e) {
+				spdlog::error("Port not opened: {0}", e.what());
+			} catch(serial::PortNotOpenedException& e) {
+				spdlog::error("Port not opened: {0}", e.what());
+			} catch (std::invalid_argument& e) {
+				spdlog::error("Invalid argument error: {0}", e.what());
+			}
+
+		} else {
+
+			// If port has been initialized, 
+			// we close it if possible and reopen!
+			if(port->isOpen()) {
+				port->close();
+			}
+
+			// These two functions can throw, we encapsulate them
+			// and release the resources in the case it does happen
+			try {
+				port->setPort(port_name);
+				port->open();
+			} catch(serial::IOException& e) {
+				spdlog::error("Port not opened: {0}", e.what());
+				port.reset();
+			} catch(serial::PortNotOpenedException& e) {
+				spdlog::error("Port not opened: {0}", e.what());
+				port.reset();
+			} catch (std::invalid_argument& e) {
+				spdlog::error("Invalid argument error: {0}", e.what());
+				port.reset();
+			}
+		}
+		
+		if(port) {
+			if(!port->isOpen()) {
+				// If its not open, something weird happened,
+				// we release the resources
+				port.reset();
+			} else {
+				port->flush();
+				port->readlines();
+			}
+		}
+	}
+
+	void connect_par(serial_ptr& port, const std::string& port_name, const SerialParams& sp) noexcept {
+// If port not initialized
+		if(!port) {
+			// These are the Teensy serial 
+			try {
+
+				port = std::make_unique<serial::Serial>(
+					port_name, 
+					sp.Baudrate,
+					sp.Timeout,
+					sp.Bytesize,
+					sp.Parity,
+					sp.Stopbits,
+					sp.Flowcontrol
 				);
 
 			} catch(serial::IOException& e) {
@@ -114,6 +175,8 @@ namespace SBCQueens {
 				spdlog::error("Port not open: {0}", e.what());
 			} catch (std::invalid_argument& e) {
 				spdlog::error("Invalid argument error: {0}", e.what());
+			} catch ( ... ) {
+				spdlog::error("Unknown error in send_msg");
 			}
 		} 
 

@@ -8,10 +8,23 @@
 #include <spdlog/spdlog.h>
 
 namespace SBCQueens {
+
+	struct SerialParams {
+		uint32_t Baudrate = 9600;
+		serial::Timeout Timeout = serial::Timeout();
+		serial::bytesize_t Bytesize = serial::bytesize_t::eightbits;
+		serial::parity_t Parity = serial::parity_t::parity_none;
+		serial::stopbits_t Stopbits = serial::stopbits_t::stopbits_one;
+		serial::flowcontrol_t Flowcontrol = serial::flowcontrol_t::flowcontrol_hardware;
+	};
+
 	using serial_ptr = std::unique_ptr<serial::Serial>;
 
 	/// Connects to port, if it fails serial_ptr will point to nullptr
 	void connect(serial_ptr& port, const std::string& port_name) noexcept;
+
+	/// Connects to port, if it fails serial_ptr will point to nullptr
+	void connect_par(serial_ptr& port, const std::string& port_name, const SerialParams& sp) noexcept;
 
 	// Disconnects the port. If port is nullptr, it does nothing.
 	// It does not release port.
@@ -61,6 +74,8 @@ namespace SBCQueens {
 				spdlog::error("Port not opened: {0}", e.what());
 			} catch (std::invalid_argument& e) {
 				spdlog::error("Invalid argument error: {0}", e.what());
+			} catch (...) {
+				spdlog::error("Unknown error in retrieve_msg");
 			}
 		} 
 

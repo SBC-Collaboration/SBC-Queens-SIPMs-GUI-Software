@@ -128,9 +128,11 @@ namespace SBCQueens {
 
 				switch(doe.PFEIFFERState) {
 
-					case PFEIFFERSSGState::AttemptConnection:
-
-						connect(_pfeiffers_port, doe.PFEIFFERPort);
+					case PFEIFFERSSGState::AttemptConnection: 
+					{
+						SerialParams ssp; 
+						ssp.Timeout = serial::Timeout::simpleTimeout(10);
+						connect_par(_pfeiffers_port, doe.PFEIFFERPort, ssp);
 
 						if(_pfeiffers_port) {
 							if(_pfeiffers_port->isOpen()) {
@@ -142,7 +144,7 @@ namespace SBCQueens {
 									+ "/PFEIFFERSSPressures.txt");
 						 		bool s = _pfeiffer_file > 0;
 
-								if(s) {
+								if(not s) {
 										spdlog::error("Failed to open files.");
 										doe.PFEIFFERState =
 											PFEIFFERSSGState::Standby;
@@ -152,6 +154,14 @@ namespace SBCQueens {
 										doe.PFEIFFERPort);
 
 										send_msg(_pfeiffers_port, "COM," +
+											std::to_string(static_cast<uint16_t> (
+												doe.PFEIFFERSingleGaugeUpdateSpeed)) + "\n",
+											"");
+
+
+										flush(_pfeiffers_port);
+
+										spdlog::info("Sent {0} ", "COM," +
 											std::to_string(static_cast<uint16_t> (
 												doe.PFEIFFERSingleGaugeUpdateSpeed)));
 
@@ -171,8 +181,9 @@ namespace SBCQueens {
 							doe.PFEIFFERState
 								= PFEIFFERSSGState::Standby;
 						}
-
+					}
 					break;
+
 
 					case PFEIFFERSSGState::Connected:
 
@@ -232,7 +243,7 @@ namespace SBCQueens {
 			PFEIFFERSingleGaugeSP::SLOW ? 60*1000 : doe.PFEIFFERSingleGaugeUpdateSpeed ==
 			PFEIFFERSingleGaugeSP::FAST ? 1000 : 100;
 
-			static auto retrieve_pids_nb = make_total_timed_event(
+			static auto retrieve_press_nb = make_total_timed_event(
 				std::chrono::milliseconds(retrieve_time),
 				// Lambda hacking to allow the class function to be pass to
 				// make_total_timed_event. Is there any other way?
@@ -241,16 +252,25 @@ namespace SBCQueens {
 					auto msg = retrieve_msg<std::string>(_pfeiffers_port);
 
 					if(msg.has_value()) {
-						auto split_msg = split(msg.value(), ",");
-						double pressure = std::stod(split_msg[1]);
-						double dt = get_current_time_epoch() - _init_time;
+						if(not msg.value().empty()) {
 
-						_plot_sender(IndicatorNames::PFEIFFER_PRESS, dt, pressure);
+							spdlog::info("{0}", msg.value());
+							auto split_msg = split(msg.value(), ",");
+
+							if(split_msg.size() > 1) {
+								double pressure = std::stod(split_msg[1]);
+								double dt = (get_current_time_epoch() - _init_time ) / 1000.0;
+
+								_plot_sender(IndicatorNames::PFEIFFER_PRESS, dt, pressure);
+							}
+
+						}
+
 					}
 				}
 			);
 
-			retrieve_pids_nb();
+			retrieve_press_nb();
 
 		}
 
