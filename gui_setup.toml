@@ -1,20 +1,20 @@
 [File]
 RunDir = "./RUNS"
-RunName = "TESTING"
+RunName = "COLD_TEST_01"
 
 [Teensy]
-Port = "/dev/ttyACM0"
+Port = "COM5"
 
 # If true, the Teensy is in RTD only mode.
 # cannot be changed during GUI
-RTDMode = false
+RTDMode = true
 # RTD sampling period in ms
-RTDSamplingPeriod = 100
+RTDSamplingPeriod = 1000
 # If bit n is set, it enabled the RTD at position (i, k)
 # where i is the board and k is the RTD
 # Depends on how many boards and RTDs are in each board.
 RTDMask = 0xFFFF
-RTDNames = ["SiPM1", "Block", "SiPM2"]
+#RTDNames = ["SiPM1", "Block", "SiPM2", "Whatever"]
 
 PIDEnable = false
 PeltierTempSetpoint = -30

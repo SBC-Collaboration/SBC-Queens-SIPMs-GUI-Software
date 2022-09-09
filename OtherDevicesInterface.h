@@ -31,6 +31,7 @@ namespace SBCQueens {
 	};
 
 	struct PFEIFFERSingleGaugeData {
+		double time;
 		double Pressure;
 	};
 
@@ -254,14 +255,19 @@ namespace SBCQueens {
 					if(msg.has_value()) {
 						if(not msg.value().empty()) {
 
-							spdlog::info("{0}", msg.value());
+							// spdlog::info("{0}", msg.value());
 							auto split_msg = split(msg.value(), ",");
 
 							if(split_msg.size() > 1) {
-								double pressure = std::stod(split_msg[1]);
+								double pressure = std::stod(split_msg[1]) / 1000.0;
 								double dt = (get_current_time_epoch() - _init_time ) / 1000.0;
 
 								_plot_sender(IndicatorNames::PFEIFFER_PRESS, dt, pressure);
+
+								PFEIFFERSingleGaugeData d;
+								d.Pressure = pressure;
+								d.time = get_current_time_epoch() ;
+								_pfeiffer_file->Add(d);
 							}
 
 						}
@@ -270,7 +276,20 @@ namespace SBCQueens {
 				}
 			);
 
+			static auto save_files = make_total_timed_event(
+				std::chrono::seconds(30),
+				[&](){
+					spdlog::info("Saving PFEIFFER data...");
+
+					async_save(_pfeiffer_file, [](const PFEIFFERSingleGaugeData& data) {
+						return std::to_string(data.time) + "," + std::to_string(data.Pressure) + "\n";
+					});
+				}
+			);
+
 			retrieve_press_nb();
+
+			save_files();
 
 		}
 

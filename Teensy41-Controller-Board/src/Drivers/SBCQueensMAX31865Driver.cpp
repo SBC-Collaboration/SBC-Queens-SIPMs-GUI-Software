@@ -82,7 +82,7 @@ namespace SBCQueens {
     temp = c_Z2 + (c_Z3 * Rtf);
     temp = (sqrt(temp) + c_Z1) / c_Z4;
 
-    if (temp >= 0.0)
+    // if (temp >= 0.0)
       return temp;
 
     // ugh.

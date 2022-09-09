@@ -119,7 +119,7 @@ public:
 			controlWindow();
 
 			//// Plots
-			ImGui::Begin("Teensy-BME280 Plots"); 
+			ImGui::Begin("Other Plots"); 
 
 			// This functor updates the plots values from the queue.
 			GeneralIndicatorReceiver();
@@ -131,6 +131,10 @@ public:
 				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::LOCAL_BME_Humidity);
 				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::LOCAL_BME_Temps);
 				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::LOCAL_BME_Pressure);
+
+				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::PFEIFFER_PRESS);
+				GeneralIndicatorReceiver.ClearPlot(IndicatorNames::VACUUM_PRESS);
+
 			}
 
 			if (ImGui::BeginTabBar("Other Plots")) {
