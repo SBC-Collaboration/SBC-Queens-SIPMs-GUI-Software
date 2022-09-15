@@ -662,6 +662,7 @@ private:
 
 					// Send them to GUI to draw them
 					for(uint16_t i = 0; i < rtds.RTDS.size(); i++) {
+						rtds.RTDS[i] += 273.15;
 						MultiPlotSender(i, dt, rtds.RTDS[i]);
 					}
 

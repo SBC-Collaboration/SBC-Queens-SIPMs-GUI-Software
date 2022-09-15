@@ -208,7 +208,7 @@ public:
 			}
 
 			if (ImPlot::BeginPlot("RTDs", ImVec2(-1,0))) {
-				ImPlot::SetupAxes("time [s]", "Temperature [degC]", g_axis_flags, g_axis_flags);
+				ImPlot::SetupAxes("time [s]", "Temperature [K]", g_axis_flags, g_axis_flags);
 
 				for(uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
 					for(uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {

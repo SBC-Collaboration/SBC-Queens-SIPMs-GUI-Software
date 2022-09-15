@@ -2,6 +2,8 @@
 
 // std includes
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <ios>
 #include <memory>
@@ -235,18 +237,23 @@ public:
 	template<typename T>
 	class Plot : public Indicator<T> {
 
-		std::vector< double > _x;
-		std::vector< double > _y;
-
 		bool Cleared = false;
 		bool ClearOnNewData = false;
+
+		std::size_t MaxSamples;
+		std::size_t CurrentNumSamples;
+
+		std::vector< double > _x;
+		std::vector< double > _y;
 
 public:
 		using type = T;
 		using data_type = double;
 
-		explicit Plot(const T& id, bool clearOnNewData = false)
-			: Indicator<T>(id), ClearOnNewData(clearOnNewData) {
+		explicit Plot(const T& id, const bool& clearOnNewData = false,
+			const std::size_t& maxSamples = 500e3) : Indicator<T>(id),
+			ClearOnNewData(clearOnNewData), MaxSamples(maxSamples),
+			CurrentNumSamples(0), _x(maxSamples), _y(maxSamples) {
 		}
 
 		// No moving
@@ -260,21 +267,27 @@ public:
 		void add(const IndicatorVector<T, OFFDATA>& v) {
 
 			if(v.ID == Indicator<T>::ID){
-				_x.push_back( static_cast<double>(v.x) );
-				_y.push_back( static_cast<double>(v.y) );
+
+				_x[CurrentNumSamples] =  static_cast<double>(v.x);
+				_y[CurrentNumSamples] =  static_cast<double>(v.y);
+
+				CurrentNumSamples++;
 			}
 
 		}
 
 		template<typename OFFDATA>
 		void add(const OFFDATA& x, const OFFDATA& y) {
-			_x.push_back( static_cast<double>(x) );
-			_y.push_back( static_cast<double>(y) );
+
+			_x[CurrentNumSamples] = static_cast<double>(x);
+			_y[CurrentNumSamples] = static_cast<double>(y);
+			CurrentNumSamples++;
 		}
 
 		void clear() {
-			_x.clear();
-			_y.clear();
+			CurrentNumSamples = 0;
+			_x[CurrentNumSamples] = 0;
+			_y[CurrentNumSamples] = 0;
 		}
 
 		// Returns the start of the X values
@@ -294,6 +307,7 @@ public:
 
 					clear();
 					Cleared = true;
+
 				}
 			}
 		}
@@ -306,7 +320,7 @@ public:
 
 		// Wraps ImPlot::PlotLine
 		void operator()(const std::string& label) {
-			ImPlot::PlotLine(label.c_str(), &_x.front(), &_y.front(), _x.size());
+			ImPlot::PlotLine(label.c_str(), &_x.front(), &_y.front(), CurrentNumSamples);
 		}
 
 		void Draw(const std::string& label) {
@@ -322,13 +336,13 @@ public:
 
 		IndicatorsQueue<T, DATA>& _q;
 		std::unordered_map<T, std::unique_ptr<Indicator<T>>> _indicators;
-		//std::unordered_map<T, std::unique_ptr<Plot<T>>> _plots;
 
 public:
 		using type = T;
 		using data_type = DATA;
 
 		explicit IndicatorReceiver(IndicatorsQueue<T, DATA>& q) : _q(q) { }
+
 
 		// No copying
 		IndicatorReceiver(const IndicatorReceiver&) = delete;
