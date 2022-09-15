@@ -242,6 +242,7 @@ public:
 
 		std::size_t MaxSamples;
 		std::size_t CurrentNumSamples;
+		std::size_t CurrentIndex;
 
 		std::vector< double > _x;
 		std::vector< double > _y;
@@ -253,7 +254,7 @@ public:
 		explicit Plot(const T& id, const bool& clearOnNewData = false,
 			const std::size_t& maxSamples = 500e3) : Indicator<T>(id),
 			ClearOnNewData(clearOnNewData), MaxSamples(maxSamples),
-			CurrentNumSamples(0), _x(maxSamples), _y(maxSamples) {
+			_x(maxSamples), _y(maxSamples) {
 		}
 
 		// No moving
@@ -268,10 +269,13 @@ public:
 
 			if(v.ID == Indicator<T>::ID){
 
-				_x[CurrentNumSamples] =  static_cast<double>(v.x);
-				_y[CurrentNumSamples] =  static_cast<double>(v.y);
+				_x[CurrentIndex] =  static_cast<double>(v.x);
+				_y[CurrentIndex] =  static_cast<double>(v.y);
 
-				CurrentNumSamples++;
+				CurrentNumSamples = CurrentNumSamples >= MaxSamples ? MaxSamples :
+				CurrentNumSamples + 1;
+
+				CurrentIndex = CurrentNumSamples >= MaxSamples ? 0 : CurrentIndex + 1;
 			}
 
 		}
@@ -279,13 +283,17 @@ public:
 		template<typename OFFDATA>
 		void add(const OFFDATA& x, const OFFDATA& y) {
 
-			_x[CurrentNumSamples] = static_cast<double>(x);
-			_y[CurrentNumSamples] = static_cast<double>(y);
-			CurrentNumSamples++;
+			_x[CurrentIndex] = static_cast<double>(x);
+			_y[CurrentIndex] = static_cast<double>(y);
+			CurrentNumSamples = CurrentNumSamples >= MaxSamples ? MaxSamples :
+			CurrentNumSamples + 1;
+
+			CurrentIndex = CurrentNumSamples >= MaxSamples ? 0 : CurrentIndex + 1;
 		}
 
 		void clear() {
 			CurrentNumSamples = 0;
+			CurrentIndex = 0;
 			_x[CurrentNumSamples] = 0;
 			_y[CurrentNumSamples] = 0;
 		}
@@ -320,7 +328,11 @@ public:
 
 		// Wraps ImPlot::PlotLine
 		void operator()(const std::string& label) {
-			ImPlot::PlotLine(label.c_str(), &_x.front(), &_y.front(), CurrentNumSamples);
+			// ImPlot::PlotLine(label.c_str(), &_x.front(), &_y.front(), CurrentNumSamples);
+			ImPlot::PlotLineG(label.c_str(), [&](void* data, int idx) -> ImPlotPoint {
+				std::size_t index = (idx + CurrentIndex) % CurrentNumSamples;
+				return ImPlotPoint(_x[index], _y[index]);
+			}, nullptr, CurrentNumSamples);
 		}
 
 		void Draw(const std::string& label) {
