@@ -282,7 +282,12 @@ namespace SBCQueens {
 					spdlog::info("Saving PFEIFFER data...");
 
 					async_save(_pfeiffer_file, [](const PFEIFFERSingleGaugeData& data) {
-						return std::to_string(data.time) + "," + std::to_string(data.Pressure) + "\n";
+
+						std::ostringstream out;
+						out.precision(4);
+						out << std::scientific;
+						out << data.Pressure;
+						return std::to_string(data.time) + "," + out.str() + "\n";
 					});
 				}
 			);

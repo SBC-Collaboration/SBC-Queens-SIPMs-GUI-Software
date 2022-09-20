@@ -229,6 +229,15 @@ public:
 	};
 
 
+	struct PlotData {
+		std::size_t CurrentNumSamples = 0;
+		std::size_t CurrentIndex = 0;
+
+		std::vector< std::pair <double, double> > Data;
+
+		PlotData(const std::size_t& max) : Data(max) {}
+	};
+
 	// A plot indicator. It inherits from indicator, but more out of necessity.
 	// It keeps the code clean, but it was really not necessary.
 	// Originally, a plot could be any type that was not double but
@@ -241,20 +250,16 @@ public:
 		bool ClearOnNewData = false;
 
 		std::size_t MaxSamples;
-		std::size_t CurrentNumSamples;
-		std::size_t CurrentIndex;
-
-		std::vector< double > _x;
-		std::vector< double > _y;
+		PlotData plotData;
 
 public:
 		using type = T;
 		using data_type = double;
 
 		explicit Plot(const T& id, const bool& clearOnNewData = false,
-			const std::size_t& maxSamples = 500e3) : Indicator<T>(id),
+			const std::size_t& maxSamples = 100e3) : Indicator<T>(id),
 			ClearOnNewData(clearOnNewData), MaxSamples(maxSamples),
-			_x(maxSamples), _y(maxSamples) {
+			plotData(maxSamples) {
 		}
 
 		// No moving
@@ -269,13 +274,13 @@ public:
 
 			if(v.ID == Indicator<T>::ID){
 
-				_x[CurrentIndex] =  static_cast<double>(v.x);
-				_y[CurrentIndex] =  static_cast<double>(v.y);
+				plotData.Data[plotData.CurrentIndex] = std::make_pair( static_cast<double>(v.x),
+					static_cast<double>(v.y));
 
-				CurrentNumSamples = CurrentNumSamples >= MaxSamples ? MaxSamples :
-				CurrentNumSamples + 1;
+				plotData.CurrentNumSamples = plotData.CurrentNumSamples< MaxSamples ? 
+					plotData.CurrentNumSamples + 1 : MaxSamples;
 
-				CurrentIndex = CurrentNumSamples >= MaxSamples ? 0 : CurrentIndex + 1;
+				plotData.CurrentIndex = plotData.CurrentIndex < MaxSamples ? plotData.CurrentIndex + 1 : 0;
 			}
 
 		}
@@ -283,30 +288,20 @@ public:
 		template<typename OFFDATA>
 		void add(const OFFDATA& x, const OFFDATA& y) {
 
-			_x[CurrentIndex] = static_cast<double>(x);
-			_y[CurrentIndex] = static_cast<double>(y);
-			CurrentNumSamples = CurrentNumSamples >= MaxSamples ? MaxSamples :
-			CurrentNumSamples + 1;
+			plotData.Data[plotData.CurrentIndex] = std::make_pair( static_cast<double>(x),
+					static_cast<double>(y));
+			plotData.CurrentNumSamples = plotData.CurrentNumSamples < MaxSamples ?
+				plotData.CurrentNumSamples + 1 : MaxSamples;
 
-			CurrentIndex = CurrentNumSamples >= MaxSamples ? 0 : CurrentIndex + 1;
+			plotData.CurrentIndex = plotData.CurrentIndex < MaxSamples ? plotData.CurrentIndex + 1 : 0;
 		}
 
 		void clear() {
-			CurrentNumSamples = 0;
-			CurrentIndex = 0;
-			_x[CurrentNumSamples] = 0;
-			_y[CurrentNumSamples] = 0;
+			plotData.CurrentNumSamples = 0;
+			plotData.CurrentIndex = 0;
+			plotData.Data[0] = std::make_pair(0.0, 0.0);
 		}
 
-		// Returns the start of the X values
-		auto begin() const {
-			return _x.begin();
-		}
-
-		// Returns the end of the X values
-		auto end() const {
-			return _x.end();
-		}
 
 		// Executes attributes. For plots, it clears on new data.
 		void ExecuteAttributes() {
@@ -329,15 +324,22 @@ public:
 		// Wraps ImPlot::PlotLine
 		void operator()(const std::string& label) {
 			// ImPlot::PlotLine(label.c_str(), &_x.front(), &_y.front(), CurrentNumSamples);
-			ImPlot::PlotLineG(label.c_str(), [&](void* data, int idx) -> ImPlotPoint {
-				std::size_t index = (idx + CurrentIndex) % CurrentNumSamples;
-				return ImPlotPoint(_x[index], _y[index]);
-			}, nullptr, CurrentNumSamples);
+
+			// static ImPlotGetter getter = static_cast<ImPlotGetter>(_transform);
+			static auto transform = [](int idx, void* data) {
+				auto myData = static_cast<PlotData*>(data);
+				std::size_t index = (idx + myData->CurrentIndex) % myData->CurrentNumSamples;
+				return ImPlotPoint(myData->Data[index].first, myData->Data[index].second);
+			};
+
+			ImPlot::PlotLineG(label.c_str(), transform, &plotData, plotData.CurrentNumSamples);
 		}
 
 		void Draw(const std::string& label) {
 			this->operator()(label);
 		}
+private:
+
 
 	};
 

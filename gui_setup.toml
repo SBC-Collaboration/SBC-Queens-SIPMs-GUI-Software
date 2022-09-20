@@ -3,7 +3,7 @@ RunDir = "./RUNS"
 RunName = "COLD_TEST_01"
 
 [Teensy]
-Port = "COM5"
+Port = "COM4"
 
 # If true, the Teensy is in RTD only mode.
 # cannot be changed during GUI
@@ -14,7 +14,7 @@ RTDSamplingPeriod = 1000
 # where i is the board and k is the RTD
 # Depends on how many boards and RTDs are in each board.
 RTDMask = 0xFFFF
-#RTDNames = ["SiPM1", "Block", "SiPM2", "Whatever"]
+RTDNames = ["Cold Head", "Top of support leg CU", "SiPM Panel","Lower seal",  "Horiz CU strap", "Cold CU bar"]
 
 PIDEnable = false
 PeltierTempSetpoint = -30
@@ -67,7 +67,7 @@ Threshold = 8000
 
 [Other]
 [Other.PFEIFFERSingleGauge]
-Port = "COM3"
+Port = "COM6"
 Enabled = true
 # 0 = 100ms, 1 = 1s, 2 = 1min
 Rate = 1
