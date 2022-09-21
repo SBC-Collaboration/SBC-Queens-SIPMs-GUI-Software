@@ -103,9 +103,9 @@ void sleep_rtd_cb(TimerHandle_t xTimer) {
         SBCQueens::RTDboard_standby(SBCQueens::RTD_BOARDS[i]);
     }
 
-    // for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
-    //     SBCQueens::RTDboard_translate_meas(SBCQueens::RTD_BOARDS[i]);
-    // }
+    for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
+        SBCQueens::RTDboard_translate_meas(SBCQueens::RTD_BOARDS[i]);
+    }
 #else 
     for(uint8_t i = 0; i < SBCQueens::NUM_RTD_BOARDS; i++) {
         SBCQueens::max31865_retrieve_measurement(SBCQueens::RTD_BOARDS[i]);
@@ -214,9 +214,10 @@ void serial_task(void* parameters) {
 
 void local_devices_initialization() {
 
+#ifndef RTD_ONLY_MODE
     SBCQueens::bme280_init(SBCQueens::LOCAL_BME280);
-
     SBCQueens::peltierdriver_init(SBCQueens::PELTIER_DRIVER);
+#endif
 
 }
 
@@ -237,7 +238,9 @@ FLASHMEM __attribute__((noinline)) void setup()
     SBCQueens::init_hardware_structs();
     local_devices_initialization();
 
+#ifndef RTD_ONLY_MODE
     SBCQueens::TCPID_init(SBCQueens::PELTIER_PID);
+#endif
     // /// !Hardware Initializations
 
     // // Tasks section

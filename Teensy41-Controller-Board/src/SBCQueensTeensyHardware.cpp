@@ -5,9 +5,14 @@
 
 namespace SBCQueens {
 
-	BME280_t LOCAL_BME280;
+#ifndef RTD_ONLY_MODE
 
+	BME280_t LOCAL_BME280;
 	PeltierDriver PELTIER_DRIVER;
+	PID PELTIER_PID;
+	AnalogReadMV VACUUM_PRESSURE_SENSOR;
+
+#endif
 
 #ifdef NEW_RTD_BOARD
 	RTDBoard<NUM_RTD_PER_BOARD> RTD_BOARDS[NUM_RTD_BOARDS];
@@ -15,13 +20,9 @@ namespace SBCQueens {
 	MAX31865_t RTD_BOARDS[NUM_RTD_BOARDS];
 #endif
 
-	PID PELTIER_PID;
-
-	AnalogReadMV VACUUM_PRESSURE_SENSOR;
-
 	void init_hardware_structs() {
 
-
+#ifndef RTD_ONLY_MODE
 		LOCAL_BME280.CS_PIN                         = BME_CS;
 		LOCAL_BME280.ConfValue                      = BME_CONFIG_VALS::LOWEST_T_FILTER_MAX;
 		LOCAL_BME280.ControlValue                   = BME_CONTROL_VALS::TEMP_ON_PRESS_ON_NORMAL;
@@ -37,12 +38,17 @@ namespace SBCQueens {
 		PELTIER_DRIVER.MAX_CURRENT              	= 5.0;
 		PELTIER_DRIVER.CurrentADCconfig         	= CURRENT_ADC_CONFIG_VALS::ADC_PID_OPTIMIZED_CONFIG;
 		PELTIER_DRIVER.OutputDACconfig          	= OUTPUT_DAC_CONFIG_VALS::DAC_PID_OPTIMIZED_CONFIG;
+#endif
 
 #ifdef NEW_RTD_BOARD
 		RTD_BOARDS[0].MCP23S08_CS 						= 20;
 		RTD_BOARDS[0].ADC_CS[0]							= 23;
 		RTD_BOARDS[0].ADC_CS[1]							= 22;
 		RTD_BOARDS[0].ADC_CS[2]							= 21;
+		RTD_BOARDS[1].MCP23S08_CS 						= 16;
+		RTD_BOARDS[1].ADC_CS[0]							= 19;
+		RTD_BOARDS[1].ADC_CS[1]							= 18;
+		RTD_BOARDS[1].ADC_CS[2]							= 17;
 #else
 		RTD_BOARDS[0].CS_PIN                           = RTD_ONE_CS;
 		RTD_BOARDS[0].State                            = MAX31865_STATES::SLEEP;
@@ -61,6 +67,7 @@ namespace SBCQueens {
 		RTD_BOARDS[3].Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
 #endif
 
+#ifndef RTD_ONLY_MODE
 		PELTIER_PID.State                        	= PID_STATE::SLEEP; // starts at sleep
 		PELTIER_PID.SET_EN							= true;				// there is a control/set
 		PELTIER_PID.OutputMax                   	= 0x0FFF; 			// 12 bits
@@ -95,6 +102,7 @@ namespace SBCQueens {
 
 		AnalogReadMV_init(VACUUM_PRESSURE_SENSOR);
 		// AnalogReadMV_init(NTWO_PRESSURE_SENSOR);
+#endif
 
 #ifdef NEW_RTD_BOARD
 		for ( uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
@@ -106,6 +114,7 @@ namespace SBCQueens {
 
 	void init_pins() {
 	/// Pin Initializations
+#ifndef RTD_ONLY_MODE
 		pinMode(        TWELVEV_PIN_ONE,    arduino::OUTPUT);
 		digitalWrite(   TWELVEV_PIN_ONE,    arduino::LOW);
 
@@ -133,6 +142,7 @@ namespace SBCQueens {
 
 		pinMode(        BOX_BME_CS,         arduino::OUTPUT);
 		digitalWrite(   BOX_BME_CS,         arduino::HIGH);
+#endif
 		/// !Pin Initializations
 	}
 

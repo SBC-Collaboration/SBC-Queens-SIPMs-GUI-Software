@@ -15,12 +15,16 @@ namespace SBCQueens {
 
     /// PIN DEFINITIONS
  
+#ifndef RTD_ONLY_MODE
     const uint8_t TWELVEV_PIN_ONE   = 2u;
     const uint8_t TWELVEV_PIN_TWO   = 3u;
     const uint8_t TWELVEV_PIN_THREE = 4u;
 
+#ifndef NEW_RTD_BOARD
     const uint8_t RTD_ONE_CS        = 5u;
     const uint8_t RTD_TWO_CS        = 6u;
+#endif
+
     const uint8_t BME_CS            = 7u;
     const uint8_t BOX_BME_CS        = 8u;
 
@@ -35,9 +39,13 @@ namespace SBCQueens {
     extern BME280_t LOCAL_BME280;
 
     extern PeltierDriver PELTIER_DRIVER;
+    extern PID PELTIER_PID;
+    extern AnalogReadMV VACUUM_PRESSURE_SENSOR;
+    
+#endif
 
 #ifdef NEW_RTD_BOARD
-    const uint8_t NUM_RTD_BOARDS = 1;
+    const uint8_t NUM_RTD_BOARDS = 2;
     const uint8_t NUM_RTD_PER_BOARD = 3;
     extern RTDBoard<NUM_RTD_PER_BOARD> RTD_BOARDS[NUM_RTD_BOARDS];
 #else
@@ -45,10 +53,6 @@ namespace SBCQueens {
     const uint8_t NUM_RTD_PER_BOARD = 1;
     extern MAX31865_t RTD_BOARDS[NUM_RTD_BOARDS];
 #endif
-
-    extern PID PELTIER_PID;
-
-    extern AnalogReadMV VACUUM_PRESSURE_SENSOR;
 
     // Initializes the internal data structures that are going to be used
     // to control and talk to the external hardware

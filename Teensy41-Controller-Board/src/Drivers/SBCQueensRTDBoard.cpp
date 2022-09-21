@@ -18,14 +18,13 @@ namespace SBCQueens {
         const float c_Z4 = 2 * c_RTD_B;
         
         float temp, Rtf;
-        Rtf = static_cast<float>(Rt);
-        Rtf = c_REF_RESISTOR*((Rtf / 32768) - 1.0);
+        Rtf = c_REF_RESISTOR*((Rt / 32768.0f) - 1.0f);
 
         temp = c_Z2 + (c_Z3 * Rtf);
         temp = (sqrt(temp) + c_Z1) / c_Z4;
 
-        if (temp >= 0.0)
-          return temp;
+        // if (temp >= 0.0)
+        return temp;
 
         // ugh.
         Rtf /= c_RTD_NOMINAL;

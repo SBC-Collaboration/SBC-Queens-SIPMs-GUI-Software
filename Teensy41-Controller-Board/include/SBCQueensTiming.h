@@ -10,12 +10,13 @@ namespace SBCQueens {
 
 	// Should be less than RTDSamplingTime
 	// Time it takes for the RTD to warm up and reach a steady state
-	const uint16_t c_RTDPrepareTime = 10; //ms
+	const uint16_t c_RTDPrepareTime = 20; //ms
 
 	// Should be less than (RTDSamplingTime - RTDPrepareTime)
 	// Time it takes for a single ADC to finalize a conversion
 #ifdef NEW_RTD_BOARD
-	const uint16_t c_RTDAcquisitionTime = 17; //ms
+	// real is 17ms
+	const uint16_t c_RTDAcquisitionTime = 20; //ms
 #else 
     // The maxboard is 52
     const uint16_t c_RTDAcquisitionTime = 52; //ms

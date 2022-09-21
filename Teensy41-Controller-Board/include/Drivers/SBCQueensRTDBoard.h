@@ -59,7 +59,7 @@ namespace SBCQueens {
         start_spi(controller.MCP23S08_CS, SPI_MODE0);
         SPI.transfer(c_MCP23S08_ADDR);
         SPI.transfer(c_MCP23S08_GPIO);
-        SPI.transfer(0x00);
+        SPI.transfer(0xFF);
 
         // equivalent to SPI.endTransaction();
         end_spi(controller.MCP23S08_CS);
@@ -72,7 +72,7 @@ namespace SBCQueens {
         start_spi(controller.MCP23S08_CS, SPI_MODE0);
         SPI.transfer(c_MCP23S08_ADDR);
         SPI.transfer(c_MCP23S08_GPIO);
-        SPI.transfer(0xFF & controller.MASK);
+        SPI.transfer(0x00 & controller.MASK);
         end_spi(controller.MCP23S08_CS);
     }
 
@@ -96,7 +96,7 @@ namespace SBCQueens {
 
             // configTICK_RATE_HZ = 50kHz
             // 1 / portTICK_PERIOD_MS = 50us
-            vTaskDelay( 1 / portTICK_PERIOD_MS );
+            //vTaskDelay( 1 / portTICK_PERIOD_MS );
         }
         
     }
@@ -108,7 +108,7 @@ namespace SBCQueens {
         start_spi(controller.MCP23S08_CS, SPI_MODE0);
         SPI.transfer(c_MCP23S08_ADDR);
         SPI.transfer(c_MCP23S08_GPIO);
-        SPI.transfer(0x00);
+        SPI.transfer(0xFF);
         end_spi(controller.MCP23S08_CS);
 
     }
@@ -119,7 +119,7 @@ namespace SBCQueens {
     template<size_t N>
     void RTDboard_translate_meas(RTDBoard<N>& controller) {
         
-        float tmp[N];
+        float tmp[N] = {0};
         for(size_t i = 0; i < N; i++) {
             tmp[i] = __rtd_reg_to_temperature(controller.LAST_ADC_VAL[i]);
         }

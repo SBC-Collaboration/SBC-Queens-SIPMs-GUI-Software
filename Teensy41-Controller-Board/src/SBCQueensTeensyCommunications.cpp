@@ -32,6 +32,7 @@ namespace SBCQueens {
 
     }
 
+#ifndef RTD_ONLY_MODE  
     void SET_PPID_UP(float newVal) {
         PIDUpdateTime = static_cast<uint16_t>(newVal);
 
@@ -89,7 +90,7 @@ namespace SBCQueens {
     void RESET_PPID(float) {
         TCPID_restart(PELTIER_PID);
     }
-
+#endif
     void SET_RTD_SP(float newVal ) { 
         RTDSamplingTime = static_cast<uint16_t>(newVal);
 
@@ -157,38 +158,6 @@ namespace SBCQueens {
         Serial.println("}");
     }
 
-    void GET_PRESSURES(float newVal) {
-        char num_buff[11] = "";
-        uint8_t length = 0;
-        Serial.print("{");
-
-        float f_send_vals[] = {
-            VACUUM_PRESSURE_SENSOR.LATEST_VALUE
-        };
-
-        const char* names[] = {
-            "\"VACUUMP\":"
-        };
-
-        const uint16_t size_f_send_vals = (sizeof(f_send_vals) / sizeof(float));
-        for(unsigned int i = 0; i < size_f_send_vals; i++) {
-
-            // Send the name first
-            length = strlen(names[i]);
-            Serial.print(names[i]);
-
-            sprintf(num_buff, "%.6f", f_send_vals[i]);
-            length = strlen(num_buff);
-            Serial.print(num_buff);
-
-            if((size_f_send_vals - 1) != i) {
-                Serial.print(",");
-            }
-        }
-
-        Serial.println("}");
-    }
-
     void GET_RTDS(float newVal) {
         char num_buff[10] = "";
         uint8_t length = 0;
@@ -199,7 +168,7 @@ namespace SBCQueens {
 
         for(uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
             for(uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
-                f_send_vals[i] = RTD_BOARDS[i].LAST_TEMP_VAL[j];
+                f_send_vals[i*NUM_RTD_PER_BOARD + j] = RTD_BOARDS[i].LAST_TEMP_VAL[j];
             }
         }
 
@@ -269,6 +238,38 @@ namespace SBCQueens {
         Serial.println("}");
     }
 
+#ifndef RTD_ONLY_MODE 
+    void GET_PRESSURES(float newVal) {
+        char num_buff[11] = "";
+        uint8_t length = 0;
+        Serial.print("{");
+
+        float f_send_vals[] = {
+            VACUUM_PRESSURE_SENSOR.LATEST_VALUE
+        };
+
+        const char* names[] = {
+            "\"VACUUMP\":"
+        };
+
+        const uint16_t size_f_send_vals = (sizeof(f_send_vals) / sizeof(float));
+        for(unsigned int i = 0; i < size_f_send_vals; i++) {
+
+            // Send the name first
+            length = strlen(names[i]);
+            Serial.print(names[i]);
+
+            sprintf(num_buff, "%.6f", f_send_vals[i]);
+            length = strlen(num_buff);
+            Serial.print(num_buff);
+
+            if((size_f_send_vals - 1) != i) {
+                Serial.print(",");
+            }
+        }
+
+        Serial.println("}");
+    }
     // This function must be used only inside the mutex safe region
     // of the serial task. GET_PIDS;2938400538
     void GET_PELTIERS_CURRS(float newVal) {
@@ -355,6 +356,6 @@ namespace SBCQueens {
             digitalWrite(TWELVEV_PIN_ONE, arduino::HIGH);
         }
     }
-
+#endif
     
 } // namespace SBCQueens
