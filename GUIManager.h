@@ -166,8 +166,13 @@ public:
 					}
 				}
 
+
+
 				if (ImGui::BeginTabItem("Pressures")) {
+					static ImPlotScale press_scale_axis = ImPlotScale_Linear;
+					ImGui::CheckboxFlags("Log Axis", (unsigned int*)&press_scale_axis, ImPlotScale_Log10);
 					if(ImPlot::BeginPlot("Pressures", ImVec2(-1, 0))) {
+						ImPlot::SetupAxisScale(ImAxis_Y1, press_scale_axis);
 						ImPlot::SetupAxes("time [s]", "P [Bar]", g_axis_flags, g_axis_flags);
 
 						GeneralIndicatorReceiver.plot(IndicatorNames::PFEIFFER_PRESS, "PFEIFFER");
@@ -187,6 +192,7 @@ public:
 			// ////
 			// /// Teensy-PID Plots
 			ImGui::Begin("Teensy-PID Plots"); 
+
 			if(ImGui::Button("Clear")) {
 				for(uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
 					for(uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
@@ -199,6 +205,8 @@ public:
 				}
 			}
 
+
+
 			if(not tgui_state.SystemParameters.InRTDOnlyMode) {
 				if (ImPlot::BeginPlot("PIDs", ImVec2(-1,0))) {
 					ImPlot::SetupAxes("time [s]", "Current [A]", g_axis_flags, g_axis_flags);
@@ -207,7 +215,12 @@ public:
 				}
 			}
 
+			static ImPlotRect rect(0.0025,0.0045,0,0.5);
+			static ImPlotDragToolFlags flags = ImPlotDragToolFlags_None;
+			static ImPlotScale rtd_scale_axis = ImPlotScale_Linear;
+			ImGui::CheckboxFlags("Log Axis", (unsigned int*)&rtd_scale_axis, ImPlotScale_Log10);
 			if (ImPlot::BeginPlot("RTDs", ImVec2(-1,0))) {
+				ImPlot::SetupAxisScale(ImAxis_Y1, rtd_scale_axis);
 				ImPlot::SetupAxes("time [s]", "Temperature [K]", g_axis_flags, g_axis_flags);
 
 				for(uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
@@ -225,8 +238,30 @@ public:
 					}
 				}
 
+				ImPlot::DragRect(0,&rect.X.Min,&rect.Y.Min, &rect.X.Max,&rect.Y.Max,ImVec4(1,0,1,1), flags);
 				ImPlot::EndPlot();
 
+			}
+
+			if (ImPlot::BeginPlot("RTD Zoom", ImVec2(-1,0))) {
+				ImPlot::SetupAxisScale(ImAxis_Y1, rtd_scale_axis);
+				ImPlot::SetupAxes("time [s]", "Temperature [K]", g_axis_flags, g_axis_flags);
+				ImPlot::SetupAxesLimits(rect.X.Min, rect.X.Max, rect.Y.Min, rect.Y.Max, ImGuiCond_Always);
+
+				for(uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
+					for(uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
+
+						auto k = i*tgui_state.SystemParameters.NumRtdsPerBoard +j;
+
+						if(k < rtd_names.size()) {
+							MultiPlotReceiver.plot(k, rtd_names[k]);
+						} else {
+							MultiPlotReceiver.plot(k, std::to_string(k));
+						}
+
+					}
+				}
+				ImPlot::EndPlot();
 			}
 
 			ImGui::End();

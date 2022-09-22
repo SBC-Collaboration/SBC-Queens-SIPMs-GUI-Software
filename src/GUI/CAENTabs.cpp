@@ -8,6 +8,16 @@ namespace SBCQueens {
 
 			ImGui::PushItemWidth(120);
 
+			CAENControlFac.Button("Reset", [](CAENInterfaceData& state){
+				return true;
+			});
+			if(ImGui::IsItemHovered()) {
+				ImGui::SetTooltip(
+					"Resets the CAEN digitizer with new"
+					"values found in these tabs. NOT IMPLEMENTED YET"
+				);
+			}
+
 			CAENControlFac.ComboBox("Model", cgui_state.Model,
 					CAENDigitizerModels_map, [](){ return false; }, [](){ return true; });
 

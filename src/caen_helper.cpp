@@ -1,4 +1,5 @@
 #include "caen_helper.h"
+#include "CAENComm.h"
 
 #include <cstdint>
 #include <memory>
@@ -20,7 +21,7 @@ namespace SBCQueens {
 	}
 
 	CAENError connect(CAEN& res, const CAENDigitizerModel& model,
-		const CAEN_DGTZ_ConnectionType& ct,
+		const CAENConnectionType& ct,
 		const int& ln, const int& cn, const uint32_t& addr) noexcept {
 
 		CAENError err;
@@ -36,7 +37,23 @@ namespace SBCQueens {
 		}
 
 		int handle = 0;
-		auto errCode = CAEN_DGTZ_OpenDigitizer(ct, ln, cn, addr, &handle);
+		int errCode;
+		switch(ct) {
+
+			case CAENConnectionType::A4818:
+
+				errCode = CAEN_DGTZ_OpenDigitizer(CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB_A4818,
+					ln, 0, addr, &handle);
+
+			break;
+
+			case CAENConnectionType::USB:
+			default:
+				errCode = CAEN_DGTZ_OpenDigitizer(CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
+					ln, cn, 0, 0);
+			break;
+		}
+		// errCode = CAEN_DGTZ_OpenDigitizer(ct, ln, cn, addr, &handle);
 		
 		if(errCode >= 0) {
 			res = std::make_unique<caen>(model, ct, ln, cn, addr,
@@ -44,7 +61,7 @@ namespace SBCQueens {
 		} else {
 			return CAENError {
 				.ErrorMessage = "Failed to connect to the resource",
-				.ErrorCode = errCode,
+				.ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(errCode),
 				.isError = true
 			};
 		}
@@ -53,11 +70,11 @@ namespace SBCQueens {
 
 	}
 
-	CAENError connect_usb(CAEN& res, const CAENDigitizerModel& model,
-		const int& linkNum) noexcept {
-		return connect(res, model, CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
-			linkNum, 0, 0);
-	}
+	// CAENError connect_usb(CAEN& res, const CAENDigitizerModel& model,
+	// 	const int& linkNum) noexcept {
+	// 	return connect(res, model, CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
+	// 		linkNum, 0, 0);
+	// }
 
 	CAENError disconnect(CAEN& res) noexcept {
 

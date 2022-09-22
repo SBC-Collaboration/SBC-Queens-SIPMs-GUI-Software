@@ -43,11 +43,14 @@ namespace SBCQueens {
 		std::string RunName =  "";
 		std::string SiPMParameters = "";
 
+		CAENConnectionType ConnectionType;
+
 		CAENDigitizerModel Model;
 		CAENGlobalConfig GlobalConfig;
 		std::vector<CAENGroupConfig> GroupConfigs;
 
 		int PortNum = 0;
+		uint32_t VMEAddress = 0;
 
 		CAENInterfaceStates CurrentState =
 			CAENInterfaceStates::NullState;
@@ -269,9 +272,12 @@ private:
 		// Attempts a connection to the CAEN digitizer, setups the channels
 		// and starts acquisition
 		bool attempt_connection() {
-			auto err = connect_usb(Port,
+			auto err = connect(Port,
 				state_of_everything.Model,
-				state_of_everything.PortNum);
+				state_of_everything.ConnectionType,
+				state_of_everything.PortNum,
+				0,
+				state_of_everything.VMEAddress);
 
 			// If port resource was not created, it equals a failure!
 			if(!Port) {

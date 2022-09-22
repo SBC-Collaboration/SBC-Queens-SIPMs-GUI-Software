@@ -1,4 +1,5 @@
 #include "GUI/ControlWindow.h"
+#include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 
 namespace SBCQueens {
@@ -233,15 +234,26 @@ namespace SBCQueens {
 
 				static float c_connected_mod = 1.5;
 				static int caen_port = cgui_state.PortNum;
-				ImGui::InputInt("CAEN port", &caen_port);
+				ImGui::InputInt("CAEN port", &cgui_state.PortNum);
 		        if (ImGui::IsItemHovered()) {
         			ImGui::SetTooltip("Usually 0 as long as there is no "
         			"other CAEN digitizers connected. If there are more, "
         			"the port increases as they were connected to the "
         			"computer.");
-		        }
+		        } ImGui::SameLine();
 
-				ImGui::SameLine(300);
+    			CAENControlFac.ComboBox("Connection Type",
+					cgui_state.ConnectionType,
+					{{CAENConnectionType::USB, "USB"},
+					{CAENConnectionType::A4818, "A4818 USB 3.0 to CONET Adapter"}},
+					[]() {return false;}, [](){});
+
+				if(cgui_state.ConnectionType == CAENConnectionType::A4818) {
+					ImGui::SameLine();
+					ImGui::InputScalar("VME Address", ImGuiDataType_U32, &cgui_state.VMEAddress);
+				}
+
+				// ImGui::SameLine(300);
 				// Colors to pop up or shadow it depending on the conditions
 				ImGui::PushStyleColor(ImGuiCol_Button,
 					static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, c_connected_mod*0.6f)));
@@ -258,7 +270,6 @@ namespace SBCQueens {
 						state = cgui_state;
 						state.RunDir = i_run_dir;
 						state.RunName = i_run_name;
-						state.PortNum = caen_port;
 						state.GlobalConfig = cgui_state.GlobalConfig;
 						state.GroupConfigs = cgui_state.GroupConfigs;
 						state.CurrentState =
@@ -376,7 +387,7 @@ namespace SBCQueens {
 				// (so far) threads.
 				// TODO(Hector): generalize this in the future
 				CAENControlFac.Button(
-					"Start Data Taking",
+					"Start SiPM Data Taking",
 					[=](CAENInterfaceData& state) {
 					// Only change state if its in a work related
 					// state, i.e oscilloscope mode
@@ -389,7 +400,7 @@ namespace SBCQueens {
 				});
 
 				CAENControlFac.Button(
-					"Stop Data Taking",
+					"Stop SiPM Data Taking",
 					[=](CAENInterfaceData& state) {
 					if(state.CurrentState == CAENInterfaceStates::RunMode) {
 						state.CurrentState = CAENInterfaceStates::OscilloscopeMode;

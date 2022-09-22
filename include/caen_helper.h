@@ -21,6 +21,11 @@
 
 namespace SBCQueens {
 
+	enum class CAENConnectionType {
+		USB,
+		A4818
+	};
+
 	enum class CAENDigitizerModel {
 		DT5730B = 0,
 		DT5740D = 1
@@ -236,7 +241,7 @@ private:
 	struct caen {
 
 		caen(const CAENDigitizerModel model,
-			const CAEN_DGTZ_ConnectionType& ct, const int& ln, const int& cn,
+			const CAENConnectionType& ct, const int& ln, const int& cn,
 			const uint32_t& addr, const int& h,
 			const CAENError& err) :
 			Model(model),
@@ -263,7 +268,7 @@ private:
 		std::map<uint8_t, CAENGroupConfig> GroupConfigs;
 		uint32_t CurrentMaxBuffers;
 
-		CAEN_DGTZ_ConnectionType ConnectionType;
+		CAENConnectionType ConnectionType;
 		int LinkNum;
 		int ConetNode;
 		uint32_t VMEBaseAddress;
@@ -390,11 +395,11 @@ private:
 	// addr -> VME Base address of the board. Only for VME models.
 	//  0 in all other cases
 	CAENError connect(CAEN&, const CAENDigitizerModel&,
-		const CAEN_DGTZ_ConnectionType&, const int&,
+		const CAENConnectionType&, const int&,
 		const int&, const uint32_t&) noexcept;
 
 	// Simplifies connect() func for the use of USB only.
-	CAENError connect_usb(CAEN&, const CAENDigitizerModel&, const int&) noexcept;
+	// CAENError connect_usb(CAEN&, const CAENDigitizerModel&, const int&) noexcept;
 
 	// Releases the CAEN resource, stop acquisition, clear internal buffer,
 	// and closes the communication with the CAEN digitizer

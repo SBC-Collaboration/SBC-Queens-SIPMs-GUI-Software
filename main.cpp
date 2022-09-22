@@ -1,8 +1,12 @@
 // STL includes
+
+
 #include <thread>
 
 // 3rd party includes
 #include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 #include <readerwriterqueue.h>
 
 // My includes
@@ -22,6 +26,17 @@
 
 int main(int argc, char *argv[])
 {
+
+	try{
+	    auto async_file = spdlog::rotating_logger_mt<spdlog::async_factory>(
+	    	"main logger", "log.txt", 1024 * 1024 * 5, 3
+		);
+
+		spdlog::set_default_logger(async_file);
+	} catch(const spdlog::spdlog_ex& ex) {
+		 std::cout << "Log initialization failed: " << ex.what() << std::endl;
+	}
+
 	spdlog::info("Starting software");
 	SBCQueens::TeensyQueue teensyQueue;
 	SBCQueens::CAENQueue caenQueue;
@@ -43,6 +58,16 @@ int main(int argc, char *argv[])
 		// From Anyone -> GUI, auxiliary queue for dynamic plots
 		mpQueue
 	);
+
+	spdlog::info("Creating wrapper. Using:");
+
+
+#ifdef USE_VULKAN
+	spdlog::info("VULKAN + GLFW");
+#else
+	spdlog::info("OpenGL + GLFW");
+#endif
+
 	// This function just holds the rendering framework we are using
 	// all of them found under rendering_wrappers
 	// We wrapping it under a lambda so we can pass it to a thread
@@ -93,7 +118,7 @@ int main(int argc, char *argv[])
 	other_thread.detach();
 	gui_wrapper();
 
-	spdlog::info("Closing software");
+	spdlog::info("Closing ! ! !");
 
 	return 0;
 }
