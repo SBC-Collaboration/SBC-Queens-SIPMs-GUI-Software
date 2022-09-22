@@ -280,7 +280,7 @@ public:
 				plotData.CurrentNumSamples = plotData.CurrentNumSamples< MaxSamples ? 
 					plotData.CurrentNumSamples + 1 : MaxSamples;
 
-				plotData.CurrentIndex = plotData.CurrentIndex < MaxSamples ? plotData.CurrentIndex + 1 : 0;
+				plotData.CurrentIndex = (plotData.CurrentIndex + 1) % plotData.CurrentNumSamples;
 			}
 
 		}
@@ -293,7 +293,7 @@ public:
 			plotData.CurrentNumSamples = plotData.CurrentNumSamples < MaxSamples ?
 				plotData.CurrentNumSamples + 1 : MaxSamples;
 
-			plotData.CurrentIndex = plotData.CurrentIndex < MaxSamples ? plotData.CurrentIndex + 1 : 0;
+			plotData.CurrentIndex = (plotData.CurrentIndex + 1) % plotData.CurrentNumSamples;
 		}
 
 		void clear() {

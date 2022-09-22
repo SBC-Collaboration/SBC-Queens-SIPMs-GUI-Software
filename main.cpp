@@ -27,15 +27,15 @@
 int main(int argc, char *argv[])
 {
 
-	try{
-	    auto async_file = spdlog::rotating_logger_mt<spdlog::async_factory>(
-	    	"main logger", "log.txt", 1024 * 1024 * 5, 3
-		);
+	// try{
+	//     auto async_file = spdlog::rotating_logger_mt<spdlog::async_factory>(
+	//     	"main logger", "log.txt", 1024 * 1024 * 5, 3
+	// 	);
 
-		spdlog::set_default_logger(async_file);
-	} catch(const spdlog::spdlog_ex& ex) {
-		 std::cout << "Log initialization failed: " << ex.what() << std::endl;
-	}
+	// 	spdlog::set_default_logger(async_file);
+	// } catch(const spdlog::spdlog_ex& ex) {
+	// 	 std::cout << "Log initialization failed: " << ex.what() << std::endl;
+	// }
 
 	spdlog::info("Starting software");
 	SBCQueens::TeensyQueue teensyQueue;

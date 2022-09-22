@@ -1,9 +1,9 @@
 [File]
 RunDir = "./RUNS"
-RunName = "COLD_TEST_01"
+RunName = "TESTING"
 
 [Teensy]
-Port = "COM4"
+Port = "/dev/ttyACM0"
 
 # If true, the Teensy is in RTD only mode.
 # cannot be changed during GUI

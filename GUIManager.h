@@ -215,7 +215,7 @@ public:
 				}
 			}
 
-			static ImPlotRect rect(0.0025,0.0045,0,0.5);
+			static ImPlotRect rect(0,1,0,320);
 			static ImPlotDragToolFlags flags = ImPlotDragToolFlags_None;
 			static ImPlotScale rtd_scale_axis = ImPlotScale_Linear;
 			ImGui::CheckboxFlags("Log Axis", (unsigned int*)&rtd_scale_axis, ImPlotScale_Log10);
@@ -238,7 +238,12 @@ public:
 					}
 				}
 
-				ImPlot::DragRect(0,&rect.X.Min,&rect.Y.Min, &rect.X.Max,&rect.Y.Max,ImVec4(1,0,1,1), flags);
+				auto limit_rec = ImPlot::GetPlotLimits();
+				rect.X.Max = limit_rec.X.Max;
+				static double tmp;
+				ImPlot::DragRect(0,&rect.X.Min, &rect.Y.Min, &tmp, &rect.Y.Max, ImVec4(1,0,1,1), flags);
+				rect.X.Min = rect.X.Min < limit_rec.X.Min ? limit_rec.X.Min : rect.X.Min;
+
 				ImPlot::EndPlot();
 
 			}

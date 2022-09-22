@@ -72,7 +72,8 @@ namespace SBCQueens {
         start_spi(controller.MCP23S08_CS, SPI_MODE0);
         SPI.transfer(c_MCP23S08_ADDR);
         SPI.transfer(c_MCP23S08_GPIO);
-        SPI.transfer(0x00 & controller.MASK);
+        SPI.transfer(0x00);
+        // SPI.transfer(0x00 & controller.MASK);
         end_spi(controller.MCP23S08_CS);
     }
 

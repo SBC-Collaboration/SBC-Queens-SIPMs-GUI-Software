@@ -9,7 +9,7 @@
 
 #include "SBCQueensPID.h"
 
-
+#define SIPM_SETUP
 
 namespace SBCQueens {
 
@@ -45,8 +45,14 @@ namespace SBCQueens {
 #endif
 
 #ifdef NEW_RTD_BOARD
+
+#ifdef SIPM_SETUP
+    const uint8_t NUM_RTD_BOARDS = 1;
+    const uint8_t NUM_RTD_PER_BOARD = 3;
+#else
     const uint8_t NUM_RTD_BOARDS = 2;
     const uint8_t NUM_RTD_PER_BOARD = 3;
+#endif
     extern RTDBoard<NUM_RTD_PER_BOARD> RTD_BOARDS[NUM_RTD_BOARDS];
 #else
     const uint8_t NUM_RTD_BOARDS = 4;

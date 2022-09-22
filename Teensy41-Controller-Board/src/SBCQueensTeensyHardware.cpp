@@ -41,6 +41,13 @@ namespace SBCQueens {
 #endif
 
 #ifdef NEW_RTD_BOARD
+
+#ifdef SIPM_SETUP
+		RTD_BOARDS[0].MCP23S08_CS 						= 24;
+		RTD_BOARDS[0].ADC_CS[0]							= 27;
+		RTD_BOARDS[0].ADC_CS[1]							= 26;
+		RTD_BOARDS[0].ADC_CS[2]							= 25;
+#else
 		RTD_BOARDS[0].MCP23S08_CS 						= 20;
 		RTD_BOARDS[0].ADC_CS[0]							= 23;
 		RTD_BOARDS[0].ADC_CS[1]							= 22;
@@ -49,6 +56,8 @@ namespace SBCQueens {
 		RTD_BOARDS[1].ADC_CS[0]							= 19;
 		RTD_BOARDS[1].ADC_CS[1]							= 18;
 		RTD_BOARDS[1].ADC_CS[2]							= 17;
+#endif
+
 #else
 		RTD_BOARDS[0].CS_PIN                           = RTD_ONE_CS;
 		RTD_BOARDS[0].State                            = MAX31865_STATES::SLEEP;
