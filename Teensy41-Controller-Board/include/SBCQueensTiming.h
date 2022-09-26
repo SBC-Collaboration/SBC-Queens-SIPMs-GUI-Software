@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <inttypes.h>
 
+#include "SBCQueensTeensyBasics.h"
+
 namespace SBCQueens {
 
 	// The RTD sampling rate. Ideally, a RTD measurement chain will be done after this time
@@ -10,7 +12,7 @@ namespace SBCQueens {
 
 	// Should be less than RTDSamplingTime
 	// Time it takes for the RTD to warm up and reach a steady state
-	const uint16_t c_RTDPrepareTime = 1; //ms
+	const uint16_t c_RTDPrepareTime = 20; //ms
 
 	// Should be less than (RTDSamplingTime - RTDPrepareTime)
 	// Time it takes for a single ADC to finalize a conversion

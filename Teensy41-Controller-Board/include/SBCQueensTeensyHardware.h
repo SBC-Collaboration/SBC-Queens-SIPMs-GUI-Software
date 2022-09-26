@@ -9,7 +9,7 @@
 
 #include "SBCQueensPID.h"
 
-#define SIPM_SETUP
+// #define SIPM_SETUP
 
 namespace SBCQueens {
 

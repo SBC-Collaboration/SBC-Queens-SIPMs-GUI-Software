@@ -1,9 +1,9 @@
-// STL includes
 
 
+// C++ STD includes
 #include <thread>
 
-// 3rd party includes
+// C++ 3rd party includes
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <spdlog/sinks/rotating_file_sink.h>
@@ -17,109 +17,103 @@
 #include "rendering_wrappers/glfw_opengl3_wrapper.h"
 #endif
 
-#include "imgui_helpers.h"
+// my includes
+#include "include/imgui_helpers.hpp"
 
-#include "TeensyControllerInterface.h"
-#include "CAENDigitizerInterface.h"
-#include "OtherDevicesInterface.h"
-#include "GUIManager.h"
+#include "TeensyControllerInterface.hpp"
+#include "CAENDigitizerInterface.hpp"
+#include "SlowDAQInterface.hpp"
+#include "GUIManager.hpp"
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+    // try{
+    //     auto async_file = spdlog::rotating_logger_mt<spdlog::async_factory>(
+    //      "main logger", "log.txt", 1024 * 1024 * 5, 3
+    //  );
 
-	// try{
-	//     auto async_file = spdlog::rotating_logger_mt<spdlog::async_factory>(
-	//     	"main logger", "log.txt", 1024 * 1024 * 5, 3
-	// 	);
+    //  spdlog::set_default_logger(async_file);
+    // } catch(const spdlog::spdlog_ex& ex) {
+    //   std::cout << "Log initialization failed: " << ex.what() << std::endl;
+    // }
 
-	// 	spdlog::set_default_logger(async_file);
-	// } catch(const spdlog::spdlog_ex& ex) {
-	// 	 std::cout << "Log initialization failed: " << ex.what() << std::endl;
-	// }
+    spdlog::info("Starting software");
+    SBCQueens::TeensyQueue teensyQueue;
+    SBCQueens::CAENQueue caenQueue;
+    SBCQueens::SlowDAQQueue otherQueue;
+    SBCQueens::GeneralIndicatorQueue giQueue;
+    SBCQueens::MultiplePlotQueue mpQueue;
 
-	spdlog::info("Starting software");
-	SBCQueens::TeensyQueue teensyQueue;
-	SBCQueens::CAENQueue caenQueue;
-	SBCQueens::OtherQueue otherQueue;
-	SBCQueens::GeneralIndicatorQueue giQueue;
-	SBCQueens::MultiplePlotQueue mpQueue;
+    // This is our GUI function which actually holds all of our buttons
+    // labels, inputs, graphs and ect
+    SBCQueens::GUIManager guiManager(
+        // From GUI -> Teensy
+        teensyQueue,
+        // From GUI -> CAEN
+        caenQueue,
+        // From GUI -> slow DAQ
+        otherQueue,
+        // From Anyone -> GUI
+        giQueue,
+        // From Anyone -> GUI, auxiliary queue for dynamic plots
+        mpQueue);
 
-	// This is our GUI function which actually holds all of our buttons
-	// labels, inputs, graphs and ect
-	SBCQueens::GUIManager guiManager(
-		// From GUI -> Teensy
-		teensyQueue,
-		// From GUI -> CAEN
-		caenQueue,
-		// From GUI -> slow DAQ
-		otherQueue,
-		// From Anyone -> GUI
-		giQueue,
-		// From Anyone -> GUI, auxiliary queue for dynamic plots
-		mpQueue
-	);
-
-	spdlog::info("Creating wrapper. Using:");
+    spdlog::info("Creating wrapper. Using:");
 
 
 #ifdef USE_VULKAN
-	spdlog::info("VULKAN + GLFW");
+    spdlog::info("VULKAN + GLFW");
 #else
-	spdlog::info("OpenGL + GLFW");
+    spdlog::info("OpenGL + GLFW");
 #endif
 
-	// This function just holds the rendering framework we are using
-	// all of them found under rendering_wrappers
-	// We wrapping it under a lambda so we can pass it to a thread
-	// because we do not care about its returning vallue
-	auto gui_wrapper = [&]() {
+    // This function just holds the rendering framework we are using
+    // all of them found under rendering_wrappers
+    // We wrapping it under a lambda so we can pass it to a thread
+    // because we do not care about its returning vallue
+    auto gui_wrapper = [&]() {
 #ifdef USE_VULKAN
-		ImGUIWrappers::main_glfw_vulkan_wrapper(guiManager);
+        ImGUIWrappers::main_glfw_vulkan_wrapper(guiManager);
 #else
-		ImGUIWrappers::main_glfw_open3gl_wrapper(guiManager);
+        ImGUIWrappers::main_glfw_open3gl_wrapper(guiManager);
 #endif
-	};
+    };
 
-	// std::thread main_thread(gui_wrapper);
+    // std::thread main_thread(gui_wrapper);
 
-	// The lambdas we are passing are the functions 
-	// to read and write to the queue
-	SBCQueens::TeensyControllerInterface tc(
-		// GUI -> Teensy
-		teensyQueue,
-		// From Anyone -> GUI
-		giQueue,
+    // The lambdas we are passing are the functions
+    // to read and write to the queue
+    SBCQueens::TeensyControllerInterface tc(
+        // GUI -> Teensy
+        teensyQueue,
+        // From Anyone -> GUI
+        giQueue,
 
-		mpQueue
-	);
+        mpQueue);
 
-	std::thread tc_thread(std::ref(tc));
+    std::thread tc_thread(std::ref(tc));
 
-	SBCQueens::CAENDigitizerInterface caenc(
-		giQueue,
-		caenQueue,
-		mpQueue
-	);
+    SBCQueens::CAENDigitizerInterface caenc(
+        giQueue,
+        caenQueue,
+        mpQueue);
 
-	std::thread caen_thread(std::ref(caenc));
+    std::thread caen_thread(std::ref(caenc));
 
-	SBCQueens::OtherDevicesInterface otherc(
-		giQueue,
-		otherQueue,
-		mpQueue
-	);
+    SBCQueens::SlowDAQInterface otherc(
+        giQueue,
+        otherQueue,
+        mpQueue);
 
-	std::thread other_thread(std::ref(otherc));
+    std::thread other_thread(std::ref(otherc));
 
-	spdlog::info("Starting threads");
+    spdlog::info("Starting threads");
 
-	tc_thread.detach();
-	caen_thread.detach();
-	other_thread.detach();
-	gui_wrapper();
+    tc_thread.detach();
+    caen_thread.detach();
+    other_thread.detach();
+    gui_wrapper();
 
-	spdlog::info("Closing ! ! !");
+    spdlog::info("Closing ! ! !");
 
-	return 0;
+    return 0;
 }
-
