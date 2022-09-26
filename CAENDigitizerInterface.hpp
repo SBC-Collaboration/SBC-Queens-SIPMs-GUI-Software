@@ -20,15 +20,18 @@
 #include <iostream>
 
 // C++ 3rd party includes
+#include <serial/serial.h>
 #include <readerwriterqueue.h>
 #include <spdlog/spdlog.h>
 
 // my includes
+#include "include/serial_helper.hpp"
 #include "include/file_helpers.hpp"
 #include "include/caen_helper.hpp"
 #include "include/implot_helpers.hpp"
 #include "include/indicators.hpp"
 #include "include/timing_events.hpp"
+#include "include/HardwareHelpers/ClientController.hpp"
 
 namespace SBCQueens {
 
@@ -57,6 +60,8 @@ struct CAENInterfaceData {
     int PortNum = 0;
     uint32_t VMEAddress = 0;
 
+    std::string Keithley2000Port = "";
+
     CAENInterfaceStates CurrentState =
         CAENInterfaceStates::NullState;
 
@@ -72,9 +77,10 @@ using CAENQueue
 template<typename... Queues>
 class CAENDigitizerInterface {
     std::tuple<Queues&...> _queues;
-    CAENInterfaceData state_of_everything;
+    CAENInterfaceData doe;
 
     DataFile<CAENEvent> _pulseFile;
+    DataFile<double> _voltagesFile;
 
     IndicatorSender<IndicatorNames> _plotSender;
 
@@ -84,10 +90,12 @@ class CAENDigitizerInterface {
     // tmp stuff
     uint16_t* data;
     size_t length;
-    double* x_values, *y_values;
+    std::vector<double> x_values, y_values;
     CAENEvent osc_event, adj_osc_event;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
     CAENEvent processing_evts[1024];
+
+    ClientController<serial_ptr, double> Keithley2000;
 
     // As long as we make the Func template argument a std::fuction
     // we can then use pointer magic to initialize them
@@ -115,7 +123,8 @@ class CAENDigitizerInterface {
  public:
     explicit CAENDigitizerInterface(Queues&... queues) :
         _queues(forward_as_tuple(queues...)),
-        _plotSender(std::get<GeneralIndicatorQueue&>(_queues)) {
+        _plotSender(std::get<GeneralIndicatorQueue&>(_queues)),
+        Keithley2000("Keithley2000") {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
         standby_state = std::make_shared<CAENInterfaceState>(
@@ -158,6 +167,79 @@ class CAENDigitizerInterface {
 
         main_loop_state = standby_state;
 
+        Keithley2000.init(
+            [=](serial_ptr& port) -> bool {
+
+                static auto send_msg_slow = make_blocking_total_timed_event(
+                    std::chrono::milliseconds(200),
+                    [](serial_ptr& port, const std::string& msg){
+                        spdlog::info("Sending msg to Keithely: {0}", msg);
+                        send_msg(port, msg + "\n", "");
+                    }
+                );
+
+                SerialParams ssp;
+                ssp.Timeout = serial::Timeout::simpleTimeout(5000);
+                ssp.Baudrate = 115200;
+                connect_par(port, doe.Keithley2000Port, ssp);
+
+                if (!port) {
+                    return false;
+                }
+
+                if (!port->isOpen()) {
+                    return false;
+                }
+
+                spdlog::info("Connected to Keithley 2000! "
+                    "Initializing...");
+
+                // Setup GPIB interface
+                // send_msg_slow(port, "++rst");
+                send_msg_slow(port, "++eos 0");
+                send_msg_slow(port, "++addr 10");
+                send_msg_slow(port, "++auto 0");
+
+                // Now Keithley
+                send_msg_slow(port, "*rst");
+                send_msg_slow(port, ":init:cont on");
+                send_msg_slow(port, ":volt:dc:nplc 10");
+                send_msg_slow(port, ":volt:dc:rang:auto 1");
+                send_msg_slow(port, ":volt:dc:aver:stat 1");
+                send_msg_slow(port, ":volt:dc:aver:tcon mov");
+                send_msg_slow(port, ":volt:dc:aver:coun 100");
+
+                send_msg_slow(port, ":form ascii");
+
+                send_msg_slow(port, "++auto 1");
+
+                open(_voltagesFile, doe.RunDir
+                + "/" + doe.RunName
+                + "/SIPM_VOLTAGES.txt");
+
+                bool s = _voltagesFile > 0;
+                if (!s) {
+                    spdlog::info("Failed to open voltage file");
+                    return false;
+                }
+
+                return true;
+            },
+            [=](serial_ptr& port) -> bool {
+
+                if(port) {
+                    if(port->isOpen()) {
+                        disconnect(port);
+                    }
+                }
+
+                if(_voltagesFile > 0) {
+                    close(_voltagesFile);
+                }
+
+                return false;
+        });
+
         // Actual loop!
         while (main_loop_state->operator()()) { }
     }
@@ -168,8 +250,7 @@ class CAENDigitizerInterface {
         auto size = evt->Data->ChSize[0];
 
         double counter = 0;
-        auto offset =
-            Port->GroupConfigs[0].TriggerThreshold;
+        auto offset = Port->GroupConfigs[0].TriggerThreshold;
         for (uint32_t i = 1; i < size; i++) {
             if ((buf[i] > offset) && (buf[i-1] < offset)) {
                 counter++;
@@ -190,8 +271,8 @@ class CAENDigitizerInterface {
     }
 
     void switch_state(const CAENInterfaceStates& newState) {
-        state_of_everything.CurrentState = newState;
-        switch (state_of_everything.CurrentState) {
+        doe.CurrentState = newState;
+        switch (doe.CurrentState) {
             case CAENInterfaceStates::Standby:
                 main_loop_state = standby_state;
             break;
@@ -240,10 +321,10 @@ class CAENDigitizerInterface {
         // setting the PID setpoints or constants
         // or an user driven reset
         if (guiQueueOut.try_dequeue(task)) {
-            if (!task(state_of_everything)) {
+            if (!task(doe)) {
                 spdlog::warn("Something went wrong with a command!");
             } else {
-                switch_state(state_of_everything.CurrentState);
+                switch_state(doe.CurrentState);
                 return true;
             }
         }
@@ -262,11 +343,11 @@ class CAENDigitizerInterface {
     // and starts acquisition
     bool attempt_connection() {
         auto err = connect(Port,
-            state_of_everything.Model,
-            state_of_everything.ConnectionType,
-            state_of_everything.PortNum,
+            doe.Model,
+            doe.ConnectionType,
+            doe.PortNum,
             0,
-            state_of_everything.VMEAddress);
+            doe.VMEAddress);
 
         // If port resource was not created, it equals a failure!
         if (!Port) {
@@ -286,10 +367,24 @@ class CAENDigitizerInterface {
 
         reset(Port);
         setup(Port,
-            state_of_everything.GlobalConfig,
-            state_of_everything.GroupConfigs);
+            doe.GlobalConfig,
+            doe.GroupConfigs);
 
         enable_acquisition(Port);
+
+        std::optional<double> r
+            = Keithley2000.get([=](serial_ptr& port) -> std::optional<double> {
+
+            return {};
+
+        });
+
+        r = Keithley2000.get([=](serial_ptr& port) -> std::optional<double> {
+            send_msg(port, ":fetch?\n", "");
+            return retrieve_msg<double>(port);
+        });
+
+        spdlog::info("It returned : {0}", r.value_or(0.0));
 
         // Allocate memory for events
         osc_event = std::make_shared<caenEvent>(Port->Handle);
@@ -329,20 +424,20 @@ class CAENDigitizerInterface {
 
         retrieve_data(Port);
 
-        if (state_of_everything.SoftwareTrigger) {
+        if (doe.SoftwareTrigger) {
             software_trigger(Port);
-            state_of_everything.SoftwareTrigger = false;
+            doe.SoftwareTrigger = false;
         }
 
         if (Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
-            // spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
-            // spdlog::info("Data size: {0}", Port->Data.DataSize);
-            // spdlog::info("Num events: {0}", Port->Data.NumEvents);
+            spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
+            spdlog::info("Data size: {0}", Port->Data.DataSize);
+            spdlog::info("Num events: {0}", Port->Data.NumEvents);
 
             extract_event(Port, 0, osc_event);
-            // spdlog::info("Event size: {0}", osc_event->Info.EventSize);
-            // spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
-            // spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
+            spdlog::info("Event size: {0}", osc_event->Info.EventSize);
+            spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
+            spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
 
             process_data_for_gui();
 
@@ -444,10 +539,10 @@ class CAENDigitizerInterface {
                 std::localtime(&now_t));
 
             open(_pulseFile,
-                state_of_everything.RunDir
-                + "/" + state_of_everything.RunName
+                doe.RunDir
+                + "/" + doe.RunName
                 + "/" + filename + ".bin",
-                // + state_of_everything.SiPMParameters + ".bin",
+                // + doe.SiPMParameters + ".bin",
 
                 // sbc_init_file is a function that saves the header
                 // of the sbc data format as a function of record length
@@ -541,15 +636,14 @@ class CAENDigitizerInterface {
             auto buf = osc_event->Data->DataChannel[j];
             auto size = osc_event->Data->ChSize[j];
 
-            // spdlog::info("Event size size: {0}", size);
             if (size <= 0) {
                 continue;
             }
 
-            x_values = new double[size];
-            y_values = new double[size];
+            x_values.resize(size);
+            y_values.resize(size);
 
-            for (uint32_t i = 0; i < size; i++) {
+            for (std::size_t i = 0; i < size; i++) {
                 x_values[i] = i*(1.0/Port->GetSampleRate())*(1e9);
                 y_values[i] = static_cast<double>(buf[i]);
             }
@@ -575,13 +669,7 @@ class CAENDigitizerInterface {
 
             _plotSender(plotToSend,
                 x_values,
-                y_values,
-                size);
-
-            delete x_values;
-            delete y_values;
-
-            // j++;
+                y_values);
         }
     }
 };

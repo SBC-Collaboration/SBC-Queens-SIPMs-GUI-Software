@@ -26,7 +26,13 @@ PeltierTTd = 0
 [CAEN]
 # DT5730B or DT5740D
 Model = "DT5730B"
-Port = 1
+DMMPort = "/dev/ttyUSB0"
+Port = 23473
+# USB if using a direct USB connection
+# A4818 for the USB 3.0 to CONET adapter
+ConnectionType = "A4818"
+# if applicable
+VMEAddress = 0
 # 0 = not allowed
 RecordLength = 500
 MaxEventsPerRead = 500

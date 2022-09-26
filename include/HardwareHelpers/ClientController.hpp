@@ -41,12 +41,14 @@ class ClientController {
     using ReturnFuncType = std::function<std::optional<T>(Port&)>;
 
  private:
-    std::unique_ptr<Port> _port;
+    Port _port;
     std::string _name;
     ControlFuncType _initFunc;
     ControlFuncType _closeFunc;
 
  public:
+
+    explicit ClientController(const std::string& name) : _name(name) {}
     ClientController(const std::string& name, ControlFuncType&& init,
         ControlFuncType&& close)
         : _name(name), _initFunc(init), _closeFunc(close) {}
@@ -55,6 +57,11 @@ class ClientController {
         if (_port) {
             _closeFunc(_port);
         }
+    }
+
+    void init(ControlFuncType&& init, ControlFuncType&& close) noexcept {
+        _initFunc = init;
+        _closeFunc = close;
     }
 
     // Holds the entire logic to connect to the port and retrieve the data.
@@ -68,7 +75,7 @@ class ClientController {
             bool success = _initFunc(_port);
 
             if (!success) {
-                spdlog::info("Failed to open port under controller name {0}",
+                spdlog::error("Failed to open port under controller name {0}",
                     _name);
 
                 // Sometimes the logic inside init would not close the
@@ -77,6 +84,8 @@ class ClientController {
                     _closeFunc(_port);
                 }
             }
+
+            return {};  // returns an empty optional
         }
     }
 };

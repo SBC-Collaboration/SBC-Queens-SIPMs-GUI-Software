@@ -224,10 +224,10 @@ class GUIManager {
         }
 
         static ImPlotRect rect(0, 1, 0, 320);
-        static ImPlotDragToolFlags flags = ImPlotDragToolFlags_None;
         static ImPlotScale rtd_scale_axis = ImPlotScale_Linear;
         ImGui::CheckboxFlags("Log Axis",
             (unsigned int*)&rtd_scale_axis, ImPlotScale_Log10);
+
         if (ImPlot::BeginPlot("RTDs", ImVec2(-1, 0))) {
             ImPlot::SetupAxisScale(ImAxis_Y1, rtd_scale_axis);
             ImPlot::SetupAxes("time [s]", "Temperature [K]",
@@ -245,23 +245,25 @@ class GUIManager {
                 }
             }
 
-            auto limit_rec = ImPlot::GetPlotLimits();
-            rect.X.Max = limit_rec.X.Max;
-            static double tmp;
-            ImPlot::DragRect(0, &rect.X.Min, &rect.Y.Min, &tmp, &rect.Y.Max,
-                ImVec4(1, 0, 1, 1), flags);
-            rect.X.Min = rect.X.Min < limit_rec.X.Min
-                ? limit_rec.X.Min : rect.X.Min;
+            rect = ImPlot::GetPlotLimits();
 
             ImPlot::EndPlot();
         }
+
+        static float rtd_zoom_multiplier[2] = {0.0};
+        ImGui::SliderFloat2("Zoom %", rtd_zoom_multiplier, 0.0f, 1.0f);
+        // ImGui::VSliderFloat("Zoom Y%", ImVec2(18, 160),&y_rtd_zoom_multiplier, 0.0f, 1.0f);
+        // ImGui::SameLine();
 
         if (ImPlot::BeginPlot("RTD Zoom", ImVec2(-1, 0))) {
             ImPlot::SetupAxisScale(ImAxis_Y1, rtd_scale_axis);
             ImPlot::SetupAxes("time [s]", "Temperature [K]",
                 g_axis_flags, g_axis_flags);
-            ImPlot::SetupAxesLimits(rect.X.Min, rect.X.Max,
-                rect.Y.Min, rect.Y.Max, ImGuiCond_Always);
+            ImPlot::SetupAxesLimits(
+                rtd_zoom_multiplier[0]*(rect.X.Min + rect.X.Max) + rect.X.Min,
+                rect.X.Max,
+                rtd_zoom_multiplier[1]*(rect.Y.Min + rect.Y.Max) + rect.Y.Min,
+                rect.Y.Max, ImGuiCond_Always);
 
             for (uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
                 for (uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {

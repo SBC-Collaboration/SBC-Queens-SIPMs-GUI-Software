@@ -7,6 +7,7 @@
 // C++ STD includes
 // C++ 3rd party includes
 #include <misc/cpp/imgui_stdlib.h>
+#include <unordered_map>
 
 // my includes
 
@@ -27,7 +28,7 @@ void ControlWindow::init(const toml::table& tb) {
     /// Teensy config
     // Teensy initial state
     tgui_state.CurrentState = TeensyControllerStates::Standby;
-    tgui_state.Port         = t_conf["Port"].value_or("COM4");
+    tgui_state.Port         = t_conf["Port"].value_or("COM3");
     tgui_state.RunDir       = i_run_dir;
     tgui_state.RunName      = i_run_name;
 
@@ -62,10 +63,19 @@ void ControlWindow::init(const toml::table& tb) {
     cgui_state.SiPMParameters = file_conf["SiPMParameters"].value_or("default");
 
     /// CAEN model configs
+    std::unordered_map<std::string, CAENConnectionType> connection_type_map =
+    	{{"USB", CAENConnectionType::USB, },
+        {"A4818", CAENConnectionType::A4818}};
     cgui_state.Model
         = CAENDigitizerModels_map.at(CAEN_conf["Model"].value_or("DT5730B"));
     cgui_state.PortNum
         = CAEN_conf["Port"].value_or(0u);
+    cgui_state.ConnectionType
+    	= connection_type_map[CAEN_conf["ConnectionType"].value_or("USB")];
+    cgui_state.VMEAddress
+        = CAEN_conf["VMEAddress"].value_or(0u);
+    cgui_state.Keithley2000Port
+    	= CAEN_conf["DMMPort"].value_or("COM4");
     cgui_state.GlobalConfig.MaxEventsPerRead
         = CAEN_conf["MaxEventsPerRead"].value_or(512Lu);
     cgui_state.GlobalConfig.RecordLength
@@ -121,7 +131,8 @@ void ControlWindow::init(const toml::table& tb) {
     other_state.RunName = i_run_name;
 
     /// Other PFEIFFERSingleGauge
-    other_state.PFEIFFERPort = other_conf["PFEIFFERSingleGauge"]["Port"].value_or("");
+    other_state.PFEIFFERPort
+    	= other_conf["PFEIFFERSingleGauge"]["Port"].value_or("COM5");
     other_state.PFEIFFERSingleGaugeEnable
         = other_conf["PFEIFFERSingleGauge"]["Enabled"].value_or(false);
     other_state.PFEIFFERSingleGaugeUpdateSpeed
@@ -252,6 +263,8 @@ bool ControlWindow::operator()() {
                 ImGui::InputScalar("VME Address", ImGuiDataType_U32, &cgui_state.VMEAddress);
             }
 
+            ImGui::InputText("Keithley COM Port", &cgui_state.Keithley2000Port);
+
             // ImGui::SameLine(300);
             // Colors to pop up or shadow it depending on the conditions
             ImGui::PushStyleColor(ImGuiCol_Button,
@@ -281,7 +294,7 @@ bool ControlWindow::operator()() {
 
             ImGui::PopStyleColor(3);
 
-                            /// Disconnect button
+            /// Disconnect button
             float c_disconnected_mod = 1.5 - c_connected_mod;
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Button,
@@ -308,6 +321,8 @@ bool ControlWindow::operator()() {
             }
 
             ImGui::PopStyleColor(3);
+
+
             ImGui::Separator();
 
 

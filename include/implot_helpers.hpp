@@ -279,7 +279,7 @@ class Plot : public Indicator<T> {
     template<typename OFFDATA>
     void add(const IndicatorVector<T, OFFDATA>& v) {
         if (v.ID == Indicator<T>::ID) {
-            plotData(v.x, v.x);
+            plotData(v.x, v.y);
         }
     }
 
@@ -528,7 +528,7 @@ class IndicatorSender {
         const std::vector<OFFDATA>& y) {
         std::vector< IndicatorVector<T, DATA> > items(x.size());
         for (unsigned int i = 0; i < x.size(); i++) {
-            items.emplace(i, type,
+            items[i] = IndicatorVector<T, DATA>(type,
                 static_cast<DATA>(x[i]),
                 static_cast<DATA>(y[i]));
         }

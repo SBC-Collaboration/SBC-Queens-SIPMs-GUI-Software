@@ -9,7 +9,6 @@
 #include <optional>
 #include <utility>
 
-
 // C++ 3rd party includes
 #include <serial/serial.h>
 #include <spdlog/spdlog.h>
@@ -72,7 +71,7 @@ std::optional<T> retrieve_msg(serial_ptr& port) noexcept {
             } else if constexpr ( std::is_same_v<T, float > ) {
                 return std::make_optional(std::stof(msg));
             } else if constexpr ( std::is_same_v<T, double > ) {
-                return std::make_optional(std::stod(msg));
+                return std::stod(msg);
             } else if constexpr ( std::is_same_v<T, long double > ) {
                 return std::make_optional(std::stold(msg));
             } else {
