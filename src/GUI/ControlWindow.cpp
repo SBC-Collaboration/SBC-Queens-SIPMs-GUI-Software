@@ -391,31 +391,7 @@ bool ControlWindow::operator()() {
 
             ImGui::Separator();
 
-            // This is the only button that does send a task to all
-            // (so far) threads.
-            // TODO(Hector): generalize this in the future
-            CAENControlFac.Button(
-                "Start SiPM Data Taking",
-                [=](CAENInterfaceData& state) {
-                // Only change state if its in a work related
-                // state, i.e oscilloscope mode
-                if (state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-                    state.CurrentState == CAENInterfaceStates::StatisticsMode) {
-                    state.CurrentState = CAENInterfaceStates::RunMode;
-                    state.SiPMParameters = cgui_state.SiPMParameters;
-                }
-                return true;
-            });
 
-            CAENControlFac.Button(
-                "Stop SiPM Data Taking",
-                [=](CAENInterfaceData& state) {
-                if (state.CurrentState == CAENInterfaceStates::RunMode) {
-                    state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
-                    state.SiPMParameters = cgui_state.SiPMParameters;
-                }
-                return true;
-            });
                 // _teensyQueueF([=](TeensyControllerState& oldState) {
                 //  // There is nothing to do here technically
                 //  // but I am including it just in case

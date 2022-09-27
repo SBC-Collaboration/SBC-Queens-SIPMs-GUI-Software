@@ -6,15 +6,6 @@ bool CAENTabs::operator()() {
     if (ImGui::BeginTabItem("CAEN Global")) {
         ImGui::PushItemWidth(120);
 
-        CAENControlFac.Button("Reset", [](CAENInterfaceData& state){
-            return true;
-        });
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Resets the CAEN digitizer with new"
-                "values found in these tabs. NOT IMPLEMENTED YET");
-        }
-
         CAENControlFac.ComboBox("Model", cgui_state.Model,
             CAENDigitizerModels_map, [](){ return false; },
             [](){ return true; });
@@ -76,20 +67,6 @@ bool CAENTabs::operator()() {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Forces a trigger in the digitizer if "
                 "the feature is enabled");
-        }
-
-        CAENControlFac.Button("Start processing",
-            [](CAENInterfaceData& state) {
-                if (state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-                    state.CurrentState == CAENInterfaceStates::RunMode){
-                    state.CurrentState = CAENInterfaceStates::StatisticsMode;
-                }
-                return true;
-            });
-
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Starts measuring pulses and processing "
-                "them without saving to file. Intended for diagnostics.");
         }
 
         ImGui::PopItemWidth();

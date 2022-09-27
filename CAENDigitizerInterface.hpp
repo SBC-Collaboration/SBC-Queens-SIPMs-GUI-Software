@@ -68,6 +68,9 @@ struct CAENInterfaceData {
     bool SoftwareTrigger = false;
 
     std::string Keithley2000Port = "";
+    bool PSChange = false;
+    bool PSSupplyEN = false;
+    float PSVoltage = 0.0;
 };
 
 using CAENQueueType = std::function < bool(CAENInterfaceData&) >;

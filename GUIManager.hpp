@@ -225,8 +225,6 @@ class GUIManager {
             }
         }
 
-
-
         if (!tgui_state.SystemParameters.InRTDOnlyMode) {
             if (ImPlot::BeginPlot("PIDs", ImVec2(-1, -1))) {
                 ImPlot::SetupAxes("time [s]", "Current [A]",
@@ -350,16 +348,22 @@ class GUIManager {
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Keithley 2000")) {
+            if (ImGui::BeginTabItem("Keithley")) {
                 if (ImPlot::BeginPlot("Voltage", ImVec2(-1, -1),
                     ImPlotFlags_NoTitle)) {
                     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
                     ImPlot::SetupAxisFormat(ImAxis_Y1, "%2.7f");
                     ImPlot::SetupAxes("time [EST]", "Voltage [V]", g_axis_flags,
                         g_axis_flags);
+                    ImPlot::SetupAxis(ImAxis_Y2, "Current [uA]",
+                            g_axis_flags | ImPlotAxisFlags_Opposite);
 
                     GeneralIndicatorReceiver.plot(IndicatorNames::DMM_VOLTAGE,
                         "Voltage");
+
+                    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+                    GeneralIndicatorReceiver.plot(IndicatorNames::PICO_CURRENT,
+                        "Current");
 
                     ImPlot::EndPlot();
                 }
@@ -371,6 +375,7 @@ class GUIManager {
                     ImPlotFlags_NoTitle)) {
                     ImPlot::SetupAxes("Voltage [V]", "Gain [arb]", g_axis_flags,
                         g_axis_flags);
+
 
                     ImPlot::EndPlot();
                 }

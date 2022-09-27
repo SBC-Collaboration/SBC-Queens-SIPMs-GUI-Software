@@ -33,6 +33,7 @@ namespace SBCQueens {
         LOCAL_BME_Humidity,
 
         DMM_VOLTAGE,
+        PICO_CURRENT,
 
         // For indicators:
         // Teeensy Indicators
@@ -43,6 +44,7 @@ namespace SBCQueens {
 
         LATEST_VACUUM_PRESS,
         LATEST_DMM_VOLTAGE,
+        LATEST_PICO_CURRENT,
 
         // CAEN Indicators
         CAENBUFFEREVENTS,
