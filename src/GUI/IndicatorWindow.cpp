@@ -68,6 +68,10 @@ namespace SBCQueens {
             "Events in buffer", 200, 4);
         ImGui::SameLine(300); ImGui::Text("Counts");
 
+        _indicatorReceiver.indicator(IndicatorNames::TRIGGERRATE,
+            "Trigger Rate", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("Waveforms / s");
+
         _indicatorReceiver.indicator(IndicatorNames::FREQUENCY,
             "Signal frequency", 200, 4, NumericFormat::Scientific);
         ImGui::SameLine(300); ImGui::Text("Hz");

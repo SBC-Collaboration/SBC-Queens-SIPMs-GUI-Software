@@ -25,7 +25,7 @@
 #include "SlowDAQInterface.hpp"
 #include "GUIManager.hpp"
 
-int main(int argc, char *argv[]) {
+int main() {
     // try{
     //     auto async_file = spdlog::rotating_logger_mt<spdlog::async_factory>(
     //      "main logger", "log.txt", 1024 * 1024 * 5, 3

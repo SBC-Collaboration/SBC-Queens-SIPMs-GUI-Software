@@ -31,6 +31,7 @@ CAENError connect(CAEN& res, const CAENDigitizerModel& model,
     const CAENConnectionType& ct,
     const int& ln, const int& cn, const uint32_t& addr) noexcept {
     CAENError err;
+
     // If the item exists, pass on the creation
     if (res) {
         err = CAENError {
@@ -192,7 +193,8 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     uint32_t nloc = 0;
     error_wrap("Failed to read NLOC. ", CAEN_DGTZ_ReadRegister, handle,
                          0x8020, &nloc);
-    res->GlobalConfig.RecordLength = res->GetNLOCToRecordLength() * nloc;
+    res->GlobalConfig.RecordLength
+        = res->ModelConstants.NLOCToRecordLength * nloc;
 
     error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
                          CAEN_DGTZ_SetPostTriggerSize, handle,
@@ -741,7 +743,7 @@ uint32_t calculate_max_buffers(CAEN& res) noexcept {
     uint32_t rl = 0;
 
     // Cannot be higher than the memory per channel
-    auto mem_per_ch = res->GetMemoryPerChannel();
+    auto mem_per_ch = res->ModelConstants.MemoryPerChannel;
     uint32_t nloc = 0;
 
     // This contains nloc which if multiplied by the correct
@@ -749,7 +751,7 @@ uint32_t calculate_max_buffers(CAEN& res) noexcept {
     read_register(res, 0x8020, nloc);
 
     try {
-        rl =  res->GetNLOCToRecordLength()*nloc;
+        rl =  res->ModelConstants.NLOCToRecordLength*nloc;
     } catch (...) {
         return 0;
     }
@@ -758,8 +760,8 @@ uint32_t calculate_max_buffers(CAEN& res) noexcept {
     auto max_num_buffs = mem_per_ch / rl;
 
     // It cannot be higher than the max buffers
-    max_num_buffs = max_num_buffs >= res->GetMaxNumberOfBuffers() ?
-        res->GetMaxNumberOfBuffers() : max_num_buffs;
+    max_num_buffs = max_num_buffs >= res->ModelConstants.MaxNumBuffers ?
+        res->ModelConstants.MaxNumBuffers : max_num_buffs;
 
     // It can only be a power of 2
     uint32_t real_max_buffs
@@ -785,7 +787,7 @@ std::string sbc_init_file(CAEN& res) noexcept {
     // header string = name;type;x,y,z...;
     auto g_config = res->GlobalConfig;
     auto group_configs = res->GroupConfigs;
-    const uint8_t num_groups = res->GetNumberOfGroups();
+    const uint8_t num_groups = res->ModelConstants.NumberOfGroups;
     const bool has_groups = num_groups > 0;
 
     // The enum and the map is to simplify the code for the lambdas.
@@ -936,8 +938,8 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     // Total length         20 + ch_size(10 + 2*recordlength)
 
     const auto rl = res->GlobalConfig.RecordLength;
-    const uint8_t ch_per_group = res->GetNumberOfChannelsPerGroup();
-    const uint8_t num_groups = res->GetNumberOfGroups();
+    const uint8_t ch_per_group = res->ModelConstants.NumChannelsPerGroup;
+    const uint8_t num_groups = res->ModelConstants.NumberOfGroups;
     const bool has_groups = num_groups > 0;
 
     static std::function<uint32_t(uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
@@ -983,7 +985,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     char out_str[kNumLines];
 
     // sample_rate
-    append_cstr(res->GetSampleRate(), offset, &out_str[0]);
+    append_cstr(res->ModelConstants.AcquisitionRate, offset, &out_str[0]);
 
     // en_chs
     // for(auto gr_pair : res->GroupConfigs) {

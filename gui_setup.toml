@@ -26,7 +26,6 @@ PeltierTTd = 0
 [CAEN]
 # DT5730B or DT5740D
 Model = "DT5730B"
-DMMPort = "/dev/ttyUSB0"
 Port = 23473
 # USB if using a direct USB connection
 # A4818 for the USB 3.0 to CONET adapter
@@ -72,8 +71,12 @@ Threshold = 8000
 # Threshold = 2075
 
 [Other]
+[Other.SiPMVoltageSystem]
+Port = "/dev/ttyUSB0"
+InitVoltage = 50
+
 [Other.PFEIFFERSingleGauge]
-Port = "COM6"
+Port = "COM7"
 Enabled = true
 # 0 = 100ms, 1 = 1s, 2 = 1min
 Rate = 1

@@ -7,7 +7,7 @@
     This file is meant to create a monad/interface that wraps a lot of common
     logic between a server/master and client/agent. The main assumption
     is that the client is slow (O(100ms) or higher), has an initialization
-    phase and does not send any commands to the master only responses.
+    phase and does not send any commands to the master: it only sends responses.
 
     Example: a pressure transducer which has a setup phase then all it will
     ever do is to reply with messages (after the server ask for it) with the
@@ -15,7 +15,7 @@
     to change its setup.
 
     For fast and complicated setups (several steps, feedback is needed or
-    faster acquisition times) wire an specialized code
+    faster acquisition times) write a specialized code
 */
 
 // C STD includes
@@ -52,6 +52,11 @@ class ClientController {
     ClientController(const std::string& name, ControlFuncType&& init,
         ControlFuncType&& close)
         : _name(name), _initFunc(init), _closeFunc(close) {}
+
+    // Moving allowed
+    ClientController(ClientController&&) = default;
+    // No copying
+    ClientController(const ClientController&) = delete;
 
     ~ClientController() {
         _closeFunc(_port);

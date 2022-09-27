@@ -23,6 +23,12 @@ class SiPMControlWindow {
     SiPMControlWindow(ControlLink<CAENQueue>& cc, CAENInterfaceData& cd)
         : CAENControlFac(cc), cgui_state(cd) {}
 
+    // Moving allowed
+    SiPMControlWindow(SiPMControlWindow&&) = default;
+
+    // No copying
+    SiPMControlWindow(const SiPMControlWindow&) = delete;
+
     void init(const toml::table& tb);
     bool operator()();
 };

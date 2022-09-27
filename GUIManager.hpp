@@ -36,6 +36,7 @@
 
 #include "GUI/IndicatorWindow.hpp"
 #include "GUI/ControlWindow.hpp"
+#include "GUI/SiPMControlWindow.hpp"
 
 namespace SBCQueens {
 
@@ -69,6 +70,7 @@ class GUIManager {
 
     IndicatorWindow indicatorWindow;
     ControlWindow controlWindow;
+    SiPMControlWindow sipmControlWindow;
 
  public:
     explicit GUIManager(QueueFuncs&... queues) :
@@ -81,7 +83,8 @@ class GUIManager {
         SlowDAQControlFac   (std::get<SlowDAQQueue&>(_queues)),
         indicatorWindow     (GeneralIndicatorReceiver, tgui_state, sdaq_state),
         controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state,
-            SlowDAQControlFac, sdaq_state) {
+            SlowDAQControlFac, sdaq_state),
+        sipmControlWindow(CAENControlFac, cgui_state) {
         // When config_file goes out of scope, everything
         // including the daughters get cleared
         config_file = toml::parse_file("gui_setup.toml");
@@ -91,6 +94,7 @@ class GUIManager {
 
         indicatorWindow.init(config_file);
         controlWindow.init(config_file);
+        sipmControlWindow.init(config_file);
 
         if (toml::array* arr = t_conf["RTDNames"].as_array()) {
             for (toml::node& elem : *arr) {
@@ -122,6 +126,7 @@ class GUIManager {
 
 
         controlWindow();
+        sipmControlWindow();
 
         //// Plots
         ImGui::Begin("Other Plots");
@@ -226,7 +231,7 @@ class GUIManager {
         }
 
         if (!tgui_state.SystemParameters.InRTDOnlyMode) {
-            if (ImPlot::BeginPlot("PIDs", ImVec2(-1, -1))) {
+            if (ImPlot::BeginPlot("PIDs", ImVec2(-1, 0))) {
                 ImPlot::SetupAxes("time [s]", "Current [A]",
                     g_axis_flags, g_axis_flags);
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
@@ -310,7 +315,7 @@ class GUIManager {
             if (ImGui::BeginTabItem("SiPM Waveforms")) {
                 const size_t kCHperGroup = 8;
                 const auto& model_constants
-                            = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
+                    = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
                 // const auto numgroups = model_constants.NumberOfGroups > 0 ?
                 //     model_constants.NumberOfGroups : 1;
                 // const int numchpergroup = model_constants.NumChannels / numgroups;

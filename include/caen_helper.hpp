@@ -42,8 +42,6 @@ struct CAENDigitizerModelConstants {
     double AcquisitionRate = 10e6;
     // In S/ch
     uint32_t MemoryPerChannel = 0;
-    // In S/s
-    uint32_t USBTransferRate = 15e6;
     // Total number of channels
     uint8_t NumChannels = 1;
     // If 0, digitizer does not deal in groups
@@ -74,7 +72,6 @@ const std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
             14,  // ADCResolution
             500e6,  //  AcquisitionRate
             static_cast<uint32_t>(5.12e6),  // MemoryPerChannel
-            static_cast<uint32_t>(15e6),  // USBTransferRate
             8,  // NumChannels
             0,  // NumberOfGroups
             8,  // NumChannelsPerGroup
@@ -86,7 +83,6 @@ const std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
              12,  // ADCResolution
              62.5e6,  //  AcquisitionRate
              static_cast<uint32_t>(192e3),  // MemoryPerChannel
-             static_cast<uint32_t>(15e6),  // USBTransferRate
              32,  // NumChannels
              4,  // NumChannels
              8,  // NumberOfGroups
@@ -243,6 +239,7 @@ struct caenEvent {
         this->DataPtr = other.DataPtr;
         CAEN_DGTZ_AllocateEvent(other._handle,
             reinterpret_cast<void**>(&this->Data));
+        // *A = *B copies the data
         *this->Data = *other.Data;
         this->Info = other.Info;
     }
@@ -250,6 +247,8 @@ struct caenEvent {
     caenEvent operator=(const caenEvent& other) {
         return caenEvent(other);
     }
+
+
 
 
  private:
@@ -267,8 +266,8 @@ struct caen {
         const CAENError& err) :
         Model(model),
         ConnectionType(ct), LinkNum(ln), ConetNode(cn),
-        VMEBaseAddress(addr), Handle(h), LatestError(err) {
-        ModelConstants = CAENDigitizerModelsConstants_map.at(model);
+        VMEBaseAddress(addr), Handle(h), LatestError(err),
+        ModelConstants(CAENDigitizerModelsConstants_map.at(model)) {
     }
 
     ~caen() {
@@ -294,6 +293,7 @@ struct caen {
 
     int Handle;
     CAENError LatestError;
+    const CAENDigitizerModelConstants ModelConstants;
 
     bool start_rate_calculation = false;
     std::chrono::high_resolution_clock::time_point ts, te;
@@ -303,36 +303,12 @@ struct caen {
     // This holds the latest raw CAEN data
     CAENData Data;
 
-    double GetSampleRate() const {
-        return ModelConstants.AcquisitionRate;
-    }
-
-    uint32_t GetMemoryPerChannel() const {
-        return ModelConstants.MemoryPerChannel;
-    }
-
-    uint32_t GetMaxNumberOfBuffers() const {
-        return ModelConstants.MaxNumBuffers;
-    }
-
-    uint32_t GetNumChannels() const {
-        return ModelConstants.NumChannels;
-    }
-
-    uint8_t GetNumberOfGroups() const {
-        return ModelConstants.NumberOfGroups;
-    }
-
-    uint8_t GetNumberOfChannelsPerGroup() const {
-        return ModelConstants.NumChannelsPerGroup;
-    }
-
     uint32_t GetCommTransferRate() const {
-        return ModelConstants.USBTransferRate;
-    }
-
-    double GetNLOCToRecordLength() const {
-        return ModelConstants.NLOCToRecordLength;
+        if(ConnectionType == CAENConnectionType::USB){
+            return 15000000u;  // S/s
+        } else if (ConnectionType == CAENConnectionType::A4818) {
+            return 40000000u;
+        }
     }
 
     // Returns the channel voltage range. If channel does not exist
@@ -346,9 +322,6 @@ struct caen {
         }
         return 0.0;
     }
-
- private:
-    CAENDigitizerModelConstants ModelConstants;
 };
 
 using CAEN = std::unique_ptr<caen>;

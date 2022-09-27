@@ -74,8 +74,6 @@ void ControlWindow::init(const toml::table& tb) {
     	= connection_type_map[CAEN_conf["ConnectionType"].value_or("USB")];
     cgui_state.VMEAddress
         = CAEN_conf["VMEAddress"].value_or(0u);
-    cgui_state.Keithley2000Port
-    	= CAEN_conf["DMMPort"].value_or("COM4");
     cgui_state.GlobalConfig.MaxEventsPerRead
         = CAEN_conf["MaxEventsPerRead"].value_or(512Lu);
     cgui_state.GlobalConfig.RecordLength
@@ -102,12 +100,19 @@ void ControlWindow::init(const toml::table& tb) {
         if (CAEN_conf[ch_toml].as_table()) {
             cgui_state.GroupConfigs.emplace_back(
                 CAENGroupConfig{
-                    .Number = ch,
-                    .TriggerMask = CAEN_conf[ch_toml]["TrgMask"].value_or<uint8_t>(0),
-                    .AcquisitionMask = CAEN_conf[ch_toml]["AcqMask"].value_or<uint8_t>(0),
-                    .DCOffset = CAEN_conf[ch_toml]["Offset"].value_or<uint16_t>(0x8000u),
-                    .DCRange = CAEN_conf[ch_toml]["Range"].value_or<uint8_t>(0u),
-                    .TriggerThreshold = CAEN_conf[ch_toml]["Threshold"].value_or<uint16_t>(0x8000u)
+                    ch,  // Number
+                    CAEN_conf[ch_toml]["TrgMask"].value_or<uint8_t>(0),
+                    // TriggerMask
+                    CAEN_conf[ch_toml]["AcqMask"].value_or<uint8_t>(0),
+                    // AcquisitionMask
+                    CAEN_conf[ch_toml]["Offset"].value_or<uint16_t>(0x8000u),
+                    // DCOffset
+                    std::vector<uint8_t>(),  // DCCorrections
+                    CAEN_conf[ch_toml]["Range"].value_or<uint8_t>(0u),
+                    // DCRange
+                    CAEN_conf[ch_toml]["Threshold"].value_or<uint16_t>(0x8000u)
+                    // TriggerThreshold
+
                 });
 
             if (toml::array* arr = CAEN_conf[ch_toml]["Corrections"].as_array()) {
@@ -174,7 +179,7 @@ bool ControlWindow::operator()() {
             // 1.0 -> 0.5
             // 0.5 -> 1.0
             // (1.0 - 0.5) / (0.5 - 1.0) = -1
-            static float connected_mod = 1.5;
+            static float connected_mod = 1.5f;
             // Com port text input
             // We do not make this a GUI queue item because
             // we only need to let the client know when we click connnect
@@ -183,11 +188,11 @@ bool ControlWindow::operator()() {
             ImGui::SameLine(300);
             // Colors to pop up or shadow it depending on the conditions
             ImGui::PushStyleColor(ImGuiCol_Button,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, connected_mod*0.6f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, connected_mod*0.6f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, connected_mod*0.7f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, connected_mod*0.7f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, connected_mod*0.8f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, connected_mod*0.8f)));
             // The operator () carries the ImGUI drawing functions
             // and the task it sends to its associated queue/thread
             // is the lambda (callback) we pass
@@ -218,14 +223,14 @@ bool ControlWindow::operator()() {
             ImGui::PopStyleColor(3);
 
             /// Disconnect button
-            float disconnected_mod = 1.5 - connected_mod;
+            float disconnected_mod = 1.5f - connected_mod;
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Button,
                 static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, disconnected_mod*0.6f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                 static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, disconnected_mod*0.7f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, disconnected_mod*0.8f)));
+                static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, disconnected_mod*0.8f)));
 
             if (TeensyControlFac.Button("Disconnect##teensy",
                 [=](TeensyControllerData& oldState) {
@@ -237,13 +242,13 @@ bool ControlWindow::operator()() {
                     return true;
                 }
             )) {
-                connected_mod = 1.5;
+                connected_mod = 1.5f;
             }
 
             ImGui::PopStyleColor(3);
             ImGui::Separator();
 
-            static float c_connected_mod = 1.5;
+            static float c_connected_mod = 1.5f;
             ImGui::InputInt("CAEN port", &cgui_state.PortNum);
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("Usually 0 as long as there is no "
@@ -263,16 +268,17 @@ bool ControlWindow::operator()() {
                 ImGui::InputScalar("VME Address", ImGuiDataType_U32, &cgui_state.VMEAddress);
             }
 
-            ImGui::InputText("Keithley COM Port", &cgui_state.Keithley2000Port);
+            ImGui::InputText("Keithley COM Port",
+                &cgui_state.SiPMVoltageSysPort);
 
             // ImGui::SameLine(300);
             // Colors to pop up or shadow it depending on the conditions
             ImGui::PushStyleColor(ImGuiCol_Button,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, c_connected_mod*0.6f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, c_connected_mod*0.6f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, c_connected_mod*0.7f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, c_connected_mod*0.7f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, c_connected_mod*0.8f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, c_connected_mod*0.8f)));
 
             // This button starts the CAEN communication and sends all
             // the setup configuration
@@ -295,14 +301,14 @@ bool ControlWindow::operator()() {
             ImGui::PopStyleColor(3);
 
             /// Disconnect button
-            float c_disconnected_mod = 1.5 - c_connected_mod;
+            float c_disconnected_mod = 1.5f - c_connected_mod;
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Button,
                 static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, c_disconnected_mod*0.6f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                 static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, c_disconnected_mod*0.7f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, c_disconnected_mod*0.8f)));
+                static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, c_disconnected_mod*0.8f)));
 
             if (CAENControlFac.Button("Disconnect##caen",
                 [=](CAENInterfaceData& state) {
@@ -317,27 +323,25 @@ bool ControlWindow::operator()() {
                 }
             )) {
                 // Local stuff
-                c_connected_mod = 1.5;
+                c_connected_mod = 1.5f;
             }
 
             ImGui::PopStyleColor(3);
 
-
             ImGui::Separator();
 
-
-            static float o_connected_mod = 1.5;
+            static float o_connected_mod = 1.5f;
             static std::string other_port = other_state.PFEIFFERPort;
             ImGui::InputText("PFEIFFER port", &other_port);
 
             ImGui::SameLine(300);
             // Colors to pop up or shadow it depending on the conditions
             ImGui::PushStyleColor(ImGuiCol_Button,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, o_connected_mod*0.6f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, o_connected_mod*0.6f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.7f, o_connected_mod*0.7f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, o_connected_mod*0.7f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.8f, o_connected_mod*0.8f)));
+                static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, o_connected_mod*0.8f)));
 
             // This button starts the CAEN communication and sends all
             // the setup configuration
@@ -356,20 +360,20 @@ bool ControlWindow::operator()() {
                 }
             )) {
                 spdlog::info("Hello");
-                o_connected_mod = 0.5;
+                o_connected_mod = 0.5f;
             }
 
             ImGui::PopStyleColor(3);
 
                             /// Disconnect button
-            float o_disconnected_mod = 1.5 - o_connected_mod;
+            float o_disconnected_mod = 1.5f - o_connected_mod;
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Button,
                 static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, o_disconnected_mod*0.6f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                 static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, o_disconnected_mod*0.7f)));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                static_cast<ImVec4>(ImColor::HSV(0.0, 0.8f, o_disconnected_mod*0.8f)));
+                static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, o_disconnected_mod*0.8f)));
 
             if (SlowDAQControlFac.Button("Disconnect##sdaq",
                 [=](SlowDAQData& state) {
@@ -383,7 +387,7 @@ bool ControlWindow::operator()() {
                 }
             )) {
                 // Local stuff
-                o_connected_mod = 1.5;
+                o_connected_mod = 1.5f;
             }
             ImGui::PopStyleColor(3);
 

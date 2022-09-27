@@ -48,6 +48,7 @@ namespace SBCQueens {
 
         // CAEN Indicators
         CAENBUFFEREVENTS,
+        TRIGGERRATE,
         FREQUENCY,
         DARK_NOISE_RATE,
         GAIN,

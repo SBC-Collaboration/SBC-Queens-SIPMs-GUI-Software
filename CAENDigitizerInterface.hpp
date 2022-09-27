@@ -33,7 +33,8 @@
 
 namespace SBCQueens {
 
-struct Keithley2000Measure {
+struct SiPMVoltageMeasure {
+    double Current;
     double Volt;
     double Time;  // in unix timestamp
 };
@@ -66,11 +67,12 @@ struct CAENInterfaceData {
     CAENInterfaceStates CurrentState = CAENInterfaceStates::NullState;
 
     bool SoftwareTrigger = false;
+    bool ResetCaen = false;
 
-    std::string Keithley2000Port = "";
-    bool PSChange = false;
-    bool PSSupplyEN = false;
-    float PSVoltage = 0.0;
+    std::string SiPMVoltageSysPort = "";
+    bool SiPMVoltageSysChange = false;
+    bool SiPMVoltageSysSupplyEN = false;
+    float SiPMVoltageSysVoltage = 0.0;
 };
 
 using CAENQueueType = std::function < bool(CAENInterfaceData&) >;
@@ -86,13 +88,13 @@ class CAENDigitizerInterface {
 
     // Files
     DataFile<CAENEvent> _pulseFile;
-    DataFile<Keithley2000Measure> _voltagesFile;
+    DataFile<SiPMVoltageMeasure> _voltagesFile;
 
     // Hardware
     CAEN Port = nullptr;
-    ClientController<serial_ptr, double> Keithley2000;
+    ClientController<serial_ptr, double> SiPMVoltageSystem;
 
-    Keithley2000Measure latest_measure;
+    SiPMVoltageMeasure latest_measure;
     std::uint64_t SavedWaveforms = 0;
 
     // tmp stuff
@@ -131,7 +133,7 @@ class CAENDigitizerInterface {
         _queues(forward_as_tuple(queues...)),
         _indicatorSender(std::get<GeneralIndicatorQueue&>(_queues)),
         _plotSender(std::get<SiPMPlotQueue&>(_queues)),
-        Keithley2000("Keithley2000") {
+        SiPMVoltageSystem("Keithley 2000/6487") {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
         standby_state = std::make_shared<CAENInterfaceState>(
@@ -158,7 +160,6 @@ class CAENDigitizerInterface {
             std::chrono::milliseconds(1),
             std::bind(&CAENDigitizerInterface::disconnected_mode, this));
 
-        // auto g =
         closing_state = std::make_shared<CAENInterfaceState>(
             std::chrono::milliseconds(1),
             std::bind(&CAENDigitizerInterface::closing_mode, this));
@@ -174,7 +175,7 @@ class CAENDigitizerInterface {
 
         main_loop_state = standby_state;
 
-        Keithley2000.init(
+        SiPMVoltageSystem.init(
             [=](serial_ptr& port) -> bool {
                 static auto send_msg_slow = make_blocking_total_timed_event(
                     std::chrono::milliseconds(200),
@@ -187,7 +188,7 @@ class CAENDigitizerInterface {
                 SerialParams ssp;
                 ssp.Timeout = serial::Timeout::simpleTimeout(5000);
                 ssp.Baudrate = 115200;
-                connect_par(port, doe.Keithley2000Port, ssp);
+                connect_par(port, doe.SiPMVoltageSysPort, ssp);
 
                 if (!port) {
                     return false;
@@ -207,15 +208,27 @@ class CAENDigitizerInterface {
                 send_msg_slow("++auto 0");
 
                 // Now Keithley
+                // These parameters are constant for now
+                // but later they can become a parameter or the voltage
+                // system can be optional at all
                 send_msg_slow("*rst");
                 send_msg_slow(":init:cont on");
                 send_msg_slow(":volt:dc:nplc 10");
-                send_msg_slow(":volt:dc:rang:auto 1");
+                send_msg_slow(":volt:dc:rang:auto 0");
+                send_msg_slow(":volt:dc:rang 100");
                 send_msg_slow(":volt:dc:aver:stat 1");
                 send_msg_slow(":volt:dc:aver:tcon mov");
                 send_msg_slow(":volt:dc:aver:coun 100");
 
                 send_msg_slow(":form ascii");
+
+                // Keithley 6487
+                send_msg_slow("++addr 22");
+                send_msg_slow("*rst");
+                send_msg_slow(":sour:volt:rang 100");
+                send_msg_slow(":sour:volt:ilim 250e-6");
+                send_msg_slow(":sour:volt 0.0V");
+                send_msg_slow(":sour:volt:stat OFF");
 
                 send_msg_slow("++auto 1");
 
@@ -243,81 +256,29 @@ class CAENDigitizerInterface {
 
         // Actual loop!
         while (main_loop_state->operator()()) {
-            static auto keith = make_total_timed_event(
-                std::chrono::seconds(5),
-                [&]() {
-                    auto r = Keithley2000.get([=](serial_ptr& port)
-                    -> std::optional<double> {
-                    send_msg(port, "++addr 10\n", "");
-                    send_msg(port, ":fetch?\n", "");
-
-                    return retrieve_msg<double>(port);
-                });
-
-                if (r) {
-                    double time = get_current_time_epoch() / 1000.0;
-                    double volt = r.value();
-
-                    latest_measure.Volt = volt;
-                    latest_measure.Time = time;
-                    _voltagesFile->Add(latest_measure);
-                    _indicatorSender(IndicatorNames::DMM_VOLTAGE, time, volt);
-                    _indicatorSender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
-                }
-            });
-
-            static auto save_keith = make_total_timed_event(
-                std::chrono::seconds(30),
-                [&]() {
-                    spdlog::info("Saving voltage (Keithley 2000) voltages.");
-                    async_save(_voltagesFile,
-                    [](const Keithley2000Measure& mes) {
-                            return  std::to_string(mes.Time) + "," +
-                                    std::to_string(mes.Volt) + "\n";
-                });
-            });
-
-            switch (doe.CurrentState) {
-                case CAENInterfaceStates::OscilloscopeMode:
-                case CAENInterfaceStates::StatisticsMode:
-                case CAENInterfaceStates::RunMode:
-                    keith();
-                    save_keith();
-                break;
-
-                case CAENInterfaceStates::Standby:
-                case CAENInterfaceStates::AttemptConnection:
-                case CAENInterfaceStates::Disconnected:
-                case CAENInterfaceStates::Closing:
-                case CAENInterfaceStates::NullState:
-                default:
-                break;
-            }
+            sipm_voltage_system_update();
         }
     }
 
  private:
-    double extract_frequency(CAENEvent& evt) {
-        auto buf = evt->Data->DataChannel[0];
-        auto size = evt->Data->ChSize[0];
 
-        double counter = 0;
-        auto offset = Port->GroupConfigs[0].TriggerThreshold;
-        for (uint32_t i = 1; i < size; i++) {
-            if ((buf[i] > offset) && (buf[i-1] < offset)) {
-                counter++;
-            }
-        }
 
-        return Port->GetSampleRate()*counter /
-            (Port->GlobalConfig.RecordLength);
+    void calculate_trigger_frequency() {
+        static double last_time = 0.0;
+        static uint64_t last_waveforms = 0;
+        double current_time = get_current_time_epoch() / 1000.0;
+        double dt = last_time - current_time;
+        uint64_t dWaveforms = last_waveforms - SavedWaveforms;
+
+        last_waveforms = SavedWaveforms;
+        last_time = current_time;
+        _indicatorSender(IndicatorNames::TRIGGERRATE, dWaveforms / dt);
     }
 
     // Local error checking. Checks if there was an error and prints it
     // using spdlog
     bool lec() {
-        return check_error(Port,
-            [](const std::string& cmd) {
+        return check_error(Port, [](const std::string& cmd) {
                 spdlog::error(cmd);
         });
     }
@@ -381,20 +342,50 @@ class CAENDigitizerInterface {
             }
         }
 
-
         return false;
+    }
+
+    // Logic to disconnect the CAEN and clear up memory
+    void close_caen() {
+        for (CAENEvent& evt : processing_evts) {
+            if(evt) {
+                evt.reset();
+            }
+        }
+
+        if (osc_event) {
+            osc_event.reset();
+        }
+
+        if (adj_osc_event) {
+            adj_osc_event.reset();
+        }
+
+        SiPMVoltageSystem.close();
+
+        auto err = disconnect(Port);
+        check_error(err, [](const std::string& cmd) {
+            spdlog::error(cmd);
+        });
     }
 
     // Does nothing other than wait 100ms to avoid clogging PC resources.
     bool standby() {
         change_state();
-
         return true;
     }
 
-    // Attempts a connection to the CAEN digitizer, setups the channels
-    // and starts acquisition
+    // Attempts a connection to the CAEN digitizer, setups the channels,
+    // starts acquisition, and moves the oscilloscope mode
     bool attempt_connection() {
+
+        // If the port is open, clean up and close the port.
+        // This will help turn attempt_connection into a reset
+        // for the entire system.
+        if(Port) {
+            close_caen();
+        }
+
         auto err = connect(Port,
             doe.Model,
             doe.ConnectionType,
@@ -418,18 +409,16 @@ class CAENDigitizerInterface {
 
         spdlog::info("Connected to CAEN Digitizer!");
 
-        reset(Port);
-        setup(Port,
-            doe.GlobalConfig,
-            doe.GroupConfigs);
+        setup(Port, doe.GlobalConfig, doe.GroupConfigs);
 
+        // Enable acquisition HAS to be called AFTER setup
         enable_acquisition(Port);
 
-        // Getting at least one initializes the port
-        Keithley2000.get([=](serial_ptr& port) -> std::optional<double> {
-            return {};
-        });
-
+        // Trying to call once will initialize the port
+        // but really this call is not important
+        // SiPMVoltageSystem.get([=](serial_ptr& port) -> std::optional<double> {
+        //     return {};
+        // });
 
         // Allocate memory for events
         osc_event = std::make_shared<caenEvent>(Port->Handle);
@@ -475,6 +464,7 @@ class CAENDigitizerInterface {
         }
 
         if (Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
+            SavedWaveforms += Port->Data.NumEvents;
             // spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
             // spdlog::info("Data size: {0}", Port->Data.DataSize);
             // spdlog::info("Num events: {0}", Port->Data.NumEvents);
@@ -520,6 +510,7 @@ class CAENDigitizerInterface {
             }
 
             // double frequency = 0.0;
+            SavedWaveforms += Port->Data.NumEvents;
             for (uint32_t i = 0; i < Port->Data.NumEvents; i++) {
                 // Extract event i
                 extract_event(Port, i, processing_evts[i]);
@@ -568,8 +559,7 @@ class CAENDigitizerInterface {
             }
 
             SavedWaveforms += Port->Data.NumEvents;
-            _indicatorSender(IndicatorNames::SAVED_WAVEFORMS,
-                static_cast<double>(SavedWaveforms));
+            _indicatorSender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
         };
 
         if (isFileOpen) {
@@ -621,49 +611,25 @@ class CAENDigitizerInterface {
 
     bool disconnected_mode() {
         spdlog::warn("Manually losing connection to the CAEN digitizer.");
-
-        for (CAENEvent& evt : processing_evts) {
-            evt.reset();
-        }
-
-        osc_event.reset();
-        adj_osc_event.reset();
-        Keithley2000.close();
-
-        auto err = disconnect(Port);
-        check_error(err, [](const std::string& cmd) {
-            spdlog::error(cmd);
-        });
-
+        close_caen();
         switch_state(CAENInterfaceStates::Standby);
         return true;
     }
 
     bool closing_mode() {
         spdlog::info("Going to close the CAEN thread.");
-        for (CAENEvent& evt : processing_evts) {
-            evt.reset();
-        }
-
-        osc_event.reset();
-        adj_osc_event.reset();
-        Keithley2000.close();
-
-        auto err = disconnect(Port);
-        check_error(err, [](const std::string& cmd) {
-            spdlog::error(cmd);
-        });
-
+        close_caen();
         return false;
     }
 
     void rdm_extract_for_gui() {
+        calculate_trigger_frequency();
         if (Port->Data.DataSize <= 0) {
             return;
         }
 
         // For the GUI
-        std::default_random_engine generator;
+        static std::default_random_engine generator;
         std::uniform_int_distribution<uint32_t>
             distribution(0, Port->Data.NumEvents);
         uint32_t rdm_num = distribution(generator);
@@ -674,11 +640,8 @@ class CAENDigitizerInterface {
     }
 
     void process_data_for_gui() {
-        // int j = 0;
-
-        // TODO(Zhiheng): change anything you need here, too...
-        // for(auto ch : Port->GroupConfigs) {
-        for (std::size_t j = 0; j < Port->GetNumChannels(); j++) {
+        calculate_trigger_frequency();
+        for (std::size_t j = 0; j < Port->ModelConstants.NumChannels; j++) {
             // auto& ch_num = ch.second.Number;
             auto buf = osc_event->Data->DataChannel[j];
             auto size = osc_event->Data->ChSize[j];
@@ -691,13 +654,93 @@ class CAENDigitizerInterface {
             y_values.resize(size);
 
             for (uint32_t i = 0; i < size; i++) {
-                x_values[i] = i*(1.0/Port->GetSampleRate())*(1e9);
+                x_values[i] = i*(1.0/Port->ModelConstants.AcquisitionRate)*(1e9);
                 y_values[i] = static_cast<double>(buf[i]);
             }
 
             _plotSender(static_cast<uint8_t>(j),
                 x_values,
                 y_values);
+        }
+    }
+
+    void sipm_voltage_system_update() {
+        static auto getVoltage = make_total_timed_event(
+            std::chrono::seconds(1),
+            [&]() {
+                auto r = SiPMVoltageSystem.get(
+                [=](serial_ptr& port) -> std::optional<double> {
+                    send_msg(port, "++addr 10\n", "");
+                    send_msg(port, ":fetch?\n", "");
+
+                    return retrieve_msg<double>(port);
+            });
+
+            if (r) {
+                double time = get_current_time_epoch() / 1000.0;
+                double volt = r.value();
+
+                latest_measure.Volt = volt;
+                latest_measure.Time = time;
+                _voltagesFile->Add(latest_measure);
+                _indicatorSender(IndicatorNames::DMM_VOLTAGE, time, volt);
+                _indicatorSender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
+            }
+        });
+
+        static auto saveVoltages = make_total_timed_event(
+            std::chrono::seconds(30),
+            [&]() {
+                spdlog::info("Saving voltage (Keithley 2000) voltages.");
+                async_save(_voltagesFile,
+                [](const SiPMVoltageMeasure& mes) {
+                    return  std::to_string(mes.Time) + "," +
+                        std::to_string(mes.Volt) + "," +
+                        std::to_string(mes.Current) + "\n";
+            });
+        });
+
+        switch (doe.CurrentState) {
+            case CAENInterfaceStates::OscilloscopeMode:
+            case CAENInterfaceStates::StatisticsMode:
+            case CAENInterfaceStates::RunMode:
+                getVoltage();
+                saveVoltages();
+            {
+                if (doe.SiPMVoltageSysChange) {
+                    SiPMVoltageSystem.get([=](serial_ptr& port)
+                        -> std::optional<double> {
+
+                        send_msg(port, "++auto 0\n", "");
+                        send_msg(port, "++addr 22\n", "");
+
+                        if(doe.SiPMVoltageSysSupplyEN) {
+                            send_msg(port, ":sour:volt:stat ON\n");
+                        } else {
+                            send_msg(port, ":sour:volt:stat OFF\n");
+                        }
+
+                        send_msg(port, ":sour:volt "
+                            + std::to_string(doe.SiPMVoltageSysVoltage));
+
+                        send_msg(port, "++auto 1\n", "");
+
+                        return {};
+                    });
+
+                    // Reset
+                    doe.SiPMVoltageSysChange = false;
+                }
+            }
+            break;
+
+            case CAENInterfaceStates::Standby:
+            case CAENInterfaceStates::AttemptConnection:
+            case CAENInterfaceStates::Disconnected:
+            case CAENInterfaceStates::Closing:
+            case CAENInterfaceStates::NullState:
+            default:
+            break;
         }
     }
 };
