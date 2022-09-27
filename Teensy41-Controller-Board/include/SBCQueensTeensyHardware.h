@@ -29,7 +29,7 @@ namespace SBCQueens {
     const uint8_t BME_CS            = 7u;
     const uint8_t BOX_BME_CS        = 8u;
 
-    const uint8_t PELTIER_EN_PIN    = 15u;
+    const uint8_t PELTIER_EN_PIN    = 17u;
 
     // Analog PINS
     const uint8_t NTWO_PIN = 0u; // 15

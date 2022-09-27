@@ -2,8 +2,6 @@
 
 #include <inttypes.h>
 
-
-
 struct PID_REGISTERS
 {
 	// All of these regs save the values

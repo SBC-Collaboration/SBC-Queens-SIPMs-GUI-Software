@@ -305,7 +305,6 @@ struct TeensyControllerData {
 
     TeensySystemPars SystemParameters;
 
-    bool RTDOnlyMode = false;
     uint32_t RTDSamplingPeriod = 100;
     uint32_t RTDMask = 0xFFFF;
 
@@ -637,6 +636,21 @@ class TeensyControllerInterface {
                 for (uint16_t i = 0; i < rtds.RTDS.size(); i++) {
                     rtds.RTDS[i] += 273.15;
                     MultiPlotSender(i, rtds.time, rtds.RTDS[i]);
+
+                    switch (i) {
+                        case 0:
+                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD1_TEMP,
+                            rtds.RTDS[i]);
+                        break;
+                        case 1:
+                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
+                            rtds.RTDS[i]);
+                        break;
+                        case 2:
+                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
+                            rtds.RTDS[i]);
+                        break;
+                    }
                 }
 
                 _RTDsFile->Add(rtds);
@@ -761,7 +775,7 @@ class TeensyControllerInterface {
                         return  std::to_string(rtds.time) + "," + out;
                 });
 
-                if (!doe.RTDOnlyMode){
+                if (!doe.SystemParameters.InRTDOnlyMode){
                     async_save(_PeltiersFile,
                         [](const Peltiers& pid) {
                             return  std::to_string(pid.time) + "," +
@@ -791,12 +805,12 @@ class TeensyControllerInterface {
         // Checks the status of the Teensy and sees if there are any errors
 
         // This should be called every 100ms
-        if (! doe.RTDOnlyMode) {
+        if (!doe.SystemParameters.InRTDOnlyMode) {
             retrieve_pids_nb();
             retrieve_pres_nb();
 
             // This should be called every 114ms
-            retrieve_bmes_nb();
+            // retrieve_bmes_nb();
         }
 
         retrieve_rtds_nb();
@@ -867,6 +881,9 @@ class TeensyControllerInterface {
             case TeensyCommands::SetRTDMask:
                 out << tcs.RTDMask;
             break;
+
+            case TeensyCommands::SetPeltierRelay:
+                out << tcs.PeltierState;
 
             // The default case assumes all the commands not mention above
             // do not have any inputs

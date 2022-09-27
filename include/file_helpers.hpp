@@ -235,5 +235,6 @@ void async_save(DataFile<T>& file, FormatFunc&& f, Args&&... args) noexcept {
 
     _pt(file, std::forward<FormatFunc>(f), std::forward<Args>(args)...);
 }
+
 }  // namespace SBCQueens
 #endif

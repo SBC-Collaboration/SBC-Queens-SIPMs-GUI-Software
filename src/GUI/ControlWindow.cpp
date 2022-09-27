@@ -33,8 +33,6 @@ void ControlWindow::init(const toml::table& tb) {
     tgui_state.RunName      = i_run_name;
 
     /// Teensy RTD config
-    tgui_state.RTDOnlyMode
-        = t_conf["RTDMode"].value_or(false);
     tgui_state.RTDSamplingPeriod
         = t_conf["RTDSamplingPeriod"].value_or(100Lu);
     tgui_state.RTDMask
@@ -216,7 +214,6 @@ bool ControlWindow::operator()() {
             // This is code that is run locally to this thread
             // when the button is pressed
             )) {
-                spdlog::info("Hello");
                 connected_mod = 0.5;
             }
 
@@ -314,7 +311,7 @@ bool ControlWindow::operator()() {
                 [=](CAENInterfaceData& state) {
                     // Only change the state if any of these states
                     if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-                        state.CurrentState == CAENInterfaceStates::StatisticsMode ||
+                        state.CurrentState == CAENInterfaceStates::BreakdownVoltageMode ||
                         state.CurrentState == CAENInterfaceStates::RunMode){
                             spdlog::info("Going to disconnect the CAEN digitizer");
                             state.CurrentState = CAENInterfaceStates::Disconnected;

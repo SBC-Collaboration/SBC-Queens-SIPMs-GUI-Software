@@ -30,17 +30,17 @@ bool SiPMControlWindow::operator()() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.84f, 0.0f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
         ImVec4(204.f / 255.f, 170.f / 255.f, 0.0f, 1.0f));
-    CAENControlFac.Button("Reset CAEN", [](CAENInterfaceData& old){
+    CAENControlFac.Button("Reset CAEN", [&](CAENInterfaceData& old){
         if(old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
             old.CurrentState == CAENInterfaceStates::RunMode ||
-            old.CurrentState == CAENInterfaceStates::StatisticsMode) {
+            old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
             // Setting it to AttemptConnection will force it to reset
+            old = cgui_state;
             old.CurrentState = CAENInterfaceStates::AttemptConnection;
         }
         return true;
     });
     ImGui::PopStyleColor(3);
-
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
             "Resets the CAEN digitizer with new"
@@ -68,33 +68,103 @@ bool SiPMControlWindow::operator()() {
             return true;
         });
 
-    if(ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Max voltage allowed is 50.5V");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Max voltage allowed is 60V");
     }
 
     ImGui::Separator();
-
-    CAENControlFac.Button("Gain Mode",
+    //  VBD mode controls
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        ImVec4(.0f, 8.f, .8f, 1.0f));
+    CAENControlFac.Button("Start Breakdown Voltage (VBD) Mode",
         [](CAENInterfaceData& old) {
             if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
                 old.CurrentState == CAENInterfaceStates::RunMode){
-                old.CurrentState = CAENInterfaceStates::StatisticsMode;
+                old.CurrentState = CAENInterfaceStates::BreakdownVoltageMode;
+                if(old.SiPMVoltageSysSupplyEN) {
+                    old.VBDData.State = VBRState::Init;
+                } else {
+                    spdlog::warn("VBD mode cannot start without enabling the "
+                        "power supply.");
+                }
+
             }
             return true;
     });
-
+    ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Starts measuring pulses and processing "
-            "them without saving to file. Intended for diagnostics.");
+        ImGui::SetTooltip("Starts the logic to attempt a VBD calculation.");
     }
 
+    CAENControlFac.Button("SPE estimation",
+        [](CAENInterfaceData& old) {
+            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+                if(old.VBDData.State == VBRState::Init) {
+                    old.VBDData.State = VBRState::SPEEstimate;
+                }
+            }
+            return true;
+    });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Estimates the SPE parameters: A1pe, and pulse "
+            "nuisance parameters, for example: rise and fall times.");
+    }
+
+    CAENControlFac.Button("Take gain vs V measurements",
+        [](CAENInterfaceData& old) {
+            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+                if(old.VBDData.State == VBRState::Idle) {
+                    old.VBDData.State = VBRState::TakingGainVoltageMeasurement;
+                }
+            }
+            return true;
+    });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Once SPE estimation is clicked a set of pulses "
+            "can be acquired for the estimation of their gains");
+    }
+
+    CAENControlFac.Button("Calculate VBD",
+        [](CAENInterfaceData& old) {
+            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+                if(old.VBDData.State == VBRState::Idle) {
+                    old.VBDData.State = VBRState::CalculateBreakdownVoltage;
+                }
+            }
+            return true;
+    });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Given enough data points in the G vs V plot "
+            "the user can calculate the gain by pressing this button.");
+    }
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.0f, 0.0f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        ImVec4(0.8f, .1f, .1f, 1.0f));
+    CAENControlFac.Button("Reset VBD",
+        [](CAENInterfaceData& old) {
+            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+                old.VBDData.State = VBRState::Reset;
+            }
+            return true;
+    });
+    ImGui::PopStyleColor(2);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Resets the data taken.");
+    }
+
+    //  end VBD mode controls
+    ImGui::Separator();
+    //  Data taking controls
     CAENControlFac.Button(
         "Start SiPM Data Taking",
         [=](CAENInterfaceData& old) {
         // Only change state if its in a work related
         // state, i.e oscilloscope mode
         if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-            old.CurrentState == CAENInterfaceStates::StatisticsMode) {
+            old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
             old.CurrentState = CAENInterfaceStates::RunMode;
             old.SiPMParameters = cgui_state.SiPMParameters;
         }
@@ -111,6 +181,7 @@ bool SiPMControlWindow::operator()() {
         return true;
     });
 
+    //  end Data taking controls
     ImGui::End();
     return true;
 }

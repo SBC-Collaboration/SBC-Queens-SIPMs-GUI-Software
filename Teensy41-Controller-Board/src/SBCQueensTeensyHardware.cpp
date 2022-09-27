@@ -125,13 +125,13 @@ namespace SBCQueens {
 	/// Pin Initializations
 #ifndef RTD_ONLY_MODE
 		pinMode(        TWELVEV_PIN_ONE,    arduino::OUTPUT);
-		digitalWrite(   TWELVEV_PIN_ONE,    arduino::LOW);
+		digitalWrite(   TWELVEV_PIN_ONE,    arduino::HIGH);
 
 		pinMode(        TWELVEV_PIN_TWO,    arduino::OUTPUT);
-		digitalWrite(   TWELVEV_PIN_TWO,    arduino::LOW);
+		digitalWrite(   TWELVEV_PIN_TWO,    arduino::HIGH);
 
 		pinMode(        TWELVEV_PIN_THREE,  arduino::OUTPUT);
-		digitalWrite(   TWELVEV_PIN_THREE,  arduino::LOW);
+		digitalWrite(   TWELVEV_PIN_THREE,  arduino::HIGH);
 
 		// SPI CS Pins
 		pinMode(        RTD_ONE_CS,         arduino::OUTPUT);
@@ -143,11 +143,8 @@ namespace SBCQueens {
 		pinMode(        RTD_THREE_CS,         arduino::OUTPUT);
 		digitalWrite(   RTD_THREE_CS,         arduino::HIGH);
 
-		pinMode(        9,    arduino::OUTPUT);
-		digitalWrite(   9,         arduino::HIGH);
-
-				pinMode(        20,    arduino::OUTPUT);
-		digitalWrite(   20,         arduino::HIGH);
+		pinMode(        PELTIER_EN_PIN,         arduino::OUTPUT);
+		digitalWrite(   PELTIER_EN_PIN,         arduino::HIGH);
 
 		pinMode(        BME_CS,             arduino::OUTPUT);
 		digitalWrite(   BME_CS,             arduino::HIGH);

@@ -21,9 +21,6 @@ namespace SBCQueens {
 
         // For plots:
         PELTIER_CURR,
-        RTD_TEMP_ONE,
-        RTD_TEMP_TWO,
-        RTD_TEMP_THREE,
 
         VACUUM_PRESS,
         PFEIFFER_PRESS,
@@ -49,9 +46,11 @@ namespace SBCQueens {
         // CAEN Indicators
         CAENBUFFEREVENTS,
         TRIGGERRATE,
-        FREQUENCY,
-        DARK_NOISE_RATE,
-        GAIN,
+
+        WAVEFORM_NOISE,
+        SPE_GAIN_MEAN,
+        SPE_EFFICIENCTY,
+        BREAKDOWN_VOLTAGE,
 
         SAVED_WAVEFORMS
     };

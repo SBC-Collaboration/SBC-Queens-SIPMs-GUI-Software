@@ -292,7 +292,6 @@ class Plot : public Indicator<T> {
         plotData.CurrentIndex = 0;
     }
 
-
     // Executes attributes. For plots, it clears on new data.
     void ExecuteAttributes() {
         if (ClearOnNewData) {

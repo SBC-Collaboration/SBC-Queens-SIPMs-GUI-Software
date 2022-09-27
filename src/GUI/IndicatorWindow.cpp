@@ -77,17 +77,6 @@ namespace SBCQueens {
             "Trigger Rate", 200, 4);
         ImGui::SameLine(300); ImGui::Text("Waveforms / s");
 
-        _indicatorReceiver.indicator(IndicatorNames::FREQUENCY,
-            "Signal frequency", 200, 4, NumericFormat::Scientific);
-        ImGui::SameLine(300); ImGui::Text("Hz");
-
-        _indicatorReceiver.indicator(IndicatorNames::DARK_NOISE_RATE,
-            "Dark noise rate", 200, 3, NumericFormat::Scientific);
-        ImGui::SameLine(300); ImGui::Text("Hz");
-
-        _indicatorReceiver.indicator(IndicatorNames::GAIN,
-            "Gain", 200, 3, NumericFormat::Scientific);
-        ImGui::SameLine(300); ImGui::Text("[counts x ns]");
         // End CAEN
         ImGui::End();
 

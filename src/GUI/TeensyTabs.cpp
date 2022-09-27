@@ -35,7 +35,7 @@ namespace SBCQueens {
                 }
             );
 
-            if (!tgui_state.RTDOnlyMode) {
+            if (!tgui_state.SystemParameters.InRTDOnlyMode) {
                 TeensyControlFac.Checkbox("Peltier Relay",
                     tgui_state.PeltierState,
                     ImGui::IsItemEdited,
@@ -71,7 +71,7 @@ namespace SBCQueens {
 
 
 
-            if (!tgui_state.RTDOnlyMode) {
+            if (!tgui_state.SystemParameters.InRTDOnlyMode) {
                 ImGui::Separator();
                 ImGui::PushItemWidth(180);
 

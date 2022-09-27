@@ -124,7 +124,6 @@ class GUIManager {
             trg_once = false;
         }
 
-
         controlWindow();
         sipmControlWindow();
 
@@ -134,6 +133,7 @@ class GUIManager {
         // This functor updates the plots values from the queue.
         GeneralIndicatorReceiver();
         MultiPlotReceiver();
+        SiPMPlotReceiver();
 
         const auto g_axis_flags = ImPlotAxisFlags_AutoFit;
         // /// Teensy-BME280 Plots
@@ -235,6 +235,8 @@ class GUIManager {
                 ImPlot::SetupAxes("time [s]", "Current [A]",
                     g_axis_flags, g_axis_flags);
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
+
+                GeneralIndicatorReceiver.plot(IndicatorNames::PELTIER_CURR, "Current");
 
                 ImPlot::EndPlot();
             }

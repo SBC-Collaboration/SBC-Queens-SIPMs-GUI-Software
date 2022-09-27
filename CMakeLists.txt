@@ -56,12 +56,10 @@ endif (UNIX)
 # Set the project standard and warnings
 #
 
-
-# add_compile_options(
-#   "-Wall"
-#   "$<$<CONFIG:DEBUG>:-Og;-ggdb;--std=c++17>"
-#   "$<$<CONFIG:RELEASE>:-O3;--std=c++17;>"
-# )
+add_compile_options(
+  "$<$<CONFIG:DEBUG>:-Og;-ggdb;>"
+  "$<$<CONFIG:RELEASE>:-O3;>"
+)
 
 # set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 # set (CMAKE_CXX_FLAGS "--std=c++17")

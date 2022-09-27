@@ -248,9 +248,6 @@ struct caenEvent {
         return caenEvent(other);
     }
 
-
-
-
  private:
     int _handle;
 };
