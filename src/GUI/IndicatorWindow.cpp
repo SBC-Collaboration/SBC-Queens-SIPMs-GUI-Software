@@ -1,5 +1,6 @@
 #include "GUI/IndicatorWindow.hpp"
 #include "implot_helpers.hpp"
+#include <imgui.h>
 
 // C STD includes
 // C 3rd party includes
@@ -19,7 +20,9 @@ namespace SBCQueens {
         ImGui::Text("File Statistics");
         _indicatorReceiver.indicator(
             IndicatorNames::SAVED_WAVEFORMS, "Saved SiPM Pulses", 200);
-
+        ImGui::SameLine(300); ImGui::Text("[waveforms]");
+        //
+        ImGui::Separator();
         // Teensy
         ImGui::Text("Teensy");
 
@@ -58,24 +61,46 @@ namespace SBCQueens {
         ImGui::SameLine(300); ImGui::Text("[Bar]");
         // End Teensy
 
+        ImGui::Separator();
         // CAEN
-        ImGui::Text("SiPM Statistics");
+        ImGui::Text("Supply indicators");
 
         _indicatorReceiver.indicator(IndicatorNames::LATEST_DMM_VOLTAGE,
             "Latest DMM Voltage", 200, 6, NumericFormat::Scientific);
-        ImGui::SameLine(300); ImGui::Text("V");
+        ImGui::SameLine(300); ImGui::Text("[V]");
 
         _indicatorReceiver.indicator(IndicatorNames::LATEST_PICO_CURRENT,
             "Latest DMM Voltage", 200, 6, NumericFormat::Scientific);
-        ImGui::SameLine(300); ImGui::Text("A");
+        ImGui::SameLine(300); ImGui::Text("[A]");
+
+        ImGui::Separator();
+        ImGui::Text("CAEN Statistics");
 
         _indicatorReceiver.indicator(IndicatorNames::CAENBUFFEREVENTS,
             "Events in buffer", 200, 4);
-        ImGui::SameLine(300); ImGui::Text("Counts");
+        ImGui::SameLine(300); ImGui::Text("# events");
 
         _indicatorReceiver.indicator(IndicatorNames::TRIGGERRATE,
             "Trigger Rate", 200, 4);
-        ImGui::SameLine(300); ImGui::Text("Waveforms / s");
+        ImGui::SameLine(300); ImGui::Text("[Waveforms / s]");
+
+        ImGui::Separator();
+        ImGui::Text("SiPM Statistics");
+        _indicatorReceiver.indicator(IndicatorNames::WAVEFORM_NOISE,
+            "STD noise", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[counts]");
+
+        _indicatorReceiver.indicator(IndicatorNames::SPE_GAIN_MEAN,
+            "1SPE Gain Mean", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[sp x counts]");
+
+        _indicatorReceiver.indicator(IndicatorNames::SPE_EFFICIENCTY,
+            "1SPE Efficiency", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[%]");
+
+        _indicatorReceiver.indicator(IndicatorNames::BREAKDOWN_VOLTAGE,
+            "VBD", 200, 3);
+        ImGui::SameLine(300); ImGui::Text("[V]");
 
         // End CAEN
         ImGui::End();

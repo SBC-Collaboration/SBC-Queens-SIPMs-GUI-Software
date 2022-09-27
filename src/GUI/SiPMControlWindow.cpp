@@ -101,7 +101,7 @@ bool SiPMControlWindow::operator()() {
     CAENControlFac.Button("SPE estimation",
         [](CAENInterfaceData& old) {
             if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
-                if(old.VBDData.State == VBRState::Init) {
+                if(old.VBDData.State == VBRState::Idle) {
                     old.VBDData.State = VBRState::SPEEstimate;
                 }
             }

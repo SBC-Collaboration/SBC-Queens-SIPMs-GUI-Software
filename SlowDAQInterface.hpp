@@ -123,6 +123,10 @@ class SlowDAQInterface {
             // End Communication with the GUI
 
             if (!doe.PFEIFFERSingleGaugeEnable) {
+                if (doe.PFEIFFERState == PFEIFFERSSGState::Closing) {
+                    return false;
+                }
+
                 return true;
             }
 
@@ -230,7 +234,7 @@ class SlowDAQInterface {
         // Actual loop!
         while (main_loop_block_time()) {}
 
-        spdlog::info("Closing");
+        spdlog::info("Closing SlowDAQ");
     }
 
     void PFEIFFER_update() {

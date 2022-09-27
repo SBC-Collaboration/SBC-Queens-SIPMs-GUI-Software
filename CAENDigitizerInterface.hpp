@@ -19,6 +19,7 @@
 #include <iostream>
 
 // C++ 3rd party includes
+#include <armadillo>
 #include <serial/serial.h>
 #include <readerwriterqueue.h>
 #include <spdlog/spdlog.h>
@@ -32,6 +33,9 @@
 #include "include/timing_events.hpp"
 #include "include/armadillo_helpers.hpp"
 #include "include/HardwareHelpers/ClientController.hpp"
+
+#include "sipmcharacterization/PulseFunctions.hpp"
+#include "sipmcharacterization/SPEAnalysis.hpp"
 
 namespace SBCQueens {
 
@@ -120,7 +124,8 @@ class CAENDigitizerInterface {
     ClientController<serial_ptr, std::pair<double, double>> SiPMVoltageSystem;
 
     SiPMVoltageMeasure latest_measure;
-    std::uint64_t SavedWaveforms = 0;
+    uint64_t SavedWaveforms = 0;
+    uint64_t TriggeredWaveforms = 0;
 
     // tmp stuff
     uint16_t* data;
@@ -129,6 +134,18 @@ class CAENDigitizerInterface {
     CAENEvent osc_event, adj_osc_event;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
     CAENEvent processing_evts[1024];
+
+    // Analysis
+    arma::mat coords;
+      // coords(0, 0) = 100;
+      // coords(1, 0) = 35e3;
+      // coords(2, 0) = 20;
+      // coords(3, 0) = 5;
+      // coords(4, 0) = 7500;
+    std::unique_ptr< SPEAnalysis<nEXOSiPMFunction> > spe_analysis;
+    // SPEAnalysis<nEXOSiPMFunction> _speanalysis(
+    // 100, 1100, coords
+    // );
 
     // As long as we make the Func template argument a std::fuction
     // we can then use pointer magic to initialize them
@@ -188,6 +205,8 @@ class CAENDigitizerInterface {
         closing_state = std::make_shared<CAENInterfaceState>(
             std::chrono::milliseconds(1),
             std::bind(&CAENDigitizerInterface::closing_mode, this));
+
+        coords = arma::mat(5, 1, arma::fill::ones);
     }
 
     // No copying
@@ -241,9 +260,9 @@ class CAENDigitizerInterface {
                 send_msg_slow(":volt:dc:nplc 10");
                 send_msg_slow(":volt:dc:rang:auto 0");
                 send_msg_slow(":volt:dc:rang 100");
-                send_msg_slow(":volt:dc:aver:stat 1");
-                send_msg_slow(":volt:dc:aver:tcon mov");
-                send_msg_slow(":volt:dc:aver:coun 100");
+                send_msg_slow(":volt:dc:aver:stat 0");
+                // send_msg_slow(":volt:dc:aver:tcon mov");
+                // send_msg_slow(":volt:dc:aver:coun 100");
 
                 send_msg_slow(":form ascii");
 
@@ -322,9 +341,9 @@ class CAENDigitizerInterface {
         static uint64_t last_waveforms = 0;
         double current_time = get_current_time_epoch() / 1000.0;
         double dt = current_time - last_time;
-        uint64_t dWaveforms = SavedWaveforms - last_waveforms;
+        uint64_t dWaveforms = TriggeredWaveforms - last_waveforms;
 
-        last_waveforms = SavedWaveforms;
+        last_waveforms = TriggeredWaveforms;
         last_time = current_time;
         _indicatorSender(IndicatorNames::TRIGGERRATE, dWaveforms / dt);
     }
@@ -430,7 +449,6 @@ class CAENDigitizerInterface {
     // Attempts a connection to the CAEN digitizer, setups the channels,
     // starts acquisition, and moves the oscilloscope mode
     bool attempt_connection() {
-
         // If the port is open, clean up and close the port.
         // This will help turn attempt_connection into a reset
         // for the entire system.
@@ -515,7 +533,7 @@ class CAENDigitizerInterface {
         }
 
         if (Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
-            SavedWaveforms += Port->Data.NumEvents;
+            TriggeredWaveforms += Port->Data.NumEvents;
             // spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
             // spdlog::info("Data size: {0}", Port->Data.DataSize);
             // spdlog::info("Num events: {0}", Port->Data.NumEvents);
@@ -556,6 +574,7 @@ class CAENDigitizerInterface {
 
             // double frequency = 0.0;
             num_events = Port->Data.NumEvents;
+            TriggeredWaveforms += num_events;
             for (uint32_t i = 0; i < num_events; i++) {
                 // Extract event i
                 extract_event(Port, i, processing_evts[i]);
@@ -571,8 +590,9 @@ class CAENDigitizerInterface {
         static uint32_t acq_pulses = 0;
         static bool init_done = false;
         static bool spe_estimation_done = false;
-        switch(doe.VBDData.State) {
+        switch (doe.VBDData.State) {
             case VBRState::Init:
+            {
                 // Memory allocations and prepare the resources for whenever
                 // the user presses the next button, and prepares the file
                 open(_pulseFile,
@@ -593,9 +613,35 @@ class CAENDigitizerInterface {
                 spe_estimation_pulse_buffer.resize(
                     doe.VBDData.SPEEstimationTotalPulses,
                     doe.GlobalConfig.RecordLength);
+
+                uint32_t prepulse_end_region_per
+                    = static_cast<uint32_t>(
+                    1.0 - 0.01*doe.GlobalConfig.PostTriggerPorcentage);
+                int32_t prepulse_end_region
+                    = doe.GlobalConfig.RecordLength*prepulse_end_region_per - 150;
+
+                uint32_t prepulse_end_region_u = prepulse_end_region < 0 ?
+                    0 : prepulse_end_region;
+
+                coords(0, 0) = prepulse_end_region + 1;
+                coords(1, 0) = 35e3;
+                coords(2, 0) = 20;
+                coords(3, 0) = 5;
+                coords(4, 0) = doe.GroupConfigs[0].DCOffset;
+
+                spdlog::info("prepulse_end_region: {0}", prepulse_end_region_u);
+                spdlog::info("dc offset: {0}", doe.GroupConfigs[0].DCOffset);
+
+                spe_analysis.reset(new SPEAnalysis<nEXOSiPMFunction>(
+                    prepulse_end_region_u,
+                    doe.GlobalConfig.RecordLength, coords));
+
                 acq_pulses = 0;
                 init_done = true;
                 SavedWaveforms = 0;
+
+                doe.VBDData.State = VBRState::Idle;
+            }
             break;
             case VBRState::SPEEstimate:
                 if (!init_done) {
@@ -616,18 +662,30 @@ class CAENDigitizerInterface {
                     }
 
                     arma::mat waveform
-                        = caen_event_to_armadillo(processing_evts[k], 0);
+                        = caen_event_to_armadillo(processing_evts[k], 1);
 
-                    spe_estimation_pulse_buffer.insert_rows(acq_pulses,
-                        waveform);
+                    spe_estimation_pulse_buffer.row(acq_pulses) = waveform;
 
                     acq_pulses++;
                 }
 
                 save(_pulseFile, sbc_save_func, Port);
                 if (SavedWaveforms == doe.VBDData.SPEEstimationTotalPulses) {
-
                     spe_estimation_done = true;
+
+                    auto pars = spe_analysis->FullAnalysis(
+                        spe_estimation_pulse_buffer,
+                        doe.GroupConfigs[0].DCOffset);
+
+                    _indicatorSender(IndicatorNames::SPE_GAIN_MEAN,
+                        pars.SPEParameters(1));
+
+                    _indicatorSender(IndicatorNames::WAVEFORM_NOISE,
+                        pars.CountsNoiseSTD);
+
+                    _indicatorSender(IndicatorNames::SPE_EFFICIENCTY,
+                        pars.SPEEfficiency);
+
                     doe.VBDData.State = VBRState::Idle;
                 }
 
@@ -661,6 +719,8 @@ class CAENDigitizerInterface {
             std::chrono::seconds(1),
             std::bind(&CAENDigitizerInterface::lec, this));
 
+        _indicatorSender(IndicatorNames::SAVED_WAVEFORMS,
+                    SavedWaveforms);
         checkerror();
         extract_for_gui_nb();
         change_state();
@@ -691,6 +751,7 @@ class CAENDigitizerInterface {
                     _pulseFile->Add(processing_evts[i]);
                 }
             }
+
 
             SavedWaveforms += Port->Data.NumEvents;
             _indicatorSender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
@@ -758,7 +819,6 @@ class CAENDigitizerInterface {
     }
 
     void rdm_extract_for_gui() {
-        calculate_trigger_frequency();
         if (Port->Data.DataSize <= 0) {
             return;
         }
@@ -848,14 +908,17 @@ class CAENDigitizerInterface {
                 double volt = r.value().first;
                 double curr = r.value().second;
 
-                latest_measure.Volt = volt;
-                latest_measure.Time = time;
-                latest_measure.Current = curr;
-                _voltagesFile->Add(latest_measure);
-                _indicatorSender(IndicatorNames::DMM_VOLTAGE, time, volt);
-                _indicatorSender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
-                _indicatorSender(IndicatorNames::PICO_CURRENT, time, curr);
-                _indicatorSender(IndicatorNames::LATEST_PICO_CURRENT, curr);
+                // This measure is a NaN/Overflow from the picoammeter
+                if(curr < 9.9e37){
+                    latest_measure.Volt = volt;
+                    latest_measure.Time = time;
+                    latest_measure.Current = curr;
+                    _voltagesFile->Add(latest_measure);
+                    _indicatorSender(IndicatorNames::DMM_VOLTAGE, time, volt);
+                    _indicatorSender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
+                    _indicatorSender(IndicatorNames::PICO_CURRENT, time, curr);
+                    _indicatorSender(IndicatorNames::LATEST_PICO_CURRENT, curr);
+                }
             }
         });
 
@@ -884,21 +947,19 @@ class CAENDigitizerInterface {
                 if (doe.SiPMVoltageSysChange) {
                     SiPMVoltageSystem.get([=](serial_ptr& port)
                     -> std::optional<std::pair<double, double>> {
-
-                        send_msg(port, "++auto 0\n", "");
                         send_msg(port, "++addr 22\n", "");
 
                         if(doe.SiPMVoltageSysSupplyEN) {
-                            send_msg(port, ":sour:volt:stat ON\n");
+                            send_msg(port, ":sour:volt:stat ON\n", "");
                         } else {
-                            send_msg(port, ":sour:volt:stat OFF\n");
+                            send_msg(port, ":sour:volt:stat OFF\n", "");
                         }
 
                         send_msg(port, ":sour:volt "
-                            + std::to_string(doe.SiPMVoltageSysVoltage));
+                            + std::to_string(doe.SiPMVoltageSysVoltage)
+                            + "\n", "");
 
                         // send_msg(port, "++auto 1\n", "");
-
                         return {};
                     });
 
@@ -912,6 +973,13 @@ class CAENDigitizerInterface {
             case CAENInterfaceStates::AttemptConnection:
             case CAENInterfaceStates::Disconnected:
             case CAENInterfaceStates::Closing:
+                SiPMVoltageSystem.get([=](serial_ptr& port)
+                    -> std::optional<std::pair<double, double>> {
+                        send_msg(port, "++addr 22\n", "");
+                        send_msg(port, ":sour:volt:stat OFF\n", "");
+                        send_msg(port, ":sour:volt 0.0\n", "");
+                        return {};
+                    });
             case CAENInterfaceStates::NullState:
             default:
             break;

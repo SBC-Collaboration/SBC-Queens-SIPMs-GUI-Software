@@ -136,11 +136,16 @@ endif()
 file(GLOB GUI_CONFIG_FILE gui_setup.toml)
 file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 
+find_package(OpenMP REQUIRED)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${OPENMP_LIBRARIES})
+
 # setupapi -> for serial
-target_link_libraries(SiPMControlGUI ${LIBRARIES} ${IMGUI_LIBRARIES}
+target_link_libraries(${PROJECT_NAME} PUBLIC ${LIBRARIES} ${IMGUI_LIBRARIES}
   ${ARMADILLO_LIBRARIES}
+  sipmcharacterization
   glfw imgui implot
   serial atomic spdlog
   CAENVME
   CAENComm
-  CAENDigitizer)
+  CAENDigitizer
+)

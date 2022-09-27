@@ -61,7 +61,7 @@ Offset = 0x8000
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
 Range = 1
-Threshold = 8000
+Threshold = 7500
 
 # [CAEN.group1]
 # Enabled = 0
@@ -73,7 +73,7 @@ Threshold = 8000
 [Other]
 [Other.SiPMVoltageSystem]
 Port = "/dev/ttyUSB0"
-InitVoltage = 50
+InitVoltage = 53
 
 [Other.PFEIFFERSingleGauge]
 Port = "COM7"

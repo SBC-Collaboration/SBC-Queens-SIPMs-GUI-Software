@@ -1,6 +1,7 @@
 
 
 // C++ STD includes
+#include <chrono>
 #include <thread>
 
 // C++ 3rd party includes
@@ -116,6 +117,9 @@ int main() {
     caen_thread.detach();
     other_thread.detach();
     gui_wrapper();
+
+    // while(!tc_thread.joinable());
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
     spdlog::info("Closing ! ! !");
 
