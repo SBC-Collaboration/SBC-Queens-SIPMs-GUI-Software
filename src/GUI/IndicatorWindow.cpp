@@ -60,6 +60,10 @@ namespace SBCQueens {
         // CAEN
         ImGui::Text("SiPM Statistics");
 
+        _indicatorReceiver.indicator(IndicatorNames::LATEST_DMM_VOLTAGE,
+            "Latest DMM Voltage", 200, 7);
+        ImGui::SameLine(300); ImGui::Text("V");
+
         _indicatorReceiver.indicator(IndicatorNames::CAENBUFFEREVENTS,
             "Events in buffer", 200, 4);
         ImGui::SameLine(300); ImGui::Text("Counts");

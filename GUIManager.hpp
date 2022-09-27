@@ -103,6 +103,8 @@ class GUIManager {
                 sipm_names.emplace_back(elem.value_or(""));
             }
         }
+
+
     }
 
     // No copying
@@ -111,7 +113,13 @@ class GUIManager {
     ~GUIManager() { }
 
     void operator()() {
-        ImPlot::StyleColorsDark();
+        static bool trg_once = true;
+        if (trg_once) {
+            ImPlot::StyleColorsDark();
+            ImPlot::GetStyle().UseLocalTime = true;
+            trg_once = false;
+        }
+
 
         controlWindow();
 
@@ -288,44 +296,78 @@ class GUIManager {
         /// SiPM Plots
 
 
-        ImGui::Begin("SiPM Plot");
-        const size_t kCHperGroup = 8;
-        const auto& model_constants
-                    = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
-        const auto numgroups = model_constants.NumberOfGroups > 0 ?
-            model_constants.NumberOfGroups : 1;
-        const int numchpergroup = model_constants.NumChannels / numgroups;
-        // Let's work on const auto& because we really do not want to change
-        // anything in these next lines
-        if (ImPlot::BeginPlot("SiPM Plots", ImVec2(-1, -1),
-            ImPlotFlags_NoTitle)) {
-            ImPlot::SetupAxes("time [ns]", "Counts", g_axis_flags,
-                g_axis_flags);
-            for (const auto& gp : cgui_state.GroupConfigs) {
-                // We need the number of groups each model has
+        ImGui::Begin("##SiPMs");
 
-                // If groups is higher than 0, then it has groups
-                // otherwise each group is a channel
-                if (model_constants.NumberOfGroups > 0) {
-                    // Each mask contains if the channel is enabled
-                    const auto& mask = gp.AcquisitionMask;
-                    // There is always at max 8 channels.
-                    for (std::size_t i = 0; i < kCHperGroup; i++) {
-                        if (mask & (1 << i)) {
-                            SiPMPlotReceiver.plot(kCHperGroup*gp.Number + i,
-                            "GP " +  std::to_string(gp.Number)
-                            + "CH " + std::to_string(i), true);
-                            ImPlot::EndPlot();
+        if (ImGui::BeginTabBar("SiPMs Plots")) {
+            if (ImGui::BeginTabItem("SiPM Waveforms")) {
+                const size_t kCHperGroup = 8;
+                const auto& model_constants
+                            = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
+                const auto numgroups = model_constants.NumberOfGroups > 0 ?
+                    model_constants.NumberOfGroups : 1;
+                const int numchpergroup = model_constants.NumChannels / numgroups;
+                // Let's work on const auto& because we really do not want to change
+                // anything in these next lines
+                if (ImPlot::BeginPlot("SiPM Plots", ImVec2(-1, -1),
+                    ImPlotFlags_NoTitle)) {
+                    ImPlot::SetupAxes("time [ns]", "Counts", g_axis_flags,
+                        g_axis_flags);
+                    for (const auto& gp : cgui_state.GroupConfigs) {
+                        // We need the number of groups each model has
+
+                        // If groups is higher than 0, then it has groups
+                        // otherwise each group is a channel
+                        if (model_constants.NumberOfGroups > 0) {
+                            // Each mask contains if the channel is enabled
+                            const auto& mask = gp.AcquisitionMask;
+                            // There is always at max 8 channels.
+                            for (std::size_t i = 0; i < kCHperGroup; i++) {
+                                if (mask & (1 << i)) {
+                                    SiPMPlotReceiver.plot(kCHperGroup*gp.Number + i,
+                                    "GP " +  std::to_string(gp.Number)
+                                    + "CH " + std::to_string(i), true);
+                                    ImPlot::EndPlot();
+                                }
+                            }
+                        } else {
+                            SiPMPlotReceiver.plot(gp.Number,
+                                "CH " + std::to_string(gp.Number), true);
                         }
                     }
-                } else {
-                    SiPMPlotReceiver.plot(gp.Number,
-                        "CH " + std::to_string(gp.Number), true);
+                    ImPlot::EndPlot();
                 }
+                ImGui::EndTabItem();
             }
 
-            ImPlot::EndPlot();
+            if (ImGui::BeginTabItem("Keithley 2000")) {
+                if (ImPlot::BeginPlot("Voltage", ImVec2(-1, -1),
+                    ImPlotFlags_NoTitle)) {
+                    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
+                    ImPlot::SetupAxisFormat(ImAxis_Y1, "%2.7f");
+                    ImPlot::SetupAxes("time [EST]", "Voltage [V]", g_axis_flags,
+                        g_axis_flags);
+
+                    GeneralIndicatorReceiver.plot(IndicatorNames::DMM_VOLTAGE,
+                        "Voltage");
+
+                    ImPlot::EndPlot();
+                }
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Gain")) {
+                if (ImPlot::BeginPlot("Voltage", ImVec2(-1, -1),
+                    ImPlotFlags_NoTitle)) {
+                    ImPlot::SetupAxes("Voltage [V]", "Gain [arb]", g_axis_flags,
+                        g_axis_flags);
+
+                    ImPlot::EndPlot();
+                }
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
         }
+
         ImGui::End();
         /// !SiPM Plots
         //// !Plots

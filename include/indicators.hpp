@@ -32,10 +32,7 @@ namespace SBCQueens {
         LOCAL_BME_Pressure,
         LOCAL_BME_Humidity,
 
-        SiPM_Plot_ZERO,
-        SiPM_Plot_ONE,
-        SiPM_Plot_TWO,
-        SiPM_Plot_THREE,
+        DMM_VOLTAGE,
 
         // For indicators:
         // Teeensy Indicators
@@ -45,6 +42,7 @@ namespace SBCQueens {
         LATEST_Peltier_CURR,
 
         LATEST_VACUUM_PRESS,
+        LATEST_DMM_VOLTAGE,
 
         // CAEN Indicators
         CAENBUFFEREVENTS,

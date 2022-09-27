@@ -64,6 +64,10 @@ class ClientController {
         _closeFunc = close;
     }
 
+    void close() noexcept {
+        _closeFunc(_port);
+    }
+
     // Holds the entire logic to connect to the port and retrieve the data.
     // A form of "lazy evaluation" leaving the connection to the port
     // until required. The code returns an optional to deal in the case the
@@ -79,10 +83,9 @@ class ClientController {
                     _name);
 
                 // Sometimes the logic inside init would not close the
-                // port, so we close it manually.
-                if (_port) {
-                    _closeFunc(_port);
-                }
+                // port, so we close it here.
+                _closeFunc(_port);
+
             }
 
             return {};  // returns an empty optional
