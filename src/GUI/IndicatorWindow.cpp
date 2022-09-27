@@ -70,7 +70,7 @@ namespace SBCQueens {
         ImGui::SameLine(300); ImGui::Text("[V]");
 
         _indicatorReceiver.indicator(IndicatorNames::LATEST_PICO_CURRENT,
-            "Latest DMM Voltage", 200, 6, NumericFormat::Scientific);
+            "Latest DMM Current", 200, 6, NumericFormat::Scientific);
         ImGui::SameLine(300); ImGui::Text("[A]");
 
         ImGui::Separator();
@@ -96,7 +96,23 @@ namespace SBCQueens {
 
         _indicatorReceiver.indicator(IndicatorNames::SPE_EFFICIENCTY,
             "1SPE Efficiency", 200, 4);
-        ImGui::SameLine(300); ImGui::Text("[%]");
+        ImGui::SameLine(300); ImGui::Text("[%%]");
+
+        _indicatorReceiver.indicator(IndicatorNames::RISE_TIME,
+            "1SPE Rise time", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[sp]");
+
+        _indicatorReceiver.indicator(IndicatorNames::FALL_TIME,
+            "1SPE Fall time", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[sp]");
+
+        _indicatorReceiver.indicator(IndicatorNames::OFFSET,
+            "1SPE Offset", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[counts]");
+
+        _indicatorReceiver.indicator(IndicatorNames::INTEGRAL_THRESHOLD,
+            "1SPE Integral threshold", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[arb.]");
 
         _indicatorReceiver.indicator(IndicatorNames::BREAKDOWN_VOLTAGE,
             "VBD", 200, 3);

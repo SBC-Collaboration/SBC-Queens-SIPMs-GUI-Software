@@ -480,6 +480,9 @@ void clear_data(CAEN&) noexcept;
 // Ex: x5730 record length can only be multiples of 10
 uint32_t t_to_record_length(CAEN&, const double&) noexcept;
 
+// Turns a voltage threshold counts to ADC cts
+uint32_t v_threshold_cts_to_adc_cts(CAEN&, const uint32_t&) noexcept;
+
 // Turns a voltage (V) into trigger counts
 uint32_t v_to_threshold_counts(CAEN&, const double&) noexcept;
 

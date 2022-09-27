@@ -32,7 +32,12 @@
 #include "include/indicators.hpp"
 #include "include/timing_events.hpp"
 #include "include/armadillo_helpers.hpp"
+
 #include "include/HardwareHelpers/ClientController.hpp"
+#include "include/HardwareHelpers/Calibration.hpp"
+
+#include "sipmcharacterization/PulseFunctions.hpp"
+#include "sipmcharacterization/SPEAnalysis.hpp"
 
 #include "sipmcharacterization/PulseFunctions.hpp"
 #include "sipmcharacterization/SPEAnalysis.hpp"
@@ -251,6 +256,7 @@ class CAENDigitizerInterface {
                 send_msg_slow("++addr 10");
                 send_msg_slow("++auto 0");
 
+                //// if tired of waiting for keithley comment starting here:
                 // Now Keithley
                 // These parameters are constant for now
                 // but later they can become a parameter or the voltage
@@ -452,7 +458,7 @@ class CAENDigitizerInterface {
         // If the port is open, clean up and close the port.
         // This will help turn attempt_connection into a reset
         // for the entire system.
-        if(Port) {
+        if (Port) {
             close_caen();
         }
 
@@ -552,7 +558,6 @@ class CAENDigitizerInterface {
             clear_data(Port);
         }
 
-
         lec();
         change_state();
         return true;
@@ -578,8 +583,6 @@ class CAENDigitizerInterface {
             for (uint32_t i = 0; i < num_events; i++) {
                 // Extract event i
                 extract_event(Port, i, processing_evts[i]);
-
-
             }
         };
 
@@ -614,23 +617,23 @@ class CAENDigitizerInterface {
                     doe.VBDData.SPEEstimationTotalPulses,
                     doe.GlobalConfig.RecordLength);
 
-                uint32_t prepulse_end_region_per
-                    = static_cast<uint32_t>(
-                    1.0 - 0.01*doe.GlobalConfig.PostTriggerPorcentage);
+                double prepulse_end_region_per =
+                    1.0 - 0.01*doe.GlobalConfig.PostTriggerPorcentage;
                 int32_t prepulse_end_region
-                    = doe.GlobalConfig.RecordLength*prepulse_end_region_per - 150;
+                    = static_cast<int32_t>(doe.GlobalConfig.RecordLength*prepulse_end_region_per) - 20;
 
                 uint32_t prepulse_end_region_u = prepulse_end_region < 0 ?
-                    0 : prepulse_end_region;
+                    0 : static_cast<uint32_t>(prepulse_end_region);
 
                 coords(0, 0) = prepulse_end_region + 1;
                 coords(1, 0) = 35e3;
                 coords(2, 0) = 20;
                 coords(3, 0) = 5;
-                coords(4, 0) = doe.GroupConfigs[0].DCOffset;
+                coords(4, 0) = v_threshold_cts_to_adc_cts(Port,
+                    doe.GroupConfigs[0].DCOffset);
 
                 spdlog::info("prepulse_end_region: {0}", prepulse_end_region_u);
-                spdlog::info("dc offset: {0}", doe.GroupConfigs[0].DCOffset);
+                spdlog::info("dc offset: {0}", coords(4, 0) );
 
                 spe_analysis.reset(new SPEAnalysis<nEXOSiPMFunction>(
                     prepulse_end_region_u,
@@ -686,6 +689,18 @@ class CAENDigitizerInterface {
                     _indicatorSender(IndicatorNames::SPE_EFFICIENCTY,
                         pars.SPEEfficiency);
 
+                    _indicatorSender(IndicatorNames::INTEGRAL_THRESHOLD,
+                        pars.IntegralThreshold);
+
+                    _indicatorSender(IndicatorNames::RISE_TIME,
+                        pars.SPEParameters(2));
+
+                    _indicatorSender(IndicatorNames::FALL_TIME,
+                        pars.SPEParameters(3));
+
+                    _indicatorSender(IndicatorNames::OFFSET,
+                        pars.SPEParameters(4));
+
                     doe.VBDData.State = VBRState::Idle;
                 }
 
@@ -696,7 +711,7 @@ class CAENDigitizerInterface {
                 }
             break;
             case VBRState::CalculateBreakdownVoltage:
-
+                doe.VBDData.State = VBRState::Idle;
             break;
             case VBRState::Reset:
                 // Resets actually does reset the fi
@@ -705,6 +720,7 @@ class CAENDigitizerInterface {
                 spe_estimation_done = false;
                 SavedWaveforms = 0;
                 acq_pulses = 0;
+                doe.VBDData.State = VBRState::Idle;
             break;
             case VBRState::Idle:
             default:
@@ -814,7 +830,6 @@ class CAENDigitizerInterface {
     bool closing_mode() {
         spdlog::info("Going to close the CAEN thread.");
         close_caen();
-        SiPMVoltageSystem.close();
         return false;
     }
 
@@ -908,6 +923,8 @@ class CAENDigitizerInterface {
                 double volt = r.value().first;
                 double curr = r.value().second;
 
+                volt = calculate_sipm_voltage(volt, curr);
+
                 // This measure is a NaN/Overflow from the picoammeter
                 if(curr < 9.9e37){
                     latest_measure.Volt = volt;
@@ -951,13 +968,18 @@ class CAENDigitizerInterface {
 
                         if(doe.SiPMVoltageSysSupplyEN) {
                             send_msg(port, ":sour:volt:stat ON\n", "");
+                            spdlog::info("Turning on voltage supply");
                         } else {
                             send_msg(port, ":sour:volt:stat OFF\n", "");
+                            spdlog::warn("Turning off voltage supply");
                         }
 
                         send_msg(port, ":sour:volt "
                             + std::to_string(doe.SiPMVoltageSysVoltage)
                             + "\n", "");
+
+                        spdlog::info("Changing output voltage to {0}",
+                            doe.SiPMVoltageSysVoltage);
 
                         // send_msg(port, "++auto 1\n", "");
                         return {};
@@ -972,6 +994,7 @@ class CAENDigitizerInterface {
             case CAENInterfaceStates::Standby:
             case CAENInterfaceStates::AttemptConnection:
             case CAENInterfaceStates::Disconnected:
+            break;
             case CAENInterfaceStates::Closing:
                 SiPMVoltageSystem.get([=](serial_ptr& port)
                     -> std::optional<std::pair<double, double>> {
@@ -980,6 +1003,8 @@ class CAENDigitizerInterface {
                         send_msg(port, ":sour:volt 0.0\n", "");
                         return {};
                     });
+                SiPMVoltageSystem.close();
+                spdlog::warn("Closing DMM port");
             case CAENInterfaceStates::NullState:
             default:
             break;

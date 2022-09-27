@@ -3,6 +3,7 @@
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <ostream>
@@ -579,14 +580,13 @@ void retrieve_data(CAEN& res) noexcept {
             &res->Data.NumEvents);
     }
 
-
-        if (err < 0) {
+    if (err < 0) {
         res->LatestError = CAENError {
             "Failed to retrieve data!",  // ErrorMessage
             static_cast<CAEN_DGTZ_ErrorCode>(err),  // ErrorCode
             true  // isError
         };
-        }
+    }
 }
 
 bool retrieve_data_until_n_events(CAEN& res, uint32_t& n,
@@ -722,6 +722,14 @@ void clear_data(CAEN& res) noexcept {
 
 uint32_t t_to_record_length(CAEN& res, const double& nsTime) noexcept {
     return static_cast<uint32_t>(nsTime*1e-9*res->GetCommTransferRate());
+}
+
+uint32_t v_threshold_cts_to_adc_cts(CAEN& res, const uint32_t& cts) noexcept {
+    const uint32_t kVthresholdRangeCts = std::exp2(16);
+    uint32_t ADCRange = std::exp2(res->ModelConstants.ADCResolution);
+
+    uint32_t out = ADCRange*cts;
+    return out / kVthresholdRangeCts;
 }
 
 // Turns a voltage (V) into trigger counts
@@ -1027,7 +1035,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     // }
 
     wrap_if_group(offset, &out_str[0],
-        [=](auto group, uint64_t& offset, char* str, uint8_t ch) {
+        [=](auto group, uint64_t& offset, char* str, uint8_t) {
             append_cstr(group.TriggerThreshold, offset, str);
         });
 

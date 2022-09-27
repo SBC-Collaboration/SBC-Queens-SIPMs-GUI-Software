@@ -50,6 +50,10 @@ namespace SBCQueens {
         WAVEFORM_NOISE,
         SPE_GAIN_MEAN,
         SPE_EFFICIENCTY,
+        INTEGRAL_THRESHOLD,
+        RISE_TIME,
+        FALL_TIME,
+        OFFSET,
         BREAKDOWN_VOLTAGE,
 
         SAVED_WAVEFORMS

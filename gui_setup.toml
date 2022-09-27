@@ -35,7 +35,7 @@ VMEAddress = 0
 # 0 = not allowed
 RecordLength = 500
 MaxEventsPerRead = 500
-PostBufferPorcentage = 50
+PostBufferPorcentage = 70
 OverlappingRejection = false
 TRGINasGate = false
 # 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
@@ -73,7 +73,7 @@ Threshold = 7500
 [Other]
 [Other.SiPMVoltageSystem]
 Port = "/dev/ttyUSB0"
-InitVoltage = 53
+InitVoltage = 52.5
 
 [Other.PFEIFFERSingleGauge]
 Port = "COM7"

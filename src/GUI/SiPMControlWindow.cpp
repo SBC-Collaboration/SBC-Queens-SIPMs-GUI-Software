@@ -36,6 +36,7 @@ bool SiPMControlWindow::operator()() {
             old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
             // Setting it to AttemptConnection will force it to reset
             old = cgui_state;
+            old.SiPMVoltageSysChange = false;
             old.CurrentState = CAENInterfaceStates::AttemptConnection;
         }
         return true;

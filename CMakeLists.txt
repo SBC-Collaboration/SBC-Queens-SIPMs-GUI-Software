@@ -112,8 +112,9 @@ file(GLOB sources *.cpp)
 file(GLOB srcsources ./src/*.cpp)
 file(GLOB renderers ./src/rendering_wrappers/*.cpp)
 file(GLOB guis ./src/GUI/*.cpp)
+file(GLOB hardware ./src/HardwareHelpers/*.cpp)
 
-add_executable(SiPMControlGUI ${sources} ${srcsources} ${renderers} ${guis})
+add_executable(SiPMControlGUI ${sources} ${srcsources} ${renderers} ${guis} ${hardware})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

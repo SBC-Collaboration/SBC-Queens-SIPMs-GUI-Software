@@ -24,7 +24,7 @@ double calculate_dmm_voltage_error(const double& dmm_volt) {
 }
 
 double calculate_sipm_voltage(const double& volt, const double& current) {
-	return 0.0;
+	return calculate_dmm_voltage(volt) - kRINTERNAL*current;
 }
 
 double calculate_sipm_voltage_error(const double& volt, const double& current) {
