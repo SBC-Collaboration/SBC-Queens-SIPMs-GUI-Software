@@ -217,7 +217,8 @@ class GUIManager {
         if (ImGui::Button("Clear")) {
             for (uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
                 for (uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
-                    auto k = i*tgui_state.SystemParameters.NumRtdsPerBoard +j;
+                    uint16_t k = static_cast<uint16_t>(
+                        i*tgui_state.SystemParameters.NumRtdsPerBoard +j);
 
                     MultiPlotReceiver.ClearPlot(k);
                 }
@@ -239,7 +240,7 @@ class GUIManager {
         static ImPlotRect rect(0, 1, 0, 320);
         static ImPlotScale rtd_scale_axis = ImPlotScale_Linear;
         ImGui::CheckboxFlags("Log Axis",
-            (unsigned int*)&rtd_scale_axis, ImPlotScale_Log10);
+            &rtd_scale_axis, ImPlotScale_Log10);
 
         if (ImPlot::BeginPlot("RTDs", ImVec2(-1, 0))) {
             ImPlot::SetupAxisScale(ImAxis_Y1, rtd_scale_axis);
@@ -249,7 +250,8 @@ class GUIManager {
 
             for (uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
                 for (uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
-                    auto k = i*tgui_state.SystemParameters.NumRtdsPerBoard +j;
+                    uint16_t k = static_cast<uint16_t>(
+                        i*tgui_state.SystemParameters.NumRtdsPerBoard +j);
 
                     if (k < rtd_names.size()) {
                         MultiPlotReceiver.plot(k, rtd_names[k]);
@@ -275,14 +277,17 @@ class GUIManager {
             ImPlot::SetupAxes("time [s]", "Temperature [K]",
                 g_axis_flags, g_axis_flags);
             ImPlot::SetupAxesLimits(
-                rtd_zoom_multiplier[0]*(rect.X.Min + rect.X.Max) + rect.X.Min,
+                static_cast<double>(rtd_zoom_multiplier[0])*(rect.X.Min
+                    + rect.X.Max) + rect.X.Min,
                 rect.X.Max,
-                rtd_zoom_multiplier[1]*(rect.Y.Min + rect.Y.Max) + rect.Y.Min,
+                static_cast<double>(rtd_zoom_multiplier[1])*(rect.Y.Min
+                    + rect.Y.Max) + rect.Y.Min,
                 rect.Y.Max, ImGuiCond_Always);
 
             for (uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
                 for (uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
-                    auto k = i*tgui_state.SystemParameters.NumRtdsPerBoard +j;
+                    uint16_t k = static_cast<uint16_t>(
+                        i*tgui_state.SystemParameters.NumRtdsPerBoard +j);
 
                     if (k < rtd_names.size()) {
                         MultiPlotReceiver.plot(k, rtd_names[k]);
@@ -308,9 +313,9 @@ class GUIManager {
                 const size_t kCHperGroup = 8;
                 const auto& model_constants
                             = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
-                const auto numgroups = model_constants.NumberOfGroups > 0 ?
-                    model_constants.NumberOfGroups : 1;
-                const int numchpergroup = model_constants.NumChannels / numgroups;
+                // const auto numgroups = model_constants.NumberOfGroups > 0 ?
+                //     model_constants.NumberOfGroups : 1;
+                // const int numchpergroup = model_constants.NumChannels / numgroups;
                 // Let's work on const auto& because we really do not want to change
                 // anything in these next lines
                 if (ImPlot::BeginPlot("SiPM Plots", ImVec2(-1, -1),
@@ -328,7 +333,8 @@ class GUIManager {
                             // There is always at max 8 channels.
                             for (std::size_t i = 0; i < kCHperGroup; i++) {
                                 if (mask & (1 << i)) {
-                                    SiPMPlotReceiver.plot(kCHperGroup*gp.Number + i,
+                                    SiPMPlotReceiver.plot(
+                                    static_cast<uint8_t>(kCHperGroup*gp.Number + i),
                                     "GP " +  std::to_string(gp.Number)
                                     + "CH " + std::to_string(i), true);
                                     ImPlot::EndPlot();

@@ -44,13 +44,10 @@ struct CAENDigitizerModelConstants {
     uint32_t MemoryPerChannel = 0;
     // In S/s
     uint32_t USBTransferRate = 15e6;
-
     // Total number of channels
     uint8_t NumChannels = 1;
-
     // If 0, digitizer does not deal in groups
     uint8_t NumberOfGroups = 0;
-
     // Number of channels per group
     uint8_t NumChannelsPerGroup = 1;
 
@@ -59,6 +56,7 @@ struct CAENDigitizerModelConstants {
     float NLOCToRecordLength = 1;
 
     std::vector<double> VoltageRanges;
+
 };
 
 // This is here so we can transform string to enums
@@ -72,26 +70,52 @@ const std::unordered_map<std::string, CAENDigitizerModel>
 // are fixed per digitizer
 const std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
     CAENDigitizerModelsConstants_map {
-        {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants{
-            .ADCResolution = 14,
-            .AcquisitionRate = 500e6,
-            .MemoryPerChannel = static_cast<uint32_t>(5.12e6),
-            .NumChannels = 8,
-            .NumberOfGroups = 0,
-            .NumChannelsPerGroup = 8,
-            .NLOCToRecordLength = 10,
-            .VoltageRanges = {0.5, 2.0}
+        {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants {
+            14,  // ADCResolution
+            500e6,  //  AcquisitionRate
+            static_cast<uint32_t>(5.12e6),  // MemoryPerChannel
+            static_cast<uint32_t>(15e6),  // USBTransferRate
+            8,  // NumChannels
+            0,  // NumberOfGroups
+            8,  // NumChannelsPerGroup
+            1024,  // MaxNumBuffers
+            10.0f,  // NLOCToRecordLength
+            {0.5, 2.0}  // VoltageRanges
         }},
-        {CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants{
-            .ADCResolution = 12,
-            .AcquisitionRate = 62.5e6,
-            .MemoryPerChannel = static_cast<uint32_t>(192e3),
-            .NumChannels = 32,
-            .NumberOfGroups = 4,
-            .NumChannelsPerGroup = 8,
-            .NLOCToRecordLength = 1.5,
-            .VoltageRanges = {2.0, 10.0}
+        {CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants {
+             12,  // ADCResolution
+             62.5e6,  //  AcquisitionRate
+             static_cast<uint32_t>(192e3),  // MemoryPerChannel
+             static_cast<uint32_t>(15e6),  // USBTransferRate
+             32,  // NumChannels
+             4,  // NumChannels
+             8,  // NumberOfGroups
+             1024,  // MaxNumBuffers
+             1.5f,  // NLOCToRecordLength
+             {2.0, 10.0}  // VoltageRanges
         }}
+    // This is a C++20 higher feature so lets keep everything 17 compliant
+    // CAENDigitizerModelsConstants_map {
+    //     {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants{
+    //         .ADCResolution = 14,
+    //         .AcquisitionRate = 500e6,
+    //         .MemoryPerChannel = static_cast<uint32_t>(5.12e6),
+    //         .NumChannels = 8,
+    //         .NumberOfGroups = 0,
+    //         .NumChannelsPerGroup = 8,
+    //         .NLOCToRecordLength = 10,
+    //         .VoltageRanges = {0.5, 2.0}
+    //     }},
+    //     {CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants{
+    //         .ADCResolution = 12,
+    //         .AcquisitionRate = 62.5e6,
+    //         .MemoryPerChannel = static_cast<uint32_t>(192e3),
+    //         .NumChannels = 32,
+    //         .NumberOfGroups = 4,
+    //         .NumChannelsPerGroup = 8,
+    //         .NLOCToRecordLength = 1.5,
+    //         .VoltageRanges = {2.0, 10.0}
+    //     }}
 };
 
 // Struct that holds all the items an error might hold.
@@ -313,7 +337,7 @@ struct caen {
 
     // Returns the channel voltage range. If channel does not exist
     // returns 0
-    double GetVoltageRange(int ch) const {
+    double GetVoltageRange(const uint8_t& ch) const {
         try {
             auto config = GroupConfigs.at(ch);
             return ModelConstants.VoltageRanges[config.DCRange];
@@ -484,13 +508,13 @@ void clear_data(CAEN&) noexcept;
 // Reminder that some digitizers take data in chunks or only allow
 // some record lengths, so some record lengths are not possible.
 // Ex: x5730 record length can only be multiples of 10
-uint32_t t_to_record_length(CAEN&, double) noexcept;
+uint32_t t_to_record_length(CAEN&, const double&) noexcept;
 
 // Turns a voltage (V) into trigger counts
-uint32_t v_to_threshold_counts(CAEN&, double) noexcept;
+uint32_t v_to_threshold_counts(CAEN&, const double&) noexcept;
 
 // Turns a voltage (V) into count offset
-uint32_t v_offset_to_count_offset(CAEN&, double) noexcept;
+uint32_t v_offset_to_count_offset(CAEN&, const double&) noexcept;
 
 // Calculates the max number of buffers for a given record length
 uint32_t calculate_max_buffers(CAEN&) noexcept;

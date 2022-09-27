@@ -49,13 +49,13 @@ struct IndicatorVector {
 
     IndicatorVector() {}
     IndicatorVector(const T& id, const DATA& x, const DATA& y)
-        : ID(id), x(x), y(y) {}
+        : ID(id), X(x), Y(y) {}
     IndicatorVector(const T& id, const DATA& x)
-        : ID(id), x(x) {}
+        : ID(id), X(x) {}
 
     T ID;
-    DATA x;
-    DATA y;
+    DATA X;
+    DATA Y;
 };
 
 template<typename T, typename DATA = double>
@@ -91,7 +91,7 @@ class Indicator {
     unsigned int _precision;
     NumericFormat _format;
 
-    double val;
+    double _val;
 
  public:
     explicit Indicator(const T& id, const unsigned int& precision = 6,
@@ -99,7 +99,7 @@ class Indicator {
         :   ID(id),
             _imgui_stack("##" + std::to_string(static_cast<int>(id))),
             _display(_imgui_stack), _precision(precision), _format(format),
-            val(0.0)
+            _val(0.0)
         { }
 
     // Moving allowed
@@ -125,7 +125,7 @@ class Indicator {
                 out << std::fixed;
             }
 
-            out << newVal.x;
+            out << newVal.X;
             _display = "";
 
             if (!out.str().empty()) {
@@ -134,7 +134,7 @@ class Indicator {
 
             _display += _imgui_stack;
 
-            val = static_cast<double>(newVal.x);
+            _val = static_cast<double>(newVal.X);
         }
     }
 
@@ -143,12 +143,11 @@ class Indicator {
         const float& offset = 0) {
         ImGui::Text("%s", label.c_str()); ImGui::SameLine(offset);
         ImGui::Button(_display.c_str());
-        out = static_cast<OFFDATA>(val);
+        out = static_cast<OFFDATA>(_val);
     }
 
     template<typename OFFDATA>
-    void Draw(const std::string& label, OFFDATA& out,
-        const float& offset = 0) {
+    void Draw(const std::string& label, OFFDATA& out, const float& offset = 0) {
         this->operator()(label, out, offset);
     }
 
@@ -175,7 +174,7 @@ class BooleanIndicator : public Indicator<T> {
     explicit BooleanIndicator(const T& id, std::function<bool(const double&)>&& f)
         : Indicator<T>(id), _f(f),
         offColor(static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f))),
-        onColor(static_cast<ImVec4>(ImColor::HSV(2.0 / 7.0f, 0.6f, 0.6f))),
+        onColor(static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, 0.6f))),
         currentColor(offColor) {
     }
 
@@ -189,7 +188,7 @@ class BooleanIndicator : public Indicator<T> {
     template<typename OFFDATA>
     // Uses newVal.x to indicate the equality
     void add(const IndicatorVector<T, OFFDATA>& newVal) {
-        isOn = _f(static_cast<double>(newVal.x));
+        isOn = _f(static_cast<double>(newVal.X));
         currentColor = isOn ? onColor : offColor;
     }
 
@@ -279,7 +278,7 @@ class Plot : public Indicator<T> {
     template<typename OFFDATA>
     void add(const IndicatorVector<T, OFFDATA>& v) {
         if (v.ID == Indicator<T>::ID) {
-            plotData(v.x, v.y);
+            plotData(v.X, v.Y);
         }
     }
 
@@ -312,8 +311,6 @@ class Plot : public Indicator<T> {
 
     // Wraps ImPlot::PlotLine
     void operator()(const std::string& label) {
-        // ImPlot::PlotLine(label.c_str(), &_x.front(), &_y.front(), CurrentNumSamples);
-
         // static ImPlotGetter getter = static_cast<ImPlotGetter>(_transform);
         static auto transform = [](int idx, void* data) {
             auto myData = static_cast<PlotDataBuffer*>(data);
@@ -379,15 +376,13 @@ public:
         }
     }
 
-    void operator()(const T& type, const DATA& x, const DATA& y) {
-        IndicatorVector<T, DATA> newP(type, x, y);
+    void operator()(const T& key, const DATA& x, const DATA& y) {
+        IndicatorVector<T, DATA> newP(key, x, y);
         _q.enqueue(newP);
     }
 
     template<typename OFFDATA>
-    auto& indicator(const T& id,
-        const std::string& label,
-        OFFDATA& out,
+    auto& indicator(const T& id, const std::string& label, OFFDATA& out,
         const float& offset = 0,
         const unsigned int& precision = 6,
         const NumericFormat& format = NumericFormat::Default) {
@@ -502,14 +497,14 @@ class IndicatorSender {
     IndicatorSender(const IndicatorSender&) = delete;
 
     // Sends value x to indicator of type T
-    void operator()(const T& type, const DATA& x) {
-        IndicatorVector<T, DATA> newP(type, x);
+    void operator()(const T& key, const DATA& x) {
+        IndicatorVector<T, DATA> newP(key, x);
         _q.enqueue(newP);
     }
 
     // Sends value pair (x,y) to plot/indicator of type T
-    void operator()(const T& type, const DATA& x, const DATA& y) {
-        IndicatorVector<T, DATA> newP(type, x, y);
+    void operator()(const T& key, const DATA& x, const DATA& y) {
+        IndicatorVector<T, DATA> newP(key, x, y);
         _q.enqueue(newP);
     }
 
@@ -524,11 +519,11 @@ class IndicatorSender {
     // Note if an indicator is selected, only the latest value
     // will be shown and the list y will be ignored
     template<typename OFFDATA>
-    void operator()(const T& type, const std::vector<OFFDATA>& x,
+    void operator()(const T& key, const std::vector<OFFDATA>& x,
         const std::vector<OFFDATA>& y) {
         std::vector< IndicatorVector<T, DATA> > items(x.size());
         for (unsigned int i = 0; i < x.size(); i++) {
-            items[i] = IndicatorVector<T, DATA>(type,
+            items[i] = IndicatorVector<T, DATA>(key,
                 static_cast<DATA>(x[i]),
                 static_cast<DATA>(y[i]));
         }
@@ -540,11 +535,11 @@ class IndicatorSender {
     // Note if an indicator is selected, only the latest value
     // will be shown and the list y will be ignored
     template<typename OFFDATA>
-    void operator()(const T& type, OFFDATA* x_data, OFFDATA* y_data,
+    void operator()(const T& key, OFFDATA* x_data, OFFDATA* y_data,
         const size_t& size) {
         std::vector< IndicatorVector<T, DATA> > items(size);
         for (unsigned int i = 0; i < size; i++) {
-            items[i] = IndicatorVector<T, DATA>(type,
+            items[i] = IndicatorVector<T, DATA>(key,
                 static_cast<DATA>(x_data[i]),
                 static_cast<DATA>(y_data[i]));
         }

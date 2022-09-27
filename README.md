@@ -1,4 +1,4 @@
-This is the GUI interface for the CAEN [DT5740D](https://www.caen.it/products/dt5740d/) / [DT5730B](https://www.caen.it/products/dt5730/) digitizers, or a specially programmed [Teensy 4.1](https://www.pjrc.com/store/teensy41.html) using [FreeRTOS](https://www.freertos.org/).
+pacman This is the GUI interface for the CAEN [DT5740D](https://www.caen.it/products/dt5740d/) / [DT5730B](https://www.caen.it/products/dt5730/) digitizers, or a specially programmed [Teensy 4.1](https://www.pjrc.com/store/teensy41.html) using [FreeRTOS](https://www.freertos.org/).
 
 It is developed for the SBC collaboration and the SBC-Queens SiPM tester.
 

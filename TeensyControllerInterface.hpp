@@ -336,7 +336,7 @@ class TeensyControllerInterface {
     std::tuple<Queues&...> _queues;
     std::map<std::string, std::string> _crc_cmds;
 
-    TeensyControllerData state_of_everything;
+    TeensyControllerData doe;
     IndicatorSender<IndicatorNames> TeensyIndicatorSender;
     IndicatorSender<uint16_t> MultiPlotSender;
 
@@ -394,17 +394,17 @@ class TeensyControllerInterface {
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (!task(state_of_everything)) {
+            if (!task(doe)) {
                 spdlog::warn("Something went wrong with a command!");
             }
             // End Communication with the GUI
 
             // This will send a command only if its not none
-            send_teensy_cmd(state_of_everything.CommandToSend);
-            state_of_everything.CommandToSend = TeensyCommands::None;
+            send_teensy_cmd(doe.CommandToSend);
+            doe.CommandToSend = TeensyCommands::None;
 
             // This will turn into an SML soon*
-            switch (state_of_everything.CurrentState) {
+            switch (doe.CurrentState) {
                 case TeensyControllerStates::Standby:
                 // do nothing
                 // only way to get out of this state is by the GUI
@@ -415,23 +415,23 @@ class TeensyControllerInterface {
 
                 case TeensyControllerStates::Disconnected:
                     spdlog::warn("Manually losing connection to "
-                        "Teensy with port {}", state_of_everything.Port);
+                        "Teensy with port {}", doe.Port);
 
                     disconnect(port);
 
                     // Move to standby
-                    state_of_everything.CurrentState
+                    doe.CurrentState
                         = TeensyControllerStates::Standby;
                     break;
 
                 case TeensyControllerStates::Connected:
                     // The real bread and butter of the code!
-                    update(state_of_everything);
+                    update();
                     break;
 
                 case TeensyControllerStates::AttemptConnection:
 
-                    connect_bt(port, state_of_everything.Port);
+                    connect_bt(port, doe.Port);
 
                     if (port) {
                         if (port->isOpen()) {
@@ -440,55 +440,55 @@ class TeensyControllerInterface {
 
                             // Open files to start saving!
                             open(_PressuresFile,
-                                state_of_everything.RunDir
-                                + "/" + state_of_everything.RunName
+                                doe.RunDir
+                                + "/" + doe.RunName
                                 + "/Pressures.txt");
                             bool s = (_PressuresFile != nullptr);
 
                             open(_RTDsFile,
-                                state_of_everything.RunDir
-                                + "/" + state_of_everything.RunName
+                                doe.RunDir
+                                + "/" + doe.RunName
                                 + "/RTDs.txt");
                             s = (_RTDsFile != nullptr) && s;
 
                             open(_PeltiersFile,
-                                state_of_everything.RunDir
-                                + "/" + state_of_everything.RunName
+                                doe.RunDir
+                                + "/" + doe.RunName
                                 + "/Peltiers.txt");
                             s = (_PeltiersFile != nullptr)  && s;
 
                             open(_BMEsFile,
-                                state_of_everything.RunDir
-                                + "/" + state_of_everything.RunName
+                                doe.RunDir
+                                + "/" + doe.RunName
                                 + "/BMEs.txt");
                             s = (_BMEsFile != nullptr)  && s;
 
 
                             if (!s) {
                                 spdlog::error("Failed to open files.");
-                                state_of_everything.CurrentState =
+                                doe.CurrentState =
                                     TeensyControllerStates::Standby;
                             } else {
                                 spdlog::info(
                                     "Connected to Teensy with port {}",
-                                state_of_everything.Port);
+                                doe.Port);
 
                                 send_initial_config();
 
-                                state_of_everything.CurrentState =
+                                doe.CurrentState =
                                     TeensyControllerStates::Connected;
                             }
 
                         } else {
                             spdlog::error("Failed to connect to port {}",
-                                state_of_everything.Port);
+                                doe.Port);
 
-                            state_of_everything.CurrentState
+                            doe.CurrentState
                                 = TeensyControllerStates::Standby;
                         }
                     } else {
                         // No need for a message
-                        state_of_everything.CurrentState
+                        doe.CurrentState
                             = TeensyControllerStates::Standby;
                     }
 
@@ -502,7 +502,7 @@ class TeensyControllerInterface {
                 case TeensyControllerStates::NullState:
                 default:
                     // do nothing other than set to standby state
-                    state_of_everything.CurrentState
+                    doe.CurrentState
                         = TeensyControllerStates::Standby;
             }
 
@@ -523,8 +523,7 @@ class TeensyControllerInterface {
  private:
 
     template <class T>
-    void retrieve_data(TeensyControllerData& teensyState,
-        const TeensyCommands& cmd, T&& f) {
+    void retrieve_data(const TeensyCommands& cmd, T&& f) {
         if (!send_teensy_cmd(cmd)) {
             spdlog::warn("Failed to send {0} to Teensy.",
                 cTeensyCommands.at(cmd));
@@ -572,24 +571,24 @@ class TeensyControllerInterface {
 
         flush(port);
 
-        retrieve_data(state_of_everything, TeensyCommands::GetSystemParameters,
+        retrieve_data(TeensyCommands::GetSystemParameters,
         [&](json& parse, auto& msg) {
             try {
                 auto system_pars = parse.get<TeensySystemPars>();
 
-                state_of_everything.SystemParameters = system_pars;
+                doe.SystemParameters = system_pars;
 
                 spdlog::info("{0}, {1}, {2}", system_pars.NumRtdBoards,
                     system_pars.NumRtdsPerBoard, system_pars.InRTDOnlyMode);
 
                 TeensyIndicatorSender(IndicatorNames::NUM_RTD_BOARDS,
-                    state_of_everything.SystemParameters.NumRtdBoards);
+                    doe.SystemParameters.NumRtdBoards);
 
                 TeensyIndicatorSender(IndicatorNames::NUM_RTDS_PER_BOARD,
-                    state_of_everything.SystemParameters.NumRtdsPerBoard);
+                    doe.SystemParameters.NumRtdsPerBoard);
 
                 TeensyIndicatorSender(IndicatorNames::IS_RTD_ONLY,
-                    state_of_everything.SystemParameters.InRTDOnlyMode);
+                    doe.SystemParameters.InRTDOnlyMode);
             } catch (... ) {
                 spdlog::warn("Failed to parse system data from {0}. "
                     "Message received from Teensy: {1}",
@@ -604,8 +603,8 @@ class TeensyControllerInterface {
         flush(port);
     }
 
-    void retrieve_pids(TeensyControllerData& teensyState) {
-        retrieve_data(teensyState, TeensyCommands::GetPeltiers,
+    void retrieve_pids() {
+        retrieve_data(TeensyCommands::GetPeltiers,
         [&](json& parse, auto& msg) {
             try {
                 auto pids = parse.get<Peltiers>();
@@ -628,8 +627,8 @@ class TeensyControllerInterface {
         });
     }
 
-    void retrieve_rtds(TeensyControllerData& teensyState) {
-        retrieve_data(teensyState, TeensyCommands::GetRTDs,
+    void retrieve_rtds() {
+        retrieve_data(TeensyCommands::GetRTDs,
         [&](json& parse, auto& msg) {
             try {
                 auto rtds = parse.get<RTDs>();
@@ -651,8 +650,8 @@ class TeensyControllerInterface {
         });
     }
 
-    void retrieve_pressures(TeensyControllerData& teensyState) {
-        retrieve_data(teensyState, TeensyCommands::GetPressures,
+    void retrieve_pressures() {
+        retrieve_data(TeensyCommands::GetPressures,
         [&](json& parse, auto& msg) {
             try {
                 auto press = parse.get<Pressures>();
@@ -675,8 +674,8 @@ class TeensyControllerInterface {
         });
     }
 
-    void retrieve_bmes(TeensyControllerData& teensyState) {
-        retrieve_data(teensyState, TeensyCommands::GetBMEs,
+    void retrieve_bmes() {
+        retrieve_data(TeensyCommands::GetBMEs,
         [&](json& parse, auto& msg) {
             try {
                 auto bmes = parse.get<BMEs>();
@@ -701,39 +700,39 @@ class TeensyControllerInterface {
 
     // It continuosly polls the Teensy for the latest data and saves it
     // to the file and updates the GUI graphs
-    void update(TeensyControllerData& teensyState) {
+    void update() {
         // We do not need this function to be out of this scope
         // and make it static to call it once
         static auto retrieve_pids_nb = make_total_timed_event(
             std::chrono::milliseconds(500),
             // Lambda hacking to allow the class function to be pass to
             // make_total_timed_event. Is there any other way?
-            [&](TeensyControllerData& teensyState) {
-                retrieve_pids(teensyState);
+            [&]() {
+                retrieve_pids();
         });
 
         static auto retrieve_rtds_nb = make_total_timed_event(
             std::chrono::milliseconds(100),
             // Lambda hacking to allow the class function to be pass to
             // make_total_timed_event. Is there any other way?
-            [&](TeensyControllerData& teensyState) {
-                retrieve_rtds(teensyState);
+            [&]() {
+                retrieve_rtds();
         });
 
         static auto retrieve_pres_nb = make_total_timed_event(
             std::chrono::milliseconds(500),
             // Lambda hacking to allow the class function to be pass to
             // make_total_timed_event. Is there any other way?
-            [&](TeensyControllerData& teensyState) {
-                retrieve_pressures(teensyState);
+            [&]() {
+                retrieve_pressures();
         });
 
         static auto retrieve_bmes_nb = make_total_timed_event(
             std::chrono::milliseconds(114),
             // Lambda hacking to allow the class function to be pass to
             // make_total_timed_event. Is there any other way?
-            [&](TeensyControllerData& teensyState) {
-                retrieve_bmes(teensyState);
+            [&]() {
+                retrieve_bmes();
         });
 
         // This looks intimidating but it is actually pretty simple once
@@ -762,7 +761,7 @@ class TeensyControllerInterface {
                         return  std::to_string(rtds.time) + "," + out;
                 });
 
-                if (!state_of_everything.RTDOnlyMode){
+                if (!doe.RTDOnlyMode){
                     async_save(_PeltiersFile,
                         [](const Peltiers& pid) {
                             return  std::to_string(pid.time) + "," +
@@ -792,18 +791,18 @@ class TeensyControllerInterface {
         // Checks the status of the Teensy and sees if there are any errors
 
         // This should be called every 100ms
-        if (not state_of_everything.RTDOnlyMode) {
-            retrieve_pids_nb(teensyState);
-            retrieve_pres_nb(teensyState);
+        if (! doe.RTDOnlyMode) {
+            retrieve_pids_nb();
+            retrieve_pres_nb();
 
             // This should be called every 114ms
-            retrieve_bmes_nb(teensyState);
+            retrieve_bmes_nb();
         }
 
-        retrieve_rtds_nb(teensyState);
+        retrieve_rtds_nb();
 
         retrieve_rtds_nb.ChangeWaitTime(
-            std::chrono::milliseconds(state_of_everything.RTDSamplingPeriod));
+            std::chrono::milliseconds(doe.RTDSamplingPeriod));
 
         // These should be called every 30 seconds
         save_files();
@@ -819,7 +818,7 @@ class TeensyControllerInterface {
             return false;
         }
 
-        auto tcs = state_of_everything;
+        auto tcs = doe;
         // This functions essentially wraps the send_msg function with
         // the map to get the command from the map.
         auto str_cmd = cTeensyCommands.at(cmd);

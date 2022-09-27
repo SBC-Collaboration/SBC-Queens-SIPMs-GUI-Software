@@ -173,10 +173,9 @@ class CAENDigitizerInterface {
 
         Keithley2000.init(
             [=](serial_ptr& port) -> bool {
-
                 static auto send_msg_slow = make_blocking_total_timed_event(
                     std::chrono::milliseconds(200),
-                    [](serial_ptr& port, const std::string& msg){
+                    [&](const std::string& msg){
                         spdlog::info("Sending msg to Keithely: {0}", msg);
                         send_msg(port, msg + "\n", "");
                     }
@@ -200,22 +199,22 @@ class CAENDigitizerInterface {
 
                 // Setup GPIB interface
                 // send_msg_slow(port, "++rst");
-                send_msg_slow(port, "++eos 0");
-                send_msg_slow(port, "++addr 10");
-                send_msg_slow(port, "++auto 0");
+                send_msg_slow("++eos 0");
+                send_msg_slow("++addr 10");
+                send_msg_slow("++auto 0");
 
                 // Now Keithley
-                send_msg_slow(port, "*rst");
-                send_msg_slow(port, ":init:cont on");
-                send_msg_slow(port, ":volt:dc:nplc 10");
-                send_msg_slow(port, ":volt:dc:rang:auto 1");
-                send_msg_slow(port, ":volt:dc:aver:stat 1");
-                send_msg_slow(port, ":volt:dc:aver:tcon mov");
-                send_msg_slow(port, ":volt:dc:aver:coun 100");
+                send_msg_slow("*rst");
+                send_msg_slow(":init:cont on");
+                send_msg_slow(":volt:dc:nplc 10");
+                send_msg_slow(":volt:dc:rang:auto 1");
+                send_msg_slow(":volt:dc:aver:stat 1");
+                send_msg_slow(":volt:dc:aver:tcon mov");
+                send_msg_slow(":volt:dc:aver:coun 100");
 
-                send_msg_slow(port, ":form ascii");
+                send_msg_slow(":form ascii");
 
-                send_msg_slow(port, "++auto 1");
+                send_msg_slow("++auto 1");
 
                 open(_voltagesFile, doe.RunDir
                     + "/" + doe.RunName
@@ -230,9 +229,8 @@ class CAENDigitizerInterface {
                 return true;
             },
             [=](serial_ptr& port) -> bool {
-
-                if(port) {
-                    if(port->isOpen()) {
+                if (port) {
+                    if (port->isOpen()) {
                         disconnect(port);
                     }
                 }
@@ -242,7 +240,6 @@ class CAENDigitizerInterface {
 
         // Actual loop!
         while (main_loop_state->operator()()) {
-
             static auto keith = make_total_timed_event(
                 std::chrono::seconds(5),
                 [&]() {
@@ -275,7 +272,6 @@ class CAENDigitizerInterface {
                             return  std::to_string(mes.Time) + "," +
                                     std::to_string(mes.Volt) + "\n";
                 });
-
             });
 
             switch (doe.CurrentState) {
@@ -294,8 +290,6 @@ class CAENDigitizerInterface {
                 default:
                 break;
             }
-
-
         }
     }
 
@@ -478,15 +472,15 @@ class CAENDigitizerInterface {
         }
 
         if (Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
-            spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
-            spdlog::info("Data size: {0}", Port->Data.DataSize);
-            spdlog::info("Num events: {0}", Port->Data.NumEvents);
+            // spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
+            // spdlog::info("Data size: {0}", Port->Data.DataSize);
+            // spdlog::info("Num events: {0}", Port->Data.NumEvents);
 
-            extract_event(Port, 0, osc_event);
-            spdlog::info("Event size: {0}", osc_event->Info.EventSize);
-            spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
-            spdlog::info("Trigger Time Tag: {0}",
-                osc_event->Info.TriggerTimeTag);
+            // extract_event(Port, 0, osc_event);
+            // spdlog::info("Event size: {0}", osc_event->Info.EventSize);
+            // spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
+            // spdlog::info("Trigger Time Tag: {0}",
+            //     osc_event->Info.TriggerTimeTag);
 
             process_data_for_gui();
 
@@ -541,7 +535,6 @@ class CAENDigitizerInterface {
         process_events();
         checkerror();
         extract_for_gui_nb();
-        // extract_for_gui_nb();
         change_state();
         return true;
     }
@@ -572,7 +565,8 @@ class CAENDigitizerInterface {
             }
 
             SavedWaveforms += Port->Data.NumEvents;
-            _indicatorSender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
+            _indicatorSender(IndicatorNames::SAVED_WAVEFORMS,
+                static_cast<double>(SavedWaveforms));
         };
 
         if (isFileOpen) {
@@ -623,8 +617,7 @@ class CAENDigitizerInterface {
     }
 
     bool disconnected_mode() {
-        spdlog::warn("Manually losing connection to the "
-                        "CAEN digitizer.");
+        spdlog::warn("Manually losing connection to the CAEN digitizer.");
 
         for (CAENEvent& evt : processing_evts) {
             evt.reset();
@@ -694,7 +687,7 @@ class CAENDigitizerInterface {
             x_values.resize(size);
             y_values.resize(size);
 
-            for (std::size_t i = 0; i < size; i++) {
+            for (uint32_t i = 0; i < size; i++) {
                 x_values[i] = i*(1.0/Port->GetSampleRate())*(1e9);
                 y_values[i] = static_cast<double>(buf[i]);
             }

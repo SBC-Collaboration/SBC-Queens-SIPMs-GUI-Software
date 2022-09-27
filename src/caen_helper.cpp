@@ -34,9 +34,9 @@ CAENError connect(CAEN& res, const CAENDigitizerModel& model,
     // If the item exists, pass on the creation
     if (res) {
         err = CAENError {
-            .ErrorMessage = "Resource already connected",
-            .ErrorCode = CAEN_DGTZ_ErrorCode::CAEN_DGTZ_GenericError,
-            .isError = true
+            "Resource already connected",  // ErrorMessage
+            CAEN_DGTZ_ErrorCode::CAEN_DGTZ_GenericError,  // ErrorCode
+            true  // isError
         };
 
         return err;
@@ -67,9 +67,9 @@ CAENError connect(CAEN& res, const CAENDigitizerModel& model,
             handle, err);
     } else {
         return CAENError {
-            .ErrorMessage = "Failed to connect to the resource",
-            .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(errCode),
-            .isError = true
+            "Failed to connect to the resource",  // ErrorMessage
+            static_cast<CAEN_DGTZ_ErrorCode>(errCode),  // ErrorCode
+            true   // isError
         };
     }
 
@@ -100,10 +100,10 @@ CAENError disconnect(CAEN& res) noexcept {
 
     if (errCode < 0) {
         return CAENError {
-            .ErrorMessage = "Error while disconnecting CAEN resource. "
-            "Will delete internal resource anyways.",
-            .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(errCode),
-            .isError = true
+            "Error while disconnecting CAEN resource. "
+            "Will delete internal resource anyways.",  // ErrorMessage
+            static_cast<CAEN_DGTZ_ErrorCode>(errCode),  // ErrorCode
+            true  // isError
         };
     }
 
@@ -120,9 +120,9 @@ void reset(CAEN& res) noexcept {
 
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "Could not reset CAEN board.",
-            .ErrorCode = err,
-            .isError = true
+            "Could not reset CAEN board.",  // ErrorMessage
+            err,  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -401,10 +401,10 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     }
 
     if (latest_err < 0) {
-        res->LatestError = CAENError{
-                .ErrorMessage = "There was en error during setup! " + err_msg,
-                .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(latest_err),
-                .isError = true};
+        res->LatestError = CAENError {
+                "There was en error during setup! " + err_msg,  // ErrorMessage
+                static_cast<CAEN_DGTZ_ErrorCode>(latest_err),  // ErrorCode
+                true};  // isError
     }
 }
 
@@ -427,10 +427,10 @@ void enable_acquisition(CAEN& res) noexcept {
 
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "There was en error while trying to enable"
-            "acquisition or allocate memory for buffers.",
-            .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(err),
-            .isError = true
+            "There was en error while trying to enable"
+            "acquisition or allocate memory for buffers.",  // ErrorMessage
+            static_cast<CAEN_DGTZ_ErrorCode>(err),  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -444,10 +444,10 @@ void disable_acquisition(CAEN& res) noexcept {
 
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "There was en error while trying to disable"
-            "acquisition.",
-            .ErrorCode = err,
-            .isError = true
+            "There was en error while trying to disable"
+            "acquisition.",  // ErrorMessage
+            err,  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -465,10 +465,10 @@ void write_register(CAEN& res, uint32_t&& addr,
     auto err = CAEN_DGTZ_WriteRegister(res->Handle, addr, value);
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "There was en error while trying to write"
-            "to register.",
-            .ErrorCode = err,
-            .isError = true
+            "There was en error while trying to write"
+            "to register.",  // ErrorMessage
+            err,  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -481,10 +481,10 @@ void read_register(CAEN& res, uint32_t&& addr, uint32_t& value) noexcept {
     auto err = CAEN_DGTZ_ReadRegister(res->Handle, addr, &value);
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "There was en error while trying to read"
-            "to register " + std::to_string(addr),
-            .ErrorCode = err,
-            .isError = true
+            "There was en error while trying to read"
+            "to register " + std::to_string(addr),  // ErrorMessage
+            err,  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -501,10 +501,10 @@ void write_bits(CAEN& res, uint32_t&& addr,
 
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "There was en error while trying to read"
-            "to register " + std::to_string(addr),
-            .ErrorCode = err,
-            .isError = true
+            "There was en error while trying to read"
+            "to register " + std::to_string(addr),  // ErrorMessage
+            err,  // ErrorCode
+            true  // isError
         };
     }
 
@@ -518,10 +518,10 @@ void write_bits(CAEN& res, uint32_t&& addr,
 
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "There was en error while trying to write"
-            "to register " + std::to_string(addr),
-            .ErrorCode = err,
-            .isError = true
+            "There was en error while trying to write"
+            "to register " + std::to_string(addr),  // ErrorMessage
+            err,  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -539,9 +539,9 @@ void software_trigger(CAEN& res) noexcept {
 
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "Failed to send a software trigger",
-            .ErrorCode = err,
-            .isError = true
+            "Failed to send a software trigger",  // ErrorMessage
+            err,  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -580,9 +580,9 @@ void retrieve_data(CAEN& res) noexcept {
 
         if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "Failed to retrieve data!",
-            .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(err),
-            .isError = true
+            "Failed to retrieve data!",  // ErrorMessage
+            static_cast<CAEN_DGTZ_ErrorCode>(err),  // ErrorCode
+            true  // isError
         };
         }
 }
@@ -702,9 +702,9 @@ void clear_data(CAEN& res) noexcept {
     err |= CAEN_DGTZ_SWStartAcquisition(handle);
     if (err < 0) {
         res->LatestError = CAENError {
-            .ErrorMessage = "Failed to send a software trigger",
-            .ErrorCode = static_cast<CAEN_DGTZ_ErrorCode>(err),
-            .isError = true
+            "Failed to send a software trigger",  // ErrorMessage
+            static_cast<CAEN_DGTZ_ErrorCode>(err),  // ErrorCode
+            true  // isError
         };
     }
 }
@@ -718,17 +718,17 @@ void clear_data(CAEN& res) noexcept {
 //  return freq;
 // }
 
-uint32_t t_to_record_length(CAEN& res, double nsTime) noexcept {
+uint32_t t_to_record_length(CAEN& res, const double& nsTime) noexcept {
     return static_cast<uint32_t>(nsTime*1e-9*res->GetCommTransferRate());
 }
 
 // Turns a voltage (V) into trigger counts
-uint32_t v_to_threshold_counts(CAEN& res, double volt) noexcept {
+uint32_t v_to_threshold_counts(CAEN& res, const double& volt) noexcept {
     return 0;
 }
 
 // Turns a voltage (V) into count offset
-uint32_t v_offset_to_count_offset(CAEN&, double volt) noexcept {
+uint32_t v_offset_to_count_offset(CAEN&, const double& volt) noexcept {
     return 0;
 }
 
@@ -834,7 +834,7 @@ std::string sbc_init_file(CAEN& res) noexcept {
         if (has_groups) {
             num_ch += has_groups*n_channels_acq(gr_pair.second.AcquisitionMask);
         } else {
-            num_ch = res->GroupConfigs.size();
+            num_ch = static_cast<uint32_t>(res->GroupConfigs.size());
         }
     }
 
@@ -879,7 +879,7 @@ std::string sbc_init_file(CAEN& res) noexcept {
     data_header += num_channels_s + ";";          // dim 2
 
     // uint16_t is required as the format requires it to be 16 unsigned max
-    uint16_t s = (header + data_header).length();
+    uint16_t s = static_cast<uint16_t>((header + data_header).length());
     std::string data_header_size = NumToBinString(s);
 
     // 0 means that it will be calculated by the number of lines
