@@ -1,4 +1,5 @@
 #include "GUI/IndicatorWindow.hpp"
+#include "implot_helpers.hpp"
 
 // C STD includes
 // C 3rd party includes
@@ -61,8 +62,12 @@ namespace SBCQueens {
         ImGui::Text("SiPM Statistics");
 
         _indicatorReceiver.indicator(IndicatorNames::LATEST_DMM_VOLTAGE,
-            "Latest DMM Voltage", 200, 7);
+            "Latest DMM Voltage", 200, 6, NumericFormat::Scientific);
         ImGui::SameLine(300); ImGui::Text("V");
+
+        _indicatorReceiver.indicator(IndicatorNames::LATEST_PICO_CURRENT,
+            "Latest DMM Voltage", 200, 6, NumericFormat::Scientific);
+        ImGui::SameLine(300); ImGui::Text("A");
 
         _indicatorReceiver.indicator(IndicatorNames::CAENBUFFEREVENTS,
             "Events in buffer", 200, 4);

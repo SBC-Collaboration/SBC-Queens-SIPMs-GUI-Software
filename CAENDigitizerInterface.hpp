@@ -226,6 +226,7 @@ class CAENDigitizerInterface {
                 // Keithley 6487
                 send_msg_slow("++addr 22");
                 send_msg_slow("*rst");
+                send_msg_slow(":form:elem read");
 
                 // Volt supply side
                 send_msg_slow(":sour:volt:rang 55");
@@ -235,25 +236,31 @@ class CAENDigitizerInterface {
                 send_msg_slow(":sour:volt:stat OFF");
 
                 // Ammeter side
-                send_msg_slow(":sens:curr:dc:nplc 60");
-                send_msg_slow(":sens:aver:tcon mov");
-                send_msg_slow(":sens:aver:coun 100");
-                send_msg_slow(":sens:aver:stat ON");
-                send_msg_slow(":syst:azer ON");
+                send_msg_slow(":sens:curr:dc:nplc 6");
+                send_msg_slow(":sens:aver:stat off");
 
                 // Zero check
                 send_msg_slow(":syst:zch ON");
                 send_msg_slow(":curr:rang 2E-4");
-                send_msg_slow("init");
+                send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1000));
+                send_msg_slow(":init");
                 send_msg_slow(":syst:zcor:stat OFF");
                 send_msg_slow(":syst:zcor:acq");
                 send_msg_slow(":syst:zch OFF");
                 send_msg_slow(":syst:zcor ON");
+                send_msg_slow(":syst:azer ON");
 
-                send_msg_slow(":arm:count inf");
-                send_msg_slow(":init:imm");
+                send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(200));
+                send_msg_slow(":arm:coun 1");
+                send_msg_slow(":arm:sour imm");
+                send_msg_slow(":arm:timer 0");
+                send_msg_slow(":trig:coun 1");
+                send_msg_slow(":trig:sour imm");
 
-                send_msg_slow("++auto 1");
+                send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1100));
+                send_msg_slow(":init");
+
+                // send_msg_slow("++auto 1");
 
                 open(_voltagesFile, doe.RunDir
                     + "/" + doe.RunName
@@ -287,7 +294,7 @@ class CAENDigitizerInterface {
 
 
     void calculate_trigger_frequency() {
-        static double last_time = 0.0;
+        static double last_time = get_current_time_epoch() / 1000.0;
         static uint64_t last_waveforms = 0;
         double current_time = get_current_time_epoch() / 1000.0;
         double dt = last_time - current_time;
@@ -460,7 +467,6 @@ class CAENDigitizerInterface {
             });
 
             switch_state(CAENInterfaceStates::Standby);
-
         } else {
             spdlog::info("CAEN Setup complete!");
             switch_state(CAENInterfaceStates::OscilloscopeMode);
@@ -694,8 +700,18 @@ class CAENDigitizerInterface {
                 auto r = SiPMVoltageSystem.get(
                 [=](serial_ptr& port)
                 -> std::optional<std::pair<double, double>> {
-                    send_msg(port, "++addr 10\n", "");
-                    send_msg(port, ":fetch?\n", "");
+                    static auto send_msg_slow = make_blocking_total_timed_event(
+                        std::chrono::milliseconds(10),
+                        [&](const std::string& msg){
+                            // spdlog::info("Sending msg to Keithely: {0}", msg);
+                            send_msg(port, msg + "\n", "");
+                        }
+                    );
+                    send_msg_slow.ChangeWaitTime(
+                        std::chrono::milliseconds(10));
+                    send_msg_slow("++addr 10");
+                    send_msg_slow(":fetch?");
+                    send_msg_slow("++read eoi");
 
                     auto volt = retrieve_msg<double>(port);
 
@@ -703,16 +719,19 @@ class CAENDigitizerInterface {
                         return {};
                     }
 
-                    send_msg(port, "++addr 22\n", "");
-                    send_msg(port, ":fetch?\n", "");
+                    send_msg_slow.ChangeWaitTime(
+                        std::chrono::milliseconds(100));
+                    send_msg_slow("++addr 22");
+                    send_msg_slow(":fetch?");
+                    send_msg_slow("++read eoi");
 
                     auto curr = retrieve_msg<double>(port);
 
-                    if(!curr) {
+                    send_msg_slow(":init");
+
+                    if (!curr) {
                         return {};
                     }
-
-                    spdlog::info("{0}", curr.value_or(0.0));
 
                     return std::make_optional(
                         std::make_pair(volt.value(), curr.value()));
@@ -740,9 +759,12 @@ class CAENDigitizerInterface {
                 spdlog::info("Saving voltage (Keithley 2000) voltages.");
                 async_save(_voltagesFile,
                 [](const SiPMVoltageMeasure& mes) {
-                    return  std::to_string(mes.Time) + "," +
-                        std::to_string(mes.Volt) + "," +
-                        std::to_string(mes.Current) + "\n";
+                    std::ostringstream out;
+                    out.precision(7);
+                    out << "," << mes.Volt <<
+                        "," << mes.Current << "\n" << std::scientific;;
+
+                    return  std::to_string(mes.Time) + out.str();
             });
         });
 
@@ -769,7 +791,7 @@ class CAENDigitizerInterface {
                         send_msg(port, ":sour:volt "
                             + std::to_string(doe.SiPMVoltageSysVoltage));
 
-                        send_msg(port, "++auto 1\n", "");
+                        // send_msg(port, "++auto 1\n", "");
 
                         return {};
                     });

@@ -64,7 +64,8 @@ void connect(serial_ptr& port, const std::string& port_name) noexcept {
     }
 }
 
-void connect_par(serial_ptr& port, const std::string& port_name, const SerialParams& sp) noexcept {
+void connect_par(serial_ptr& port, const std::string& port_name,
+    const SerialParams& sp) noexcept {
 // If port not initialized
     if(!port) {
         // These are the Teensy serial
@@ -82,10 +83,13 @@ void connect_par(serial_ptr& port, const std::string& port_name, const SerialPar
 
         } catch(serial::IOException& e) {
             spdlog::error("Port not opened: {0}", e.what());
+            port.release();
         } catch(serial::PortNotOpenedException& e) {
             spdlog::error("Port not opened: {0}", e.what());
+            port.release();
         } catch (std::invalid_argument& e) {
             spdlog::error("Invalid argument error: {0}", e.what());
+            port.release();
         }
 
     } else {
@@ -102,13 +106,13 @@ void connect_par(serial_ptr& port, const std::string& port_name, const SerialPar
             port->open();
         } catch(serial::IOException& e) {
             spdlog::error("Port not opened: {0}", e.what());
-            port.reset();
+            port.release();
         } catch(serial::PortNotOpenedException& e) {
             spdlog::error("Port not opened: {0}", e.what());
-            port.reset();
+            port.release();
         } catch (std::invalid_argument& e) {
             spdlog::error("Invalid argument error: {0}", e.what());
-            port.reset();
+            port.release();
         }
     }
 
@@ -116,7 +120,7 @@ void connect_par(serial_ptr& port, const std::string& port_name, const SerialPar
         if (!port->isOpen()) {
             // If its not open, something weird happened,
             // we release the resources
-            port.reset();
+            port.release();
         } else {
             port->flush();
             port->readlines();
