@@ -14,14 +14,14 @@ RTDSamplingPeriod = 1000
 # where i is the board and k is the RTD
 # Depends on how many boards and RTDs are in each board.
 RTDMask = 0xFFFF
-RTDNames = ["Cold Head", "Top of support leg CU", "SiPM Panel","Lower seal",  "Horiz CU strap", "Cold CU bar"]
+RTDNames = ["SiPM 1", "SiPM 2", "Water Block"]
 
 PIDEnable = false
 PeltierTempSetpoint = -30
 
-PeltierTKp = -100
-PeltierTTi = 1e6
-PeltierTTd = 0
+PeltierTKp = -300
+PeltierTTi = 500000.0
+PeltierTTd = 0.0
 
 [CAEN]
 # DT5730B or DT5740D
@@ -33,9 +33,9 @@ ConnectionType = "A4818"
 # if applicable
 VMEAddress = 0
 # 0 = not allowed
-RecordLength = 500
+RecordLength = 5000
 MaxEventsPerRead = 500
-PostBufferPorcentage = 70
+PostBufferPorcentage = 90
 OverlappingRejection = false
 TRGINasGate = false
 # 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
@@ -61,7 +61,7 @@ Offset = 0x8000
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
 Range = 1
-Threshold = 7500
+Threshold = 7900
 
 # [CAEN.group1]
 # Enabled = 0

@@ -620,7 +620,7 @@ class CAENDigitizerInterface {
                 double prepulse_end_region_per =
                     1.0 - 0.01*doe.GlobalConfig.PostTriggerPorcentage;
                 int32_t prepulse_end_region
-                    = static_cast<int32_t>(doe.GlobalConfig.RecordLength*prepulse_end_region_per) - 20;
+                    = static_cast<int32_t>(doe.GlobalConfig.RecordLength*prepulse_end_region_per) - 70;
 
                 uint32_t prepulse_end_region_u = prepulse_end_region < 0 ?
                     0 : static_cast<uint32_t>(prepulse_end_region);
@@ -677,14 +677,16 @@ class CAENDigitizerInterface {
                     spe_estimation_done = true;
 
                     auto pars = spe_analysis->FullAnalysis(
-                        spe_estimation_pulse_buffer,
-                        doe.GroupConfigs[0].DCOffset);
+                        spe_estimation_pulse_buffer);
 
                     _indicatorSender(IndicatorNames::SPE_GAIN_MEAN,
                         pars.SPEParameters(1));
 
                     _indicatorSender(IndicatorNames::WAVEFORM_NOISE,
-                        pars.CountsNoiseSTD);
+                        pars.BaselineParameters.NoiseSTD);
+
+                    _indicatorSender(IndicatorNames::WAVEFORM_BASELINE,
+                        pars.BaselineParameters.Baseline);
 
                     _indicatorSender(IndicatorNames::SPE_EFFICIENCTY,
                         pars.SPEEfficiency);

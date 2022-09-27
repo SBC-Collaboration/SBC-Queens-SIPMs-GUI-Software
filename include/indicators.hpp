@@ -48,6 +48,7 @@ namespace SBCQueens {
         TRIGGERRATE,
 
         WAVEFORM_NOISE,
+        WAVEFORM_BASELINE,
         SPE_GAIN_MEAN,
         SPE_EFFICIENCTY,
         INTEGRAL_THRESHOLD,
