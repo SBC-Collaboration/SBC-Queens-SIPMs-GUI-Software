@@ -63,7 +63,7 @@ with ser.Serial('/dev/ttyUSB0', timeout = 1000) as port:
 
             time.sleep(1)
 
-    np.savetxt("keithley2000_10Vrange_cal.csv", out, delimiter=",")
+    np.savetxt("amplifier_cal_noresistor_10Vout_10Vin.csv", out, delimiter=",")
 
     send_kei6487(port, ':sour:volt 0.0V')
     send_kei6487(port, ':sour:volt:stat OFF')

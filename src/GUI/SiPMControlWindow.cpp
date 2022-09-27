@@ -68,6 +68,10 @@ bool SiPMControlWindow::operator()() {
             return true;
         });
 
+    if(ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Max voltage allowed is 50.5V");
+    }
+
     ImGui::Separator();
 
     CAENControlFac.Button("Gain Mode",

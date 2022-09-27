@@ -225,7 +225,7 @@ class CAENDigitizerInterface {
                 // Keithley 6487
                 send_msg_slow("++addr 22");
                 send_msg_slow("*rst");
-                send_msg_slow(":sour:volt:rang 100");
+                send_msg_slow(":sour:volt:rang 45");
                 send_msg_slow(":sour:volt:ilim 250e-6");
                 send_msg_slow(":sour:volt 0.0V");
                 send_msg_slow(":sour:volt:stat OFF");
