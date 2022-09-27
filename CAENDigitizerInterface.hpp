@@ -1,5 +1,6 @@
 #ifndef CAENDIGITIZERINTERFACE_H
 #define CAENDIGITIZERINTERFACE_H
+#include <optional>
 #pragma once
 
 // C 3rd party includes
@@ -92,7 +93,7 @@ class CAENDigitizerInterface {
 
     // Hardware
     CAEN Port = nullptr;
-    ClientController<serial_ptr, double> SiPMVoltageSystem;
+    ClientController<serial_ptr, std::pair<double, double>> SiPMVoltageSystem;
 
     SiPMVoltageMeasure latest_measure;
     std::uint64_t SavedWaveforms = 0;
@@ -225,10 +226,32 @@ class CAENDigitizerInterface {
                 // Keithley 6487
                 send_msg_slow("++addr 22");
                 send_msg_slow("*rst");
-                send_msg_slow(":sour:volt:rang 45");
+
+                // Volt supply side
+                send_msg_slow(":sour:volt:rang 55");
                 send_msg_slow(":sour:volt:ilim 250e-6");
-                send_msg_slow(":sour:volt 0.0V");
+                send_msg_slow(":sour:volt "
+                    + std::to_string(doe.SiPMVoltageSysVoltage));
                 send_msg_slow(":sour:volt:stat OFF");
+
+                // Ammeter side
+                send_msg_slow(":sens:curr:dc:nplc 60");
+                send_msg_slow(":sens:aver:tcon mov");
+                send_msg_slow(":sens:aver:coun 100");
+                send_msg_slow(":sens:aver:stat ON");
+                send_msg_slow(":syst:azer ON");
+
+                // Zero check
+                send_msg_slow(":syst:zch ON");
+                send_msg_slow(":curr:rang 2E-4");
+                send_msg_slow("init");
+                send_msg_slow(":syst:zcor:stat OFF");
+                send_msg_slow(":syst:zcor:acq");
+                send_msg_slow(":syst:zch OFF");
+                send_msg_slow(":syst:zcor ON");
+
+                send_msg_slow(":arm:count inf");
+                send_msg_slow(":init:imm");
 
                 send_msg_slow("++auto 1");
 
@@ -669,22 +692,45 @@ class CAENDigitizerInterface {
             std::chrono::seconds(1),
             [&]() {
                 auto r = SiPMVoltageSystem.get(
-                [=](serial_ptr& port) -> std::optional<double> {
+                [=](serial_ptr& port)
+                -> std::optional<std::pair<double, double>> {
                     send_msg(port, "++addr 10\n", "");
                     send_msg(port, ":fetch?\n", "");
 
-                    return retrieve_msg<double>(port);
+                    auto volt = retrieve_msg<double>(port);
+
+                    if (!volt) {
+                        return {};
+                    }
+
+                    send_msg(port, "++addr 22\n", "");
+                    send_msg(port, ":fetch?\n", "");
+
+                    auto curr = retrieve_msg<double>(port);
+
+                    if(!curr) {
+                        return {};
+                    }
+
+                    spdlog::info("{0}", curr.value_or(0.0));
+
+                    return std::make_optional(
+                        std::make_pair(volt.value(), curr.value()));
             });
 
             if (r) {
                 double time = get_current_time_epoch() / 1000.0;
-                double volt = r.value();
+                double volt = r.value().first;
+                double curr = r.value().second;
 
                 latest_measure.Volt = volt;
                 latest_measure.Time = time;
+                latest_measure.Current = curr;
                 _voltagesFile->Add(latest_measure);
                 _indicatorSender(IndicatorNames::DMM_VOLTAGE, time, volt);
                 _indicatorSender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
+                _indicatorSender(IndicatorNames::PICO_CURRENT, time, curr);
+                _indicatorSender(IndicatorNames::LATEST_PICO_CURRENT, curr);
             }
         });
 
@@ -709,7 +755,7 @@ class CAENDigitizerInterface {
             {
                 if (doe.SiPMVoltageSysChange) {
                     SiPMVoltageSystem.get([=](serial_ptr& port)
-                        -> std::optional<double> {
+                    -> std::optional<std::pair<double, double>> {
 
                         send_msg(port, "++auto 0\n", "");
                         send_msg(port, "++addr 22\n", "");

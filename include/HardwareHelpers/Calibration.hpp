@@ -11,11 +11,16 @@
 
 namespace SBCQueens {
 
-const double DMM_CAL_PRIME_PARS[] = {1.00006224e+00,  2.47822383e-05};
-const double DMM_CAL_STD[] = { 4.842252035995647e-06, 2.6919326624132015e-05};
-const double DMM_CAL_COV = -1.11407167e-10;
+const double DMM_CAL_PRIME_PARS[] = {1.00000790e+00,  -7.03796763e-06};
+const double DMM_CAL_VAR[] = { 5.79188926e-10, 6.74259920e-07};
+const double kDMMCALCOV = -1.71253999e-08;
+const double kRINTERNAL = 30642;  // Ohms
+const double kRINTERNALSTD = 6;  // Ohms
 
-double calculate_dmm_error(const double& dmm_volt);
+double calculate_dmm_voltage(const double& dmm_volt);
+double calculate_dmm_voltage_error(const double& dmm_volt);
+double calculate_sipm_voltage(const double& volt, const double& current);
+double calculate_sipm_voltage_error(const double& volt, const double& current);
 
 }  // namespace SBCQueens
 
