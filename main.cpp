@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
     SBCQueens::SlowDAQQueue otherQueue;
     SBCQueens::GeneralIndicatorQueue giQueue;
     SBCQueens::MultiplePlotQueue mpQueue;
+    SBCQueens::SiPMPlotQueue sipmQueue;
 
     // This is our GUI function which actually holds all of our buttons
     // labels, inputs, graphs and ect
@@ -55,7 +56,9 @@ int main(int argc, char *argv[]) {
         // From Anyone -> GUI
         giQueue,
         // From Anyone -> GUI, auxiliary queue for dynamic plots
-        mpQueue);
+        mpQueue,
+        // From CAEN -> GUI, auxiliary queue for dynamic plots
+        sipmQueue);
 
     spdlog::info("Creating wrapper. Using:");
 
@@ -95,7 +98,8 @@ int main(int argc, char *argv[]) {
     SBCQueens::CAENDigitizerInterface caenc(
         giQueue,
         caenQueue,
-        mpQueue);
+        mpQueue,
+        sipmQueue);
 
     std::thread caen_thread(std::ref(caenc));
 

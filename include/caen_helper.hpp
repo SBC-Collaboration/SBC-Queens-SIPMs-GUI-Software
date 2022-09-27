@@ -204,15 +204,13 @@ struct caenEvent {
         : _handle(handle) {
         // This will only allocate memory if handle does
         // has an associated digitizer to it.
-        CAEN_DGTZ_AllocateEvent(_handle,
-            reinterpret_cast<void**>(&Data));
+        CAEN_DGTZ_AllocateEvent(_handle, reinterpret_cast<void**>(&Data));
     }
 
     // If handle is released before this event is freed,
     // it will cause a memory leak, maybe?
     ~caenEvent() {
-        CAEN_DGTZ_FreeEvent(_handle,
-            reinterpret_cast<void**>(&Data) );
+        CAEN_DGTZ_FreeEvent(_handle, reinterpret_cast<void**>(&Data) );
     }
 
     // This copies event other into this
@@ -309,7 +307,7 @@ struct caen {
         return ModelConstants.USBTransferRate;
     }
 
-    double GetNLOCTORecordLength() const {
+    double GetNLOCToRecordLength() const {
         return ModelConstants.NLOCToRecordLength;
     }
 

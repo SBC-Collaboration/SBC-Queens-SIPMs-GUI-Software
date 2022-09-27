@@ -3,8 +3,6 @@
 #pragma once
 
 // C 3rd party includes
-
-
 // C++ std includes
 #include <array>
 #include <vector>
@@ -60,32 +58,33 @@ struct CAENInterfaceData {
     int PortNum = 0;
     uint32_t VMEAddress = 0;
 
-    std::string Keithley2000Port = "";
-
-    CAENInterfaceStates CurrentState =
-        CAENInterfaceStates::NullState;
+    CAENInterfaceStates CurrentState = CAENInterfaceStates::NullState;
 
     bool SoftwareTrigger = false;
+
+    std::string Keithley2000Port = "";
 };
 
-using CAENQueueType
-    = std::function < bool(CAENInterfaceData&) >;
-
-using CAENQueue
-    = moodycamel::ReaderWriterQueue< CAENQueueType >;
+using CAENQueueType = std::function < bool(CAENInterfaceData&) >;
+using CAENQueue = moodycamel::ReaderWriterQueue< CAENQueueType >;
 
 template<typename... Queues>
 class CAENDigitizerInterface {
+    // Software related items
     std::tuple<Queues&...> _queues;
     CAENInterfaceData doe;
+    IndicatorSender<IndicatorNames> _indicatorSender;
+    IndicatorSender<uint8_t> _plotSender;
 
+    // Files
     DataFile<CAENEvent> _pulseFile;
     DataFile<double> _voltagesFile;
 
-    IndicatorSender<IndicatorNames> _plotSender;
-
+    // Hardware
     CAEN Port = nullptr;
-    std::uint64_t Waveforms = 0;
+    ClientController<serial_ptr, double> Keithley2000;
+
+    std::uint64_t SavedWaveforms = 0;
 
     // tmp stuff
     uint16_t* data;
@@ -94,8 +93,6 @@ class CAENDigitizerInterface {
     CAENEvent osc_event, adj_osc_event;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
     CAENEvent processing_evts[1024];
-
-    ClientController<serial_ptr, double> Keithley2000;
 
     // As long as we make the Func template argument a std::fuction
     // we can then use pointer magic to initialize them
@@ -123,7 +120,8 @@ class CAENDigitizerInterface {
  public:
     explicit CAENDigitizerInterface(Queues&... queues) :
         _queues(forward_as_tuple(queues...)),
-        _plotSender(std::get<GeneralIndicatorQueue&>(_queues)),
+        _indicatorSender(std::get<GeneralIndicatorQueue&>(_queues)),
+        _plotSender(std::get<SiPMPlotQueue&>(_queues)),
         Keithley2000("Keithley2000") {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
@@ -374,9 +372,7 @@ class CAENDigitizerInterface {
 
         std::optional<double> r
             = Keithley2000.get([=](serial_ptr& port) -> std::optional<double> {
-
             return {};
-
         });
 
         r = Keithley2000.get([=](serial_ptr& port) -> std::optional<double> {
@@ -420,7 +416,7 @@ class CAENDigitizerInterface {
     // Similar to an oscilloscope
     bool oscilloscope() {
         auto events = get_events_in_buffer(Port);
-        _plotSender(IndicatorNames::CAENBUFFEREVENTS, events);
+        _indicatorSender(IndicatorNames::CAENBUFFEREVENTS, events);
 
         retrieve_data(Port);
 
@@ -437,7 +433,8 @@ class CAENDigitizerInterface {
             extract_event(Port, 0, osc_event);
             spdlog::info("Event size: {0}", osc_event->Info.EventSize);
             spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
-            spdlog::info("Trigger Time Tag: {0}", osc_event->Info.TriggerTimeTag);
+            spdlog::info("Trigger Time Tag: {0}",
+                osc_event->Info.TriggerTimeTag);
 
             process_data_for_gui();
 
@@ -511,7 +508,7 @@ class CAENDigitizerInterface {
                 return;
             }
 
-            //double frequency = 0.0;
+            // double frequency = 0.0;
             for (uint32_t i = 0; i < Port->Data.NumEvents; i++) {
                 // Extract event i
                 extract_event(Port, i, processing_evts[i]);
@@ -522,8 +519,8 @@ class CAENDigitizerInterface {
                 }
             }
 
-            Waveforms += Port->Data.NumEvents;
-            _plotSender(IndicatorNames::SAVED_WAVEFORMS, Waveforms);
+            SavedWaveforms += Port->Data.NumEvents;
+            _indicatorSender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
         };
 
         if (isFileOpen) {
@@ -551,7 +548,7 @@ class CAENDigitizerInterface {
                 Port);
 
             isFileOpen = _pulseFile > 0;
-            Waveforms = 0;
+            SavedWaveforms = 0;
         }
 
         process_events();
@@ -631,7 +628,7 @@ class CAENDigitizerInterface {
 
         // TODO(Zhiheng): change anything you need here, too...
         // for(auto ch : Port->GroupConfigs) {
-        for (int j = 0; j < 3; j++) {
+        for (std::size_t j = 0; j < Port->GetNumChannels(); j++) {
             // auto& ch_num = ch.second.Number;
             auto buf = osc_event->Data->DataChannel[j];
             auto size = osc_event->Data->ChSize[j];
@@ -648,26 +645,7 @@ class CAENDigitizerInterface {
                 y_values[i] = static_cast<double>(buf[i]);
             }
 
-            IndicatorNames plotToSend;
-            switch (j) {
-                case 1:
-                    plotToSend = IndicatorNames::SiPM_Plot_ONE;
-                break;
-
-                case 2:
-                    plotToSend = IndicatorNames::SiPM_Plot_TWO;
-                break;
-
-                case 3:
-                    plotToSend = IndicatorNames::SiPM_Plot_THREE;
-                break;
-
-                case 0:
-                default:
-                    plotToSend = IndicatorNames::SiPM_Plot_ZERO;
-            }
-
-            _plotSender(plotToSend,
+            _plotSender(static_cast<uint8_t>(j),
                 x_values,
                 y_values);
         }

@@ -58,7 +58,7 @@ namespace SBCQueens {
 
     using GeneralIndicatorQueue = IndicatorsQueue<IndicatorNames, double>;
     using MultiplePlotQueue = IndicatorsQueue<uint16_t, double>;
-    // using SiPMQueue = IndicatorsQueue<uint16_t, double>;
+    using SiPMPlotQueue = IndicatorsQueue<uint8_t, double>;
 
     // using RTDIndicator = Indicator<uint16_t>;
     // using TeensyIndicator = Indicator<IndicatorNames>;

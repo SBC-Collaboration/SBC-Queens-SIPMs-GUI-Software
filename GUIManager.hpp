@@ -46,6 +46,7 @@ class GUIManager {
 
     IndicatorReceiver<IndicatorNames> GeneralIndicatorReceiver;
     IndicatorReceiver<uint16_t> MultiPlotReceiver;
+    IndicatorReceiver<uint8_t> SiPMPlotReceiver;
 
     // Teensy Controls
     ControlLink<TeensyQueue> TeensyControlFac;
@@ -74,6 +75,7 @@ class GUIManager {
         _queues(std::forward_as_tuple(queues...)),
         GeneralIndicatorReceiver(std::get<GeneralIndicatorQueue&>(_queues)),
         MultiPlotReceiver   (std::get<MultiplePlotQueue&>(_queues)),
+        SiPMPlotReceiver    (std::get<SiPMPlotQueue&>(_queues)),
         TeensyControlFac    (std::get<TeensyQueue&>(_queues)),
         CAENControlFac  (std::get<CAENQueue&>(_queues)),
         SlowDAQControlFac   (std::get<SlowDAQQueue&>(_queues)),
@@ -177,7 +179,7 @@ class GUIManager {
                 static ImPlotScale press_scale_axis = ImPlotScale_Linear;
                 ImGui::CheckboxFlags("Log Axis",
                     (unsigned int*)&press_scale_axis, ImPlotScale_Log10);
-                if (ImPlot::BeginPlot("Pressures", ImVec2(-1, 0))) {
+                if (ImPlot::BeginPlot("Pressures", ImVec2(-1, -1))) {
                     ImPlot::SetupAxisScale(ImAxis_Y1, press_scale_axis);
                     ImPlot::SetupAxes("time [s]", "P [Bar]",
                         g_axis_flags, g_axis_flags);
@@ -215,7 +217,7 @@ class GUIManager {
 
 
         if (!tgui_state.SystemParameters.InRTDOnlyMode) {
-            if (ImPlot::BeginPlot("PIDs", ImVec2(-1, 0))) {
+            if (ImPlot::BeginPlot("PIDs", ImVec2(-1, -1))) {
                 ImPlot::SetupAxes("time [s]", "Current [A]",
                     g_axis_flags, g_axis_flags);
 
@@ -287,18 +289,40 @@ class GUIManager {
 
 
         ImGui::Begin("SiPM Plot");
-        if (ImPlot::BeginPlot("SiPM Trace", ImVec2(-1, 0))) {
-            ImPlot::SetupAxes("time [ns]", "Counts",
-                g_axis_flags, g_axis_flags);
+        const size_t kCHperGroup = 8;
+        const auto& model_constants
+                    = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
+        const auto numgroups = model_constants.NumberOfGroups > 0 ?
+            model_constants.NumberOfGroups : 1;
+        const int numchpergroup = model_constants.NumChannels / numgroups;
+        // Let's work on const auto& because we really do not want to change
+        // anything in these next lines
+        if (ImPlot::BeginPlot("SiPM Plots", ImVec2(-1, -1),
+            ImPlotFlags_NoTitle)) {
+            ImPlot::SetupAxes("time [ns]", "Counts", g_axis_flags,
+                g_axis_flags);
+            for (const auto& gp : cgui_state.GroupConfigs) {
+                // We need the number of groups each model has
 
-            GeneralIndicatorReceiver.plot(
-                IndicatorNames::SiPM_Plot_ZERO, "Plot 1", true);
-            GeneralIndicatorReceiver.plot(
-                IndicatorNames::SiPM_Plot_ONE, "Plot 2", true);
-            GeneralIndicatorReceiver.plot(
-                IndicatorNames::SiPM_Plot_TWO, "Plot 3", true);
-            GeneralIndicatorReceiver.plot(
-                IndicatorNames::SiPM_Plot_THREE, "Plot 4", true);
+                // If groups is higher than 0, then it has groups
+                // otherwise each group is a channel
+                if (model_constants.NumberOfGroups > 0) {
+                    // Each mask contains if the channel is enabled
+                    const auto& mask = gp.AcquisitionMask;
+                    // There is always at max 8 channels.
+                    for (std::size_t i = 0; i < kCHperGroup; i++) {
+                        if (mask & (1 << i)) {
+                            SiPMPlotReceiver.plot(kCHperGroup*gp.Number + i,
+                            "GP " +  std::to_string(gp.Number)
+                            + "CH " + std::to_string(i), true);
+                            ImPlot::EndPlot();
+                        }
+                    }
+                } else {
+                    SiPMPlotReceiver.plot(gp.Number,
+                        "CH " + std::to_string(gp.Number), true);
+                }
+            }
 
             ImPlot::EndPlot();
         }

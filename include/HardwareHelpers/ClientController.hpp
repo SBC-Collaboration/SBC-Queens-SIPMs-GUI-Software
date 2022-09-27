@@ -1,5 +1,6 @@
 #ifndef CLIENTCONTROLLER_H
 #define CLIENTCONTROLLER_H
+#include <utility>
 #pragma once
 
 /*
@@ -47,7 +48,6 @@ class ClientController {
     ControlFuncType _closeFunc;
 
  public:
-
     explicit ClientController(const std::string& name) : _name(name) {}
     ClientController(const std::string& name, ControlFuncType&& init,
         ControlFuncType&& close)
@@ -87,6 +87,10 @@ class ClientController {
 
             return {};  // returns an empty optional
         }
+    }
+
+    std::optional<T> operator()(ReturnFuncType&& g) noexcept {
+        return get(std::forward<ReturnFuncType>(g));
     }
 };
 

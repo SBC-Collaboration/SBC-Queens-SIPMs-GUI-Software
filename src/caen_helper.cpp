@@ -192,7 +192,7 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     uint32_t nloc = 0;
     error_wrap("Failed to read NLOC. ", CAEN_DGTZ_ReadRegister, handle,
                          0x8020, &nloc);
-    res->GlobalConfig.RecordLength = res->GetNLOCTORecordLength() * nloc;
+    res->GlobalConfig.RecordLength = res->GetNLOCToRecordLength() * nloc;
 
     error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
                          CAEN_DGTZ_SetPostTriggerSize, handle,
@@ -749,7 +749,7 @@ uint32_t calculate_max_buffers(CAEN& res) noexcept {
     read_register(res, 0x8020, nloc);
 
     try {
-        rl =  res->GetNLOCTORecordLength()*nloc;
+        rl =  res->GetNLOCToRecordLength()*nloc;
     } catch (...) {
         return 0;
     }
@@ -791,7 +791,7 @@ std::string sbc_init_file(CAEN& res) noexcept {
     // The enum and the map is to simplify the code for the lambdas.
     // and the header could potentially change any moment with any type
     enum class Types { CHAR, INT8, INT16, INT32, INT64, UINT8, UINT16,
-    UINT32, UINT64, SINGLE, FLOAT, DOUBLE, FLOAT128 };
+        UINT32, UINT64, SINGLE, FLOAT, DOUBLE, FLOAT128 };
 
     const std::unordered_map<Types, std::string> type_to_string = {
         {Types::CHAR, "char"},
@@ -940,7 +940,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     const uint8_t num_groups = res->GetNumberOfGroups();
     const bool has_groups = num_groups > 0;
 
-    std::function<uint32_t(uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
+    static std::function<uint32_t(uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
         return acq_mask == 0 ? 0: (acq_mask & 1) + n_channels_acq(acq_mask>>1);
     };
 
@@ -968,7 +968,6 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
             }
         }
     };
-
 
     uint32_t num_ch = 0;
     for (auto gr_pair : res->GroupConfigs) {
