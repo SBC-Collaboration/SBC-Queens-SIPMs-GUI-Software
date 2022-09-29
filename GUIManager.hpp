@@ -151,6 +151,7 @@ class GUIManager {
                 if (ImGui::BeginTabItem("Local BME")) {
                     if (ImPlot::BeginPlot("Local BME", ImVec2(-1, 0))) {
                         // We setup the axis
+                        ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
                         ImPlot::SetupAxes("time [s]", "Humidity [%]",
                             g_axis_flags, g_axis_flags);
                         ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]",
@@ -189,6 +190,7 @@ class GUIManager {
                     (unsigned int*)&press_scale_axis, ImPlotScale_Log10);
                 if (ImPlot::BeginPlot("Pressures", ImVec2(-1, -1))) {
                     ImPlot::SetupAxisScale(ImAxis_Y1, press_scale_axis);
+                    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
                     ImPlot::SetupAxes("time [s]", "P [Bar]",
                         g_axis_flags, g_axis_flags);
 
@@ -228,6 +230,7 @@ class GUIManager {
             if (ImPlot::BeginPlot("PIDs", ImVec2(-1, -1))) {
                 ImPlot::SetupAxes("time [s]", "Current [A]",
                     g_axis_flags, g_axis_flags);
+                ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
 
                 ImPlot::EndPlot();
             }
@@ -240,6 +243,7 @@ class GUIManager {
 
         if (ImPlot::BeginPlot("RTDs", ImVec2(-1, 0))) {
             ImPlot::SetupAxisScale(ImAxis_Y1, rtd_scale_axis);
+            ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
             ImPlot::SetupAxes("time [s]", "Temperature [K]",
                 g_axis_flags, g_axis_flags);
 
@@ -267,6 +271,7 @@ class GUIManager {
 
         if (ImPlot::BeginPlot("RTD Zoom", ImVec2(-1, 0))) {
             ImPlot::SetupAxisScale(ImAxis_Y1, rtd_scale_axis);
+            ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
             ImPlot::SetupAxes("time [s]", "Temperature [K]",
                 g_axis_flags, g_axis_flags);
             ImPlot::SetupAxesLimits(

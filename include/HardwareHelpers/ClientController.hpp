@@ -54,9 +54,7 @@ class ClientController {
         : _name(name), _initFunc(init), _closeFunc(close) {}
 
     ~ClientController() {
-        if (_port) {
-            _closeFunc(_port);
-        }
+        _closeFunc(_port);
     }
 
     void init(ControlFuncType&& init, ControlFuncType&& close) noexcept {

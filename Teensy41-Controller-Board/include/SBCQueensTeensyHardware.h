@@ -16,23 +16,24 @@ namespace SBCQueens {
     /// PIN DEFINITIONS
  
 #ifndef RTD_ONLY_MODE
-    const uint8_t TWELVEV_PIN_ONE   = 2u;
-    const uint8_t TWELVEV_PIN_TWO   = 3u;
-    const uint8_t TWELVEV_PIN_THREE = 4u;
+    const uint8_t TWELVEV_PIN_ONE   = 30u;
+    const uint8_t TWELVEV_PIN_TWO   = 31u;
+    const uint8_t TWELVEV_PIN_THREE = 32u;
 
 #ifndef NEW_RTD_BOARD
-    const uint8_t RTD_ONE_CS        = 5u;
-    const uint8_t RTD_TWO_CS        = 6u;
+    const uint8_t RTD_ONE_CS        = 24u;
+    const uint8_t RTD_TWO_CS        = 25u;
+    const uint8_t RTD_THREE_CS      = 26u;
 #endif
 
     const uint8_t BME_CS            = 7u;
     const uint8_t BOX_BME_CS        = 8u;
 
-    const uint8_t PELTIER_EN_PIN    = 21u;
+    const uint8_t PELTIER_EN_PIN    = 15u;
 
     // Analog PINS
     const uint8_t NTWO_PIN = 0u; // 15
-    const uint8_t VACUUM_PIN = 1u; // 16
+    const uint8_t VACUUM_PIN = 9u; //23
 
     ///
 
@@ -55,7 +56,7 @@ namespace SBCQueens {
 #endif
     extern RTDBoard<NUM_RTD_PER_BOARD> RTD_BOARDS[NUM_RTD_BOARDS];
 #else
-    const uint8_t NUM_RTD_BOARDS = 4;
+    const uint8_t NUM_RTD_BOARDS = 3;
     const uint8_t NUM_RTD_PER_BOARD = 1;
     extern MAX31865_t RTD_BOARDS[NUM_RTD_BOARDS];
 #endif

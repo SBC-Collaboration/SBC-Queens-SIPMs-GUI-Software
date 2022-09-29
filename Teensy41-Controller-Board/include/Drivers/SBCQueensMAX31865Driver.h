@@ -61,7 +61,7 @@ namespace SBCQueens {
 
 	/// Math specific functions
 	const float c_RTD_NOMINAL = 100.0; 
-	const float c_REF_RESISTOR = 430.0;
+	const float c_REF_RESISTOR = 350.0;
 	const float c_RTD_A = 3.9083e-3;
 	const float c_RTD_B = -5.775e-7;
 

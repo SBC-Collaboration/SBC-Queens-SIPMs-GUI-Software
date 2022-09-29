@@ -610,12 +610,9 @@ class TeensyControllerInterface {
             try {
                 auto pids = parse.get<Peltiers>();
 
-                // Time since communication with the Teensy
-                double dt = (pids.time - _init_time) / 1000.0;
-
                 // Send them to GUI to draw them
                 TeensyIndicatorSender(IndicatorNames::PELTIER_CURR,
-                    dt, pids.PID.Current);
+                    pids.time, pids.PID.Current);
 
                 TeensyIndicatorSender(IndicatorNames::LATEST_Peltier_CURR,
                     pids.PID.Current);
@@ -637,13 +634,10 @@ class TeensyControllerInterface {
             try {
                 auto rtds = parse.get<RTDs>();
 
-                // Time since communication with the Teensy
-                double dt = (rtds.time - _init_time) / 1000.0;
-
                 // Send them to GUI to draw them
                 for (uint16_t i = 0; i < rtds.RTDS.size(); i++) {
                     rtds.RTDS[i] += 273.15;
-                    MultiPlotSender(i, dt, rtds.RTDS[i]);
+                    MultiPlotSender(i, rtds.time, rtds.RTDS[i]);
                 }
 
                 _RTDsFile->Add(rtds);
@@ -663,12 +657,9 @@ class TeensyControllerInterface {
             try {
                 auto press = parse.get<Pressures>();
 
-                // Time since communication with the Teensy
-                double dt = (press.time - _init_time) / 1000.0;
-
                 // Send them to GUI to draw them
                 TeensyIndicatorSender(IndicatorNames::VACUUM_PRESS,
-                    dt, press.Vacuum.Pressure);
+                    press.time , press.Vacuum.Pressure);
                 TeensyIndicatorSender(IndicatorNames::LATEST_VACUUM_PRESS,
                     press.Vacuum.Pressure);
 
@@ -690,15 +681,12 @@ class TeensyControllerInterface {
             try {
                 auto bmes = parse.get<BMEs>();
 
-                // Time since communication with the Teensy
-                double dt = (bmes.time - _init_time) / 1000.0;
-
                 TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Temps,
-                    dt, bmes.LocalBME.Temperature);
+                    bmes.time , bmes.LocalBME.Temperature);
                 TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Pressure,
-                    dt, bmes.LocalBME.Pressure);
+                    bmes.time , bmes.LocalBME.Pressure);
                 TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Humidity,
-                    dt, bmes.LocalBME.Humidity);
+                    bmes.time , bmes.LocalBME.Humidity);
 
                 _BMEsFile->Add(bmes);
             } catch (... ) {

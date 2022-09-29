@@ -248,7 +248,9 @@ class CAENDigitizerInterface {
                 [&]() {
                     auto r = Keithley2000.get([=](serial_ptr& port)
                     -> std::optional<double> {
+                    send_msg(port, "++addr 10\n", "");
                     send_msg(port, ":fetch?\n", "");
+
                     return retrieve_msg<double>(port);
                 });
 
@@ -256,11 +258,9 @@ class CAENDigitizerInterface {
                     double time = get_current_time_epoch() / 1000.0;
                     double volt = r.value();
 
-                    Keithley2000Measure tmp;
-                    tmp.Volt = volt;
-                    tmp.Time = time;
-                    latest_measure = tmp;
-                    _voltagesFile->Add(tmp);
+                    latest_measure.Volt = volt;
+                    latest_measure.Time = time;
+                    _voltagesFile->Add(latest_measure);
                     _indicatorSender(IndicatorNames::DMM_VOLTAGE, time, volt);
                     _indicatorSender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
                 }

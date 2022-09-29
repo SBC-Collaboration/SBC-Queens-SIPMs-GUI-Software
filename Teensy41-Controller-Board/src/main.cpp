@@ -14,7 +14,7 @@
 #include <CRC32.h>
 
 // My libraries includes
-#define RTD_ONLY_MODE
+// #define RTD_ONLY_MODE
 // #define NEW_RTD_BOARD
 
 #include "SBCQueensTeensyBasics.h"

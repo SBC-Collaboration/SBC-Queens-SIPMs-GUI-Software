@@ -67,13 +67,13 @@ namespace SBCQueens {
 		RTD_BOARDS[1].State                            = MAX31865_STATES::SLEEP;
 		RTD_BOARDS[1].Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
 
-		RTD_BOARDS[2].CS_PIN                           = 9;
+		RTD_BOARDS[2].CS_PIN                           = RTD_THREE_CS;
 		RTD_BOARDS[2].State                            = MAX31865_STATES::SLEEP;
 		RTD_BOARDS[2].Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
 
-		RTD_BOARDS[3].CS_PIN                           = 20;
-		RTD_BOARDS[3].State                            = MAX31865_STATES::SLEEP;
-		RTD_BOARDS[3].Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
+		// RTD_BOARDS[3].CS_PIN                           = 20;
+		// RTD_BOARDS[3].State                            = MAX31865_STATES::SLEEP;
+		// RTD_BOARDS[3].Configuration                    = MAX31865_CONF_VALS::PID_OPTIMIZED;
 #endif
 
 #ifndef RTD_ONLY_MODE
@@ -139,6 +139,9 @@ namespace SBCQueens {
 
 		pinMode(        RTD_TWO_CS,         arduino::OUTPUT);
 		digitalWrite(   RTD_TWO_CS,         arduino::HIGH);
+
+		pinMode(        RTD_THREE_CS,         arduino::OUTPUT);
+		digitalWrite(   RTD_THREE_CS,         arduino::HIGH);
 
 		pinMode(        9,    arduino::OUTPUT);
 		digitalWrite(   9,         arduino::HIGH);

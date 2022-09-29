@@ -131,6 +131,8 @@ void disconnect(serial_ptr& port) noexcept {
             port->readlines();
             port->close();
         }
+
+        port.release();
     }
 }
 

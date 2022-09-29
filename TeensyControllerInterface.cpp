@@ -27,7 +27,7 @@ void to_json(json& j, const Peltiers& p) {
 }
 
 void from_json(const json& j, Peltiers& p) {
-    p.time = get_current_time_epoch();
+    p.time = get_current_time_epoch() / 1000.0;
     j.at("PELTIER1I").get_to(p.PID.Current);
 }
 
@@ -36,7 +36,7 @@ void to_json(json& j, const RTDs& p) {
 
 
 void from_json(const json& j, RTDs& p) {
-    p.time = get_current_time_epoch();
+    p.time = get_current_time_epoch() / 1000.0;
     j.at("RTDT").get_to(p.RTDS);
 }
 
@@ -44,7 +44,7 @@ void to_json(json& j, const RawRTDs& p) {
 }
 
 void from_json(const json& j, RawRTDs& p) {
-    p.time = get_current_time_epoch();
+    p.time = get_current_time_epoch() / 1000.0;
     j.at("RTDR").get_to(p.RTDS);
 }
 
@@ -67,7 +67,7 @@ void from_json(const json& j, TeensySystemPars& p) {
 void from_json(const json& j, Pressures& p) {
     auto press = 0.0;
 
-    p.time = get_current_time_epoch();
+    p.time = get_current_time_epoch() / 1000.0;
     j.at("VACUUMP").get_to(press);
     press *= (3.32/exp2(12)) * (1.0/135);  // to current
     press = 14.6959 - (14.7/16e-3)*(press - 4e-3);  // to psi
@@ -90,7 +90,7 @@ void to_json(json& j, const BMEs& p) {
 
 void from_json(const json& j, BMEs& p) {
     // ms
-    p.time = get_current_time_epoch();
+    p.time = get_current_time_epoch() / 1000.0;
 
     int32_t temp = 0.0;
     j.at("BME1T").get_to(temp);
