@@ -647,7 +647,7 @@ class TeensyControllerInterface {
                             rtds.RTDS[i]);
                         break;
                         case 2:
-                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
+                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD3_TEMP,
                             rtds.RTDS[i]);
                         break;
                     }

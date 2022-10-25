@@ -84,7 +84,8 @@ class GUIManager {
         indicatorWindow     (GeneralIndicatorReceiver, tgui_state, sdaq_state),
         controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state,
             SlowDAQControlFac, sdaq_state),
-        sipmControlWindow(CAENControlFac, cgui_state) {
+        sipmControlWindow(CAENControlFac, cgui_state, GeneralIndicatorReceiver)
+        {
         // When config_file goes out of scope, everything
         // including the daughters get cleared
         config_file = toml::parse_file("gui_setup.toml");
@@ -383,6 +384,9 @@ class GUIManager {
                     ImPlot::SetupAxes("Voltage [V]", "Gain [arb]", g_axis_flags,
                         g_axis_flags);
 
+                    GeneralIndicatorReceiver.plot(
+                        IndicatorNames::GAIN_VS_VOLTAGE,
+                        "Gain");
 
                     ImPlot::EndPlot();
                 }

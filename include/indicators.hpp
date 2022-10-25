@@ -31,6 +31,7 @@ namespace SBCQueens {
 
         DMM_VOLTAGE,
         PICO_CURRENT,
+        GAIN_VS_VOLTAGE,
 
         // For indicators:
         // Teeensy Indicators
@@ -44,6 +45,12 @@ namespace SBCQueens {
         LATEST_PICO_CURRENT,
 
         // CAEN Indicators
+        // Boolean
+        FULL_ANALYSIS_DONE,
+        PROCESSING_REDUCED_WF,
+        CALCULATING_VBD,
+
+        // Numerical
         CAENBUFFEREVENTS,
         TRIGGERRATE,
 
@@ -56,6 +63,7 @@ namespace SBCQueens {
         FALL_TIME,
         OFFSET,
         BREAKDOWN_VOLTAGE,
+        BREAKDOWN_VOLTAGE_ERR,
 
         SAVED_WAVEFORMS
     };

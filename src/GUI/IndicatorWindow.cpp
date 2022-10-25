@@ -90,9 +90,13 @@ namespace SBCQueens {
             "STD noise", 200, 4);
         ImGui::SameLine(300); ImGui::Text("[counts]");
 
+        _indicatorReceiver.indicator(IndicatorNames::WAVEFORM_BASELINE,
+            "Baseline", 200, 4);
+        ImGui::SameLine(300); ImGui::Text("[counts]");
+
         _indicatorReceiver.indicator(IndicatorNames::SPE_GAIN_MEAN,
             "1SPE Gain Mean", 200, 4);
-        ImGui::SameLine(300); ImGui::Text("[sp x counts]");
+        ImGui::SameLine(300); ImGui::Text("[arb.]");
 
         _indicatorReceiver.indicator(IndicatorNames::SPE_EFFICIENCTY,
             "1SPE Efficiency", 200, 4);
@@ -116,6 +120,10 @@ namespace SBCQueens {
 
         _indicatorReceiver.indicator(IndicatorNames::BREAKDOWN_VOLTAGE,
             "VBD", 200, 3);
+        ImGui::SameLine(300); ImGui::Text("[V]");
+
+        _indicatorReceiver.indicator(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
+            "VBD Error", 200, 3);
         ImGui::SameLine(300); ImGui::Text("[V]");
 
         // End CAEN
