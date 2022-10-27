@@ -70,8 +70,7 @@ bool SiPMControlWindow::operator()() {
             }
 
             // A change in voltage while in VBD mode should trip a reset
-            if (old.VBDData.State == VBRState::Idle &&
-                old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
                 old.VBDData.State = VBRState::Reset;
             }
 
@@ -91,11 +90,13 @@ bool SiPMControlWindow::operator()() {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
         ImVec4(.0f, 8.f, .8f, 1.0f));
     CAENControlFac.Button("Start Breakdown Voltage (VBD) Mode",
-        [](CAENInterfaceData& old) {
+        [=](CAENInterfaceData& old) {
             if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-                old.CurrentState == CAENInterfaceStates::RunMode) {
+                old.CurrentState == CAENInterfaceStates::RunMode ||
+                old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
                 old.CurrentState = CAENInterfaceStates::BreakdownVoltageMode;
                 if (old.SiPMVoltageSysSupplyEN) {
+                    old.LatestTemperature = tgui_state.PIDTempValues.SetPoint;
                     old.VBDData.State = VBRState::Init;
                 } else {
                     spdlog::warn("VBD mode cannot start without enabling the "
@@ -112,17 +113,16 @@ bool SiPMControlWindow::operator()() {
             "Then it grabs another sample to calculate the gain");
     }
 
-    ImGui::SameLine();
+
     bool tmp;
-    indicatorReceiver.booleanIndicator(IndicatorNames::FULL_ANALYSIS_DONE,
-        "Done?",
+    indicatorReceiver.booleanIndicator(IndicatorNames::ANALYSIS_ONGOING,
+        "Processing...",
         tmp,
         [=](const double& newVal) -> bool {
                 return newVal > 0;
     });
 
-    ImGui::SameLine();
-    indicatorReceiver.booleanIndicator(IndicatorNames::PROCESSING_REDUCED_WF,
+    indicatorReceiver.booleanIndicator(IndicatorNames::FULL_ANALYSIS_DONE,
         "Done?",
         tmp,
         [=](const double& newVal) -> bool {

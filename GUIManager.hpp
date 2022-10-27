@@ -84,7 +84,8 @@ class GUIManager {
         indicatorWindow     (GeneralIndicatorReceiver, tgui_state, sdaq_state),
         controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state,
             SlowDAQControlFac, sdaq_state),
-        sipmControlWindow(CAENControlFac, cgui_state, GeneralIndicatorReceiver)
+        sipmControlWindow(CAENControlFac, cgui_state, GeneralIndicatorReceiver,
+            tgui_state)
         {
         // When config_file goes out of scope, everything
         // including the daughters get cleared
@@ -342,13 +343,17 @@ class GUIManager {
                                     SiPMPlotReceiver.plot(
                                     static_cast<uint8_t>(kCHperGroup*gp.Number + i),
                                     "GP " +  std::to_string(gp.Number)
-                                    + "CH " + std::to_string(i), true);
+                                    + "CH " + std::to_string(i),
+                                    PlotStyle::Line,
+                                    true);
                                     ImPlot::EndPlot();
                                 }
                             }
                         } else {
                             SiPMPlotReceiver.plot(gp.Number,
-                                "CH " + std::to_string(gp.Number), true);
+                                "CH " + std::to_string(gp.Number),
+                                PlotStyle::Line,
+                                true);
                         }
                     }
                     ImPlot::EndPlot();
@@ -386,7 +391,7 @@ class GUIManager {
 
                     GeneralIndicatorReceiver.plot(
                         IndicatorNames::GAIN_VS_VOLTAGE,
-                        "Gain");
+                        "Gain", PlotStyle::Scatter);
 
                     ImPlot::EndPlot();
                 }

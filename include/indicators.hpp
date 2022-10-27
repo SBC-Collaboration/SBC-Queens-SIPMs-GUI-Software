@@ -46,6 +46,7 @@ namespace SBCQueens {
 
         // CAEN Indicators
         // Boolean
+        ANALYSIS_ONGOING,
         FULL_ANALYSIS_DONE,
         PROCESSING_REDUCED_WF,
         CALCULATING_VBD,

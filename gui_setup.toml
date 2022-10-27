@@ -17,7 +17,7 @@ RTDMask = 0xFFFF
 RTDNames = ["SiPM 1", "SiPM 2", "Water Block"]
 
 PIDEnable = false
-PeltierTempSetpoint = -30
+PeltierTempSetpoint = -15
 
 PeltierTKp = -300
 PeltierTTi = 500000.0
@@ -61,7 +61,7 @@ Offset = 0x8000
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
 Range = 1
-Threshold = 7900
+Threshold = 7800
 
 # [CAEN.group1]
 # Enabled = 0

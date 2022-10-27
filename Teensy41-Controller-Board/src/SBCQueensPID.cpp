@@ -84,6 +84,7 @@ namespace SBCQueens {
 					if(abs(temperature_setpoint - latest_temp_meas) < 5.0) {
 						// if ( latest_current_meas < 0.95*controller.REGISTERS.DESIRED_SET_VAL ) {
 							controller.State = PID_STATE::TEMP_MODE;
+							controller._cont_comm_err = 0.0;
 						// }
 					}
 
@@ -133,6 +134,7 @@ namespace SBCQueens {
 					// Changes states only if enabled and away from 5 degC
 					if(abs(pid_error) >= 5.0 && controller.SET_EN) {
 						controller.State = PID_STATE::CURRENT_MODE;
+						controller._set_comm_err = 0.0;
 					}
 
 					*controller.Ouput = tmp;

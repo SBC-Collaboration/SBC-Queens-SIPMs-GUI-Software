@@ -245,6 +245,10 @@ struct PlotDataBuffer {
     }
 };
 
+enum class PlotStyle {
+    Line,
+    Scatter
+};
 // A plot indicator. It inherits from indicator, but more out of necessity.
 // It keeps the code clean, but it was really not necessary.
 // Originally, a plot could be any type that was not double but
@@ -254,6 +258,7 @@ template<typename T>
 class Plot : public Indicator<T> {
     bool Cleared = false;
     bool ClearOnNewData = false;
+
 
     const std::size_t MaxSamples;
     PlotDataBuffer plotData;
@@ -309,7 +314,8 @@ class Plot : public Indicator<T> {
     }
 
     // Wraps ImPlot::PlotLine
-    void operator()(const std::string& label) {
+    void operator()(const std::string& label,
+        const PlotStyle& style = PlotStyle::Line) {
         // static ImPlotGetter getter = static_cast<ImPlotGetter>(_transform);
         static auto transform = [](int idx, void* data) {
             auto myData = static_cast<PlotDataBuffer*>(data);
@@ -317,11 +323,21 @@ class Plot : public Indicator<T> {
             return ImPlotPoint(pair.first, pair.second);
         };
 
-        ImPlot::PlotLineG(label.c_str(), transform, &plotData, plotData.Size);
+        switch (style) {
+            case PlotStyle::Scatter:
+                ImPlot::PlotScatterG(label.c_str(), transform, &plotData, plotData.Size);
+            break;
+            case PlotStyle::Line:
+            default:
+                ImPlot::PlotLineG(label.c_str(), transform, &plotData, plotData.Size);
+            break;
+        }
+
     }
 
-    void Draw(const std::string& label) {
-        this->operator()(label);
+    void Draw(const std::string& label,
+        const PlotStyle& style = PlotStyle::Line) {
+        this->operator()(label, style);
     }
 
  private:
@@ -453,7 +469,7 @@ public:
     // Adds plot with ID, and draws it at the placed location if exists
     // It returns a smart pointer to the indicator (not plot)
     auto& plot(const T& id, const std::string& label,
-        bool clearOnNewData = false) {
+        const PlotStyle style = PlotStyle::Line, bool clearOnNewData = false) {
         _indicators.try_emplace(id,
             std::make_unique<Plot<T>>(id, clearOnNewData));
 
@@ -461,7 +477,7 @@ public:
 
         Plot<T>* plt = dynamic_cast<Plot<T>*>(ind.get());
         if (plt) {
-            plt->Draw(label);
+            plt->Draw(label, style);
         }
 
         return ind;

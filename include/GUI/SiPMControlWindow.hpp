@@ -11,6 +11,7 @@
 // my includes
 #include "imgui_helpers.hpp"
 #include "../CAENDigitizerInterface.hpp"
+#include "../TeensyControllerInterface.hpp"
 #include "indicators.hpp"
 
 namespace SBCQueens {
@@ -21,10 +22,13 @@ class SiPMControlWindow {
     ControlLink<CAENQueue>& CAENControlFac;
     CAENInterfaceData& cgui_state;
     IndicatorReceiver<IndicatorNames>& indicatorReceiver;
+    TeensyControllerData& tgui_state;
+
  public:
     SiPMControlWindow(ControlLink<CAENQueue>& cc, CAENInterfaceData& cd,
-        IndicatorReceiver<IndicatorNames>& ir)
-        : CAENControlFac(cc), cgui_state(cd), indicatorReceiver(ir) {}
+        IndicatorReceiver<IndicatorNames>& ir, TeensyControllerData& td)
+        : CAENControlFac(cc), cgui_state(cd), indicatorReceiver(ir),
+        tgui_state(td) {}
 
     // Moving allowed
     SiPMControlWindow(SiPMControlWindow&&) = default;

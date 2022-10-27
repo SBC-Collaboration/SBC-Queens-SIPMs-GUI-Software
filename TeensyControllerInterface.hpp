@@ -365,7 +365,10 @@ class TeensyControllerInterface {
     //  -> Update until disconnect, close, or error.
     void operator()() {
         auto connect_bt = make_blocking_total_timed_event(
-            std::chrono::milliseconds(5000), connect);
+            std::chrono::milliseconds(5000),
+            [&](serial_ptr& p, const std::string& port_name) {
+                connect(p, port_name);
+            });
 
         spdlog::info("Initializing teensy thread");
 
@@ -741,13 +744,13 @@ class TeensyControllerInterface {
                 retrieve_pressures();
         });
 
-        static auto retrieve_bmes_nb = make_total_timed_event(
-            std::chrono::milliseconds(114),
-            // Lambda hacking to allow the class function to be pass to
-            // make_total_timed_event. Is there any other way?
-            [&]() {
-                retrieve_bmes();
-        });
+        // static auto retrieve_bmes_nb = make_total_timed_event(
+        //     std::chrono::milliseconds(114),
+        //     // Lambda hacking to allow the class function to be pass to
+        //     // make_total_timed_event. Is there any other way?
+        //     [&]() {
+        //         retrieve_bmes();
+        // });
 
         // This looks intimidating but it is actually pretty simple once
         // broken down. First, by make_total_timed_event it is going to call

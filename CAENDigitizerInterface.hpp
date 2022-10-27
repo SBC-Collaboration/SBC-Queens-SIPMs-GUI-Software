@@ -46,6 +46,7 @@ struct SaveFileInfo {
     double Time;
     std::string FileName;
 
+    SaveFileInfo() {}
     SaveFileInfo(const double& time, const std::string& fn) :
         Time(time), FileName(fn) {}
 };
@@ -108,7 +109,7 @@ struct CAENInterfaceData {
     bool ResetCaen = false;
 
     std::string SiPMVoltageSysPort = "";
-    double LatestTemperature;
+    float LatestTemperature = -1.f;
     bool SiPMVoltageSysChange = false;
     bool SiPMVoltageSysSupplyEN = false;
     float SiPMVoltageSysVoltage = 0.0;
@@ -156,9 +157,9 @@ class CAENDigitizerInterface {
       // coords(2, 0) = 20;
       // coords(3, 0) = 5;
       // coords(4, 0) = 7500;
-    std::unique_ptr< SPEAnalysis<nEXOSiPMFunction> > spe_analysis;
+    std::unique_ptr< SPEAnalysis<SimplifiedSiPMFunction> > spe_analysis;
     std::unique_ptr< GainVBDEstimation > vbe_analysis;
-    // SPEAnalysis<nEXOSiPMFunction> _speanalysis(
+    // SPEAnalysis<SimplifiedSiPMFunction> _speanalysis(
     // 100, 1100, coords
     // );
 
@@ -529,7 +530,7 @@ class CAENDigitizerInterface {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
         }
 
-        open(_saveinfoFile, doe.RunDir + "/" + doe.RunName + "SaveInfo.txt");
+        open(_saveinfoFile, doe.RunDir + "/" + doe.RunName + "/SaveInfo.txt");
         bool s = (_saveinfoFile != nullptr);
 
         if (!s) {
@@ -586,13 +587,13 @@ class CAENDigitizerInterface {
     // how things are changing.
     bool breakdown_voltage_mode() {
         static uint32_t num_events = 0;
-        static auto process_events = [&]() {
+        static auto process_events = [&]() -> bool {
             bool isData = retrieve_data_until_n_events(Port,
                 Port->GlobalConfig.MaxEventsPerRead);
 
             // While all of this is happening, the digitizer is taking data
             if (!isData) {
-                return;
+                return false;
             }
 
             // double frequency = 0.0;
@@ -602,15 +603,16 @@ class CAENDigitizerInterface {
                 // Extract event i
                 extract_event(Port, i, processing_evts[i]);
             }
+
+            return true;
         };
 
-        process_events();
+        bool new_data = process_events();
         //SavedWaveforms += Port->Data.NumEvents;
         // startup!
         static arma::mat spe_estimation_pulse_buffer;
         static uint32_t acq_pulses = 0;
         static bool init_done = false;
-        static bool spe_estimation_done = false;
         switch (doe.VBDData.State) {
             case VBRState::Init:
             {
@@ -620,7 +622,7 @@ class CAENDigitizerInterface {
 
                     // File preparation
                     std::ostringstream out;
-                    out.precision(1);
+                    out.precision(3);
                     out << doe.LatestTemperature;
                     std::string fileName = doe.RunDir
                         + "/" + doe.RunName
@@ -638,6 +640,9 @@ class CAENDigitizerInterface {
 
                     double t = get_current_time_epoch();
                     _saveinfoFile->Add(SaveFileInfo(t, fileName));
+                    async_save(_saveinfoFile, [](const SaveFileInfo& val){
+                        return std::to_string(val.Time) + "," + val.FileName + "\n";
+                    });
 
                     // It will hold this many pulses so let's allocate what we need
                     spe_estimation_pulse_buffer.resize(
@@ -649,14 +654,14 @@ class CAENDigitizerInterface {
                     int32_t prepulse_end_region
                         = static_cast<int32_t>(
                             doe.GlobalConfig.RecordLength*prepulse_end_region_per)
-                        - 70;  // the 70 is a constant delay in the trigger
+                        - 125;  // the 70 is a constant delay in the trigger
 
                     uint32_t prepulse_end_region_u = prepulse_end_region < 0 ?
                         0 : static_cast<uint32_t>(prepulse_end_region);
 
                     coords(0, 0) = prepulse_end_region + 1;
                     coords(1, 0) = 35e3;
-                    coords(3, 0) = v_threshold_cts_to_adc_cts(Port,
+                    coords(2, 0) = v_threshold_cts_to_adc_cts(Port,
                         doe.GroupConfigs[0].DCOffset);
                     coords(3, 0) = 20;
                     coords(4, 0) = 5;
@@ -666,7 +671,7 @@ class CAENDigitizerInterface {
 
                     // We create the analysis object with all the info, but
                     // this does not do the analysis!
-                    spe_analysis.reset(new SPEAnalysis<nEXOSiPMFunction>(
+                    spe_analysis.reset(new SPEAnalysis<SimplifiedSiPMFunction>(
                         prepulse_end_region_u,
                         doe.GlobalConfig.RecordLength, coords));
 
@@ -675,10 +680,9 @@ class CAENDigitizerInterface {
                     SavedWaveforms = 0;
 
                     // Front end preparation
-                    _indicatorSender(
-                        IndicatorNames::FULL_ANALYSIS_DONE, false);
-                    _indicatorSender(
-                        IndicatorNames::CALCULATING_VBD, false);
+                    _indicatorSender(IndicatorNames::FULL_ANALYSIS_DONE, false);
+                    _indicatorSender(IndicatorNames::CALCULATING_VBD, false);
+                    _indicatorSender(IndicatorNames::ANALYSIS_ONGOING, true);
 
                     doe.VBDData.State = VBRState::Analysis;
                 } else {
@@ -687,102 +691,110 @@ class CAENDigitizerInterface {
             }
             break;
             case VBRState::Analysis:
-                // k = 1, we always throw the first event
-                for (uint32_t k = 1; k < num_events; k++) {
+                if (new_data) {
+                    // k = 1, we always throw the first event
+                    for (uint32_t k = 1; k < num_events; k++) {
 
-                    // If we already have enough events, do not grab more
-                    if (acq_pulses >= doe.VBDData.SPEEstimationTotalPulses ) {
-                        break;
+                        // If we already have enough events, do not grab more
+                        if (acq_pulses >= doe.VBDData.SPEEstimationTotalPulses ) {
+                            continue;
+                        }
+
+                        // If the next even time is smaller than the previous
+                        // it means the trigger tag overflowed. We ignore it
+                        // because I do not feel like making the math right now
+                        if ( processing_evts[k]->Info.TriggerTimeTag <
+                            processing_evts[k - 1]->Info.TriggerTimeTag) {
+                            continue;
+                        }
+
+                        auto dtsp = processing_evts[k]->Info.TriggerTimeTag
+                            - processing_evts[k - 1]->Info.TriggerTimeTag;
+
+                        // 1 tsp = 8 ns as per CAEN documentation
+                        // dtsp * 8ns = time difference in ns
+                        // In other words, do not add events with a time
+                        // difference between the last pulse of 1000ns
+                        if(dtsp*8 < 1000) {
+                            continue;
+                        }
+
+                        if (_pulseFile) {
+                            _pulseFile->Add(processing_evts[k]);
+                        }
+
+                        arma::mat wave = caen_event_to_armadillo(processing_evts[k], 1);
+                        spe_estimation_pulse_buffer.row(acq_pulses)
+                            = wave;
+
+                        acq_pulses++;
                     }
 
-                    // If the next even time is smaller than the previous
-                    // it means the trigger tag overflowed. We ignore it
-                    // because I do not feel like making the math right now
-                    if ( processing_evts[k]->Info.TriggerTimeTag <
-                        processing_evts[k - 1]->Info.TriggerTimeTag) {
-                        continue;
-                    }
+                    // This is to update the indicator
+                    SavedWaveforms = acq_pulses;
+                    save(_pulseFile, sbc_save_func, Port);
+                    if (acq_pulses >= doe.VBDData.SPEEstimationTotalPulses) {
+                        spdlog::info("Finished taking data! Moving to analysis.");
+                        // This is the line of code that runs the analysis!
+                        auto pars = spe_analysis->FullAnalysis(
+                            spe_estimation_pulse_buffer, 0.999);
 
-                    auto dtsp = processing_evts[k]->Info.TriggerTimeTag
-                        - processing_evts[k - 1]->Info.TriggerTimeTag;
+                        spdlog::info("Finished analysis.");
 
-                    // 1 tsp = 8 ns as per CAEN documentation
-                    // dtsp * 8ns = time difference in ns
-                    // In other words, do not add events with a time
-                    // difference between the last pulse of 1000ns
-                    if(dtsp*8 < 1000) {
-                        continue;
-                    }
-
-                    if (_pulseFile) {
-                        _pulseFile->Add(processing_evts[k]);
-                    }
-
-                    spe_estimation_pulse_buffer.row(acq_pulses)
-                        = caen_event_to_armadillo(processing_evts[k], 1);
-
-                    acq_pulses++;
-                }
-
-                // This is to update the indicator
-                SavedWaveforms = acq_pulses;
-                save(_pulseFile, sbc_save_func, Port);
-                if (acq_pulses == doe.VBDData.SPEEstimationTotalPulses) {
-                    spe_estimation_done = true;
-
-                    // This is the line of code that runs the analysis!
-                    auto pars = spe_analysis->FullAnalysis(
-                        spe_estimation_pulse_buffer);
-
-                    _indicatorSender(IndicatorNames::SPE_GAIN_MEAN,
-                        pars.SPEParameters(1));
-
-                    _indicatorSender(IndicatorNames::WAVEFORM_NOISE,
-                        pars.BaselineParameters.NoiseSTD);
-
-                    _indicatorSender(IndicatorNames::WAVEFORM_BASELINE,
-                        pars.BaselineParameters.Baseline);
-
-                    _indicatorSender(IndicatorNames::SPE_EFFICIENCTY,
-                        pars.SPEEfficiency);
-
-                    _indicatorSender(IndicatorNames::INTEGRAL_THRESHOLD,
-                        pars.IntegralThreshold);
-
-                    _indicatorSender(IndicatorNames::RISE_TIME,
-                        pars.SPEParameters(3));
-
-                    _indicatorSender(IndicatorNames::FALL_TIME,
-                        pars.SPEParameters(4));
-
-                    _indicatorSender(IndicatorNames::OFFSET,
-                        pars.SPEParameters(2));
-
-                    _indicatorSender(IndicatorNames::FULL_ANALYSIS_DONE, true);
-
-                    if (pars.SPEEfficiency != 0.0) {
-                        _indicatorSender(IndicatorNames::GAIN_VS_VOLTAGE,
-                            latest_measure.Volt,
+                        _indicatorSender(IndicatorNames::SPE_GAIN_MEAN,
                             pars.SPEParameters(1));
 
-                        vbe_analysis->add(pars.SPEParameters(1),
-                            pars.SPEParametersErrors(1),
-                            latest_measure.Volt);
+                        _indicatorSender(IndicatorNames::WAVEFORM_NOISE,
+                            pars.BaselineParameters.NoiseSTD);
 
-                        double t = get_current_time_epoch();
+                        _indicatorSender(IndicatorNames::WAVEFORM_BASELINE,
+                            pars.BaselineParameters.Baseline);
 
-                        for (arma::uword i = 0; i < pars.SPEParameters.n_elem; i++) {
-                            _saveinfoFile->Add(
-                                SaveFileInfo(t,
-                            std::to_string(pars.SPEParameters(i))));
+                        _indicatorSender(IndicatorNames::SPE_EFFICIENCTY,
+                            pars.SPEEfficiency);
 
-                            _saveinfoFile->Add(
-                                SaveFileInfo(t,
-                            std::to_string(pars.SPEParametersErrors(i))));
+                        _indicatorSender(IndicatorNames::INTEGRAL_THRESHOLD,
+                            pars.IntegralThreshold);
+
+                        _indicatorSender(IndicatorNames::OFFSET,
+                            pars.SPEParameters(2));
+
+                        _indicatorSender(IndicatorNames::RISE_TIME,
+                            pars.SPEParameters(3));
+
+                        _indicatorSender(IndicatorNames::FALL_TIME,
+                            pars.SPEParameters(4));
+
+                        _indicatorSender(IndicatorNames::FULL_ANALYSIS_DONE, true);
+                        _indicatorSender(IndicatorNames::ANALYSIS_ONGOING, false);
+
+                        if (pars.SPEEfficiency != 0.0) {
+                            _indicatorSender(IndicatorNames::GAIN_VS_VOLTAGE,
+                                latest_measure.Volt,
+                                pars.SPEParameters(1));
+
+                            vbe_analysis->add(pars.SPEParameters(1),
+                                pars.SPEParametersErrors(1),
+                                latest_measure.Volt);
+
+                            double t = get_current_time_epoch();
+                            for (arma::uword i = 0; i < pars.SPEParameters.n_elem; i++) {
+                                _saveinfoFile->Add(
+                                    SaveFileInfo(t,
+                                std::to_string(pars.SPEParameters(i))));
+
+                                _saveinfoFile->Add(
+                                    SaveFileInfo(t,
+                                std::to_string(pars.SPEParametersErrors(i))));
+                            }
                         }
-                    }
 
-                    doe.VBDData.State = VBRState::Idle;
+                        async_save(_saveinfoFile, [](const SaveFileInfo& val){
+                            return std::to_string(val.Time) + "," + val.FileName + "\n";
+                        });
+
+                        doe.VBDData.State = VBRState::Idle;
+                    }
                 }
 
             break;
@@ -807,13 +819,14 @@ class CAENDigitizerInterface {
                 _indicatorSender(IndicatorNames::CALCULATING_VBD, false);
                 vbe_analysis.reset(new GainVBDEstimation());
             case VBRState::Reset:
+
                 close(_pulseFile);
                 init_done = false;
-                spe_estimation_done = false;
                 SavedWaveforms = 0;
                 acq_pulses = 0;
                 doe.VBDData.State = VBRState::Idle;
                 _indicatorSender(IndicatorNames::FULL_ANALYSIS_DONE, false);
+
             break;
             case VBRState::Idle:
             default:
@@ -831,7 +844,10 @@ class CAENDigitizerInterface {
         _indicatorSender(IndicatorNames::SAVED_WAVEFORMS,
                     SavedWaveforms);
         checkerror();
-        extract_for_gui_nb();
+        if (new_data) {
+            extract_for_gui_nb();
+        }
+
         change_state();
         return true;
     }
@@ -923,6 +939,10 @@ class CAENDigitizerInterface {
 
             double t = get_current_time_epoch();
             _saveinfoFile->Add(SaveFileInfo(t, fileName));
+
+            async_save(_saveinfoFile, [](const SaveFileInfo& val){
+                return std::to_string(val.Time) + "," + val.FileName + "\n";
+            });
 
             isFileOpen = _pulseFile > 0;
             SavedWaveforms = 0;
