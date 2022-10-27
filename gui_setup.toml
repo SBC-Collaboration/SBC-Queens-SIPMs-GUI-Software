@@ -19,8 +19,8 @@ RTDNames = ["SiPM 1", "SiPM 2", "Water Block"]
 PIDEnable = false
 PeltierTempSetpoint = -15
 
-PeltierTKp = -300
-PeltierTTi = 500000.0
+PeltierTKp = -500
+PeltierTTi = 1000000.0
 PeltierTTd = 0.0
 
 [CAEN]

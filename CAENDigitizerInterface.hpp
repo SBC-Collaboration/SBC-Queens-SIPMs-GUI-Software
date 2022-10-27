@@ -675,11 +675,14 @@ class CAENDigitizerInterface {
                     spdlog::info("Prepulse_end_region: {0}",
                         prepulse_end_region_u);
 
+                    arma::uword end_time = doe.GlobalConfig.RecordLength > 1000
+                        ? 1000 : doe.GlobalConfig.RecordLength;
+
                     // We create the analysis object with all the info, but
                     // this does not do the analysis!
                     spe_analysis.reset(new SPEAnalysis<SimplifiedSiPMFunction>(
                         prepulse_end_region_u,
-                        doe.GlobalConfig.RecordLength, coords));
+                        end_time, coords));
 
                     acq_pulses = 0;
                     init_done = true;
