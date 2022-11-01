@@ -383,7 +383,14 @@ class GUIManager {
                 ImGui::EndTabItem();
             }
 
+
+
             if (ImGui::BeginTabItem("Gain")) {
+                if (ImGui::Button("Clear")) {
+                    GeneralIndicatorReceiver.ClearPlot(
+                        IndicatorNames::GAIN_VS_VOLTAGE);
+                }
+
                 if (ImPlot::BeginPlot("Voltage", ImVec2(-1, -1),
                     ImPlotFlags_NoTitle)) {
                     ImPlot::SetupAxes("Voltage [V]", "Gain [arb]", g_axis_flags,

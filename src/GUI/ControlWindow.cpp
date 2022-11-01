@@ -171,7 +171,6 @@ bool ControlWindow::operator()() {
                     "is pressed.");
             }
 
-
             ImGui::Separator();
             ImGui::PushItemWidth(100);
             // 1.0 -> 0.5

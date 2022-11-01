@@ -50,6 +50,8 @@ bool SiPMControlWindow::operator()() {
 
     ImGui::Separator();
 
+    ImGui::InputInt("SiPM Cell #", &cgui_state.CellNumber);
+
     ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
     CAENControlFac.Checkbox("PS Enable", cgui_state.SiPMVoltageSysSupplyEN,
         ImGui::IsItemEdited, [=](CAENInterfaceData& old) {
@@ -182,15 +184,15 @@ bool SiPMControlWindow::operator()() {
         return true;
     });
 
-    CAENControlFac.Button(
-        "Stop SiPM Data Taking",
-        [=](CAENInterfaceData& state) {
-        if (state.CurrentState == CAENInterfaceStates::RunMode) {
-            state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
-            state.SiPMParameters = cgui_state.SiPMParameters;
-        }
-        return true;
-    });
+    // CAENControlFac.Button(
+    //     "Stop SiPM Data Taking",
+    //     [=](CAENInterfaceData& state) {
+    //     if (state.CurrentState == CAENInterfaceStates::RunMode) {
+    //         state.CurrentState = CAENInterfaceStates::OscilloscopeMode;
+    //         state.SiPMParameters = cgui_state.SiPMParameters;
+    //     }
+    //     return true;
+    // });
 
     //  end Data taking controls
     ImGui::End();

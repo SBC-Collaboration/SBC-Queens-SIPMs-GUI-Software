@@ -109,6 +109,7 @@ struct CAENInterfaceData {
     bool ResetCaen = false;
 
     std::string SiPMVoltageSysPort = "";
+    int CellNumber;
     float LatestTemperature = -1.f;
     bool SiPMVoltageSysChange = false;
     bool SiPMVoltageSysSupplyEN = false;
@@ -586,6 +587,7 @@ class CAENDigitizerInterface {
     // is done. Serves more for the user to know
     // how things are changing.
     bool breakdown_voltage_mode() {
+        static std::string file_name = "";
         static uint32_t num_events = 0;
         static auto process_events = [&]() -> bool {
             bool isData = retrieve_data_until_n_events(Port,
@@ -623,26 +625,26 @@ class CAENDigitizerInterface {
                     // File preparation
                     std::ostringstream out;
                     out.precision(3);
-                    out << doe.LatestTemperature;
-                    std::string fileName = doe.RunDir
+                    out << doe.LatestTemperature << "degC_";
+                    out << doe.SiPMVoltageSysVoltage << "V";
+                    file_name = doe.RunDir
                         + "/" + doe.RunName
-                        + "/" + doe.SiPMName + out.str() + "K_"
-                        + std::to_string(doe.SiPMVoltageSysVoltage) + "V"
+                        + "/" + doe.SiPMName
+                        + doe.CellNumber + "cell_"
+                        + out.str()
                         + "_spe_estimation.bin";
 
                     open(_pulseFile,
-                        fileName,
+                        file_name,
                         // sbc_init_file is a function that saves the header
                         // of the sbc data format as a function of record length
                         // and number of channels
                         sbc_init_file,
                         Port);
 
-                    double t = get_current_time_epoch();
-                    _saveinfoFile->Add(SaveFileInfo(t, fileName));
-                    async_save(_saveinfoFile, [](const SaveFileInfo& val){
-                        return std::to_string(val.Time) + "," + val.FileName + "\n";
-                    });
+                    // Save into the log when the data saving started
+                    double t = get_current_time_epoch() / 1000.0;
+                    _saveinfoFile->Add(SaveFileInfo(t, file_name));
 
                     // It will hold this many pulses so let's allocate what we need
                     spe_estimation_pulse_buffer.resize(
@@ -658,6 +660,10 @@ class CAENDigitizerInterface {
 
                     uint32_t prepulse_end_region_u = prepulse_end_region < 0 ?
                         0 : static_cast<uint32_t>(prepulse_end_region);
+
+                    t = get_current_time_epoch() / 1000.0;
+                    _saveinfoFile->Add(SaveFileInfo(t,
+                        "expected_t0 : " + std::to_string(prepulse_end_region_u)));
 
                     coords(0, 0) = prepulse_end_region + 1;
                     coords(1, 0) = 35e3;
@@ -685,6 +691,10 @@ class CAENDigitizerInterface {
                     _indicatorSender(IndicatorNames::ANALYSIS_ONGOING, true);
 
                     doe.VBDData.State = VBRState::Analysis;
+
+                    async_save(_saveinfoFile, [](const SaveFileInfo& val){
+                        return std::to_string(val.Time) + "," + val.FileName + "\n";
+                    });
                 } else {
                     doe.VBDData.State = VBRState::Idle;
                 }
@@ -734,6 +744,11 @@ class CAENDigitizerInterface {
                     SavedWaveforms = acq_pulses;
                     save(_pulseFile, sbc_save_func, Port);
                     if (acq_pulses >= doe.VBDData.SPEEstimationTotalPulses) {
+
+                        // This one is to note when the data taking ended
+                        double t = get_current_time_epoch() / 1000.0;
+                        _saveinfoFile->Add(SaveFileInfo(t, fileName));
+
                         spdlog::info("Finished taking data! Moving to analysis.");
                         // This is the line of code that runs the analysis!
                         auto pars = spe_analysis->FullAnalysis(
@@ -777,7 +792,7 @@ class CAENDigitizerInterface {
                                 pars.SPEParametersErrors(1),
                                 latest_measure.Volt);
 
-                            double t = get_current_time_epoch();
+                            t = get_current_time_epoch() / 1000.0;
                             for (arma::uword i = 0; i < pars.SPEParameters.n_elem; i++) {
                                 _saveinfoFile->Add(
                                     SaveFileInfo(t,
@@ -854,6 +869,7 @@ class CAENDigitizerInterface {
 
     bool run_mode() {
         static bool isFileOpen = false;
+        static std::string file_name;
         static auto extract_for_gui_nb = make_total_timed_event(
             std::chrono::milliseconds(200),
             std::bind(&CAENDigitizerInterface::rdm_extract_for_gui, this));
@@ -920,12 +936,14 @@ class CAENDigitizerInterface {
                 std::localtime(&now_t));
 
             std::ostringstream out;
-            out.precision(1);
-            out << doe.LatestTemperature;
-            std::string fileName = doe.RunDir
+            out.precision(3);
+            out << doe.LatestTemperature << "degC_";
+            out << doe.SiPMVoltageSysVoltage << "V";
+            file_name = doe.RunDir
                 + "/" + doe.RunName
-                + "/" + doe.SiPMName + out.str() + "K_"
-                + std::to_string(doe.SiPMVoltageSysVoltage) + "V"
+                + "/" + doe.SiPMName
+                + doe.CellNumber + "cell_"
+                + out.str()
                 + "_data.bin";
             open(_pulseFile,
                 fileName,
@@ -937,7 +955,7 @@ class CAENDigitizerInterface {
                 sbc_init_file,
                 Port);
 
-            double t = get_current_time_epoch();
+            double t = get_current_time_epoch() / 1000.0;
             _saveinfoFile->Add(SaveFileInfo(t, fileName));
 
             async_save(_saveinfoFile, [](const SaveFileInfo& val){
@@ -950,8 +968,15 @@ class CAENDigitizerInterface {
 
         process_events();
         extract_for_gui_nb();
-        if (SavedWaveforms >= doe.VBDData.DataPulses ) {
+        if (SavedWaveforms >= doe.VBDData.DataPulses) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
+
+            double t = get_current_time_epoch() / 1000.0;
+            _saveinfoFile->Add(SaveFileInfo(t, fileName));
+
+            async_save(_saveinfoFile, [](const SaveFileInfo& val){
+                return std::to_string(val.Time) + "," + val.FileName + "\n";
+            });
         }
 
         if (change_state()) {
