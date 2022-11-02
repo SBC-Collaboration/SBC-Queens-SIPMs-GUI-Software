@@ -24,6 +24,7 @@ double calculate_dmm_voltage_error(const double& dmm_volt) {
 }
 
 double calculate_sipm_voltage(const double& volt, const double& current) {
+	double rectified_curr = (volt / kDMMInternalRes) - current;
 	return calculate_dmm_voltage(volt) - kRINTERNAL*current;
 }
 
