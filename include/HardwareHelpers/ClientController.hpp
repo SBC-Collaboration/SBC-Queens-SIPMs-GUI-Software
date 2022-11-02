@@ -25,6 +25,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <future>
 
 // C++ 3rd party includes
 #include <spdlog/spdlog.h>
@@ -62,11 +63,33 @@ class ClientController {
         _closeFunc(_port);
     }
 
-    void init(ControlFuncType&& init, ControlFuncType&& close) noexcept {
+    // Sets the init and close function.
+    void build(ControlFuncType&& init, ControlFuncType&& close) noexcept {
         _initFunc = init;
         _closeFunc = close;
     }
 
+    // Builds and initializes the port
+    void init(ControlFuncType&& init, ControlFuncType&& close) noexcept {
+        _initFunc = init;
+        _closeFunc = close;
+
+        if (!_port) {
+            bool success = _initFunc(_port);
+
+            if (!success) {
+                spdlog::error("Failed to open port under controller name {0}",
+                    _name);
+
+                // Sometimes the logic inside init would not close the
+                // port, so we close it here.
+                _closeFunc(_port);
+            }
+        }
+    }
+
+    // Forces to close.
+    // The deconstructor also calls this function
     void close() noexcept {
         _closeFunc(_port);
     }
@@ -74,7 +97,7 @@ class ClientController {
     // Holds the entire logic to connect to the port and retrieve the data.
     // A form of "lazy evaluation" leaving the connection to the port
     // until required. The code returns an optional to deal in the case the
-    // port is was not open or an error occur..
+    // port was not open or an error occur.
     std::optional<T> get(ReturnFuncType&& g) noexcept {
         if (_port) {
             return g(_port);
@@ -88,16 +111,38 @@ class ClientController {
                 // Sometimes the logic inside init would not close the
                 // port, so we close it here.
                 _closeFunc(_port);
-
             }
 
             return {};  // returns an empty optional
         }
     }
 
+    // Holds the entire logic to connect to the port and retrieve the data.
+    // A form of "lazy evaluation" leaving the connection to the port
+    // until required. The code returns an optional to deal in the case the
+    // port was not open or an error occur.
     std::optional<T> operator()(ReturnFuncType&& g) noexcept {
         return get(std::forward<ReturnFuncType>(g));
     }
+
+    // std::future<std::optional<T>>  get_async(ReturnFuncType&& g) noexcept {
+    //     if (_port) {
+    //         return g(_port);
+    //     } else {
+    //         bool success = _initFunc(_port);
+
+    //         if (!success) {
+    //             spdlog::error("Failed to open port under controller name {0}",
+    //                 _name);
+
+    //             // Sometimes the logic inside init would not close the
+    //             // port, so we close it here.
+    //             _closeFunc(_port);
+    //         }
+
+    //         return {};  // returns an empty optional
+    //     }
+    // }
 };
 
 }  // namespace SBCQueens
