@@ -169,7 +169,7 @@ endif()
 find_package(Armadillo 11.2.3 REQUIRED)
 include_directories(SYSTEM "${ARMADILLO_INCLUDE_DIR}")
 
-set (SIPM_DIR tmp)
+set (SIPM_DIR /home/sbc-queens-linux/tmp/)
 if(IS_DIRECTORY ${SIPM_DIR})
   link_directories(${SIPM_DIR}/lib)
   include_directories(SYSTEM ${SIPM_DIR}/include)

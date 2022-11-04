@@ -314,7 +314,6 @@ struct TeensyControllerData {
     // PID Stuff
     uint16_t PidRTD = 0;
     uint32_t PeltierPidUpdatePeriod = 100;
-    uint32_t PeltierPidRTD = 0;
     bool PeltierPIDState    = false;
 
     float PIDTempTripPoint = 5.0;
@@ -615,7 +614,7 @@ class TeensyControllerInterface {
                 TeensyIndicatorSender(IndicatorNames::PELTIER_CURR,
                     pids.time, pids.PID.Current);
 
-                TeensyIndicatorSender(IndicatorNames::LATEST_Peltier_CURR,
+                TeensyIndicatorSender(IndicatorNames::LATEST_PELTIER_CURR,
                     pids.PID.Current);
 
                 _PeltiersFile->Add(pids);
@@ -697,11 +696,11 @@ class TeensyControllerInterface {
             try {
                 auto bmes = parse.get<BMEs>();
 
-                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Temps,
+                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_TEMPS,
                     bmes.time , bmes.LocalBME.Temperature);
-                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Pressure,
+                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_PRESS,
                     bmes.time , bmes.LocalBME.Pressure);
-                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_Humidity,
+                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_HUMD,
                     bmes.time , bmes.LocalBME.Humidity);
 
                 _BMEsFile->Add(bmes);
@@ -850,7 +849,7 @@ class TeensyControllerInterface {
             break;
 
             case TeensyCommands::SetPPIDRTD:
-                out << tcs.PeltierPidRTD;
+                out << tcs.PidRTD;
             break;
 
             case TeensyCommands::SetPPID:

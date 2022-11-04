@@ -94,7 +94,7 @@ class GUIManager {
         // auto CAEN_conf = config_file["CAEN"];
         // auto file_conf = config_file["File"];
 
-        indicatorWindow.init(config_file);
+        indicatorWindow.Init(config_file);
         controlWindow.init(config_file);
         sipmControlWindow.init(config_file);
 
@@ -141,11 +141,11 @@ class GUIManager {
         // /// Teensy-BME280 Plots
         if (ImGui::Button("Clear")) {
             GeneralIndicatorReceiver.ClearPlot(
-                IndicatorNames::LOCAL_BME_Humidity);
+                IndicatorNames::LOCAL_BME_HUMD);
             GeneralIndicatorReceiver.ClearPlot(
-                IndicatorNames::LOCAL_BME_Temps);
+                IndicatorNames::LOCAL_BME_TEMPS);
             GeneralIndicatorReceiver.ClearPlot(
-                IndicatorNames::LOCAL_BME_Pressure);
+                IndicatorNames::LOCAL_BME_PRESS);
 
             GeneralIndicatorReceiver.ClearPlot(
                 IndicatorNames::PFEIFFER_PRESS);
@@ -170,17 +170,17 @@ class GUIManager {
                         // default.
                         // This functor is almost the same as calling ImPlot
                         GeneralIndicatorReceiver.plot(
-                            IndicatorNames::LOCAL_BME_Humidity, "Humidity");
+                            IndicatorNames::LOCAL_BME_HUMD, "Humidity");
 
                         // We need to call SetAxes before ImPlot::PlotLines
                         // to let the API know the axis of our data
                         ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
                         GeneralIndicatorReceiver.plot(
-                            IndicatorNames::LOCAL_BME_Temps, "Temperature");
+                            IndicatorNames::LOCAL_BME_TEMPS, "Temperature");
 
                         ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
                         GeneralIndicatorReceiver.plot(
-                            IndicatorNames::LOCAL_BME_Pressure, "Pressure");
+                            IndicatorNames::LOCAL_BME_PRESS, "Pressure");
 
                         ImPlot::EndPlot();
                     }

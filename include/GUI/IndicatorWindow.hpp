@@ -20,14 +20,14 @@ namespace SBCQueens {
 
 class IndicatorWindow {
     toml::table _config_table;
-    IndicatorReceiver<IndicatorNames>& _indicatorReceiver;
-    TeensyControllerData& TeensyData;
-    SlowDAQData& SlowData;
+    IndicatorReceiver<IndicatorNames>& _indicator_receiver;
+    TeensyControllerData& _td;
+    SlowDAQData& _sd;
 
  public:
     IndicatorWindow(IndicatorReceiver<IndicatorNames>& ir,
-        TeensyControllerData& td, SlowDAQData& od)
-        : _indicatorReceiver(ir), TeensyData(td), SlowData(od) {}
+        TeensyControllerData& td, SlowDAQData& sd)
+        : _indicator_receiver(ir), _td(td), _sd(sd) {}
 
     // Moving allowed
     IndicatorWindow(IndicatorWindow&&) = default;
@@ -35,7 +35,7 @@ class IndicatorWindow {
     // No copying
     IndicatorWindow(const IndicatorWindow&) = delete;
 
-    void init(const toml::table& tb);
+    void Init(const toml::table& tb);
 
     bool operator()();
 };

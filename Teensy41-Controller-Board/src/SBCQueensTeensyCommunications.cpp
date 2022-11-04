@@ -59,7 +59,7 @@ namespace SBCQueens {
     #ifdef NEW_RTD_BOARD
         PELTIER_PID.REGISTERS.LATEST_CONTROL = &RTD_BOARDS[board_index].LAST_TEMP_VAL[rtd_index];
     #else 
-        PELTIER_PID.REGISTERS.LATEST_CONTROL = &RTD_BOARDS[board_index].REGISTERS.LAST_TEMP_REG;
+        PELTIER_PID.REGISTERS.LATEST_CONTROL = &RTD_BOARDS[index].REGISTERS.LAST_TEMP_REG;
     #endif
     }
 
@@ -91,6 +91,7 @@ namespace SBCQueens {
         TCPID_restart(PELTIER_PID);
     }
 #endif
+
     void SET_RTD_SP(float newVal ) { 
         RTDSamplingTime = static_cast<uint16_t>(newVal);
 
@@ -102,6 +103,12 @@ namespace SBCQueens {
         xTimerChangePeriod(prepare_rtd_conversion_h,
             pdMS_TO_TICKS(RTDSamplingTime), 
             portMAX_DELAY);
+
+        xTimerChangePeriod(update_pid_h,
+            pdMS_TO_TICKS(RTDSamplingTime),
+            portMAX_DELAY);
+
+        PELTIER_PID.DeltaTime = RTDSamplingTime;
     }
 
     void RTD_BANK_MASK(float newVal) {
@@ -185,7 +192,7 @@ namespace SBCQueens {
         Serial.print("\"RTDT\":[");
 
         const uint16_t size_f_send_vals = (sizeof(f_send_vals) / sizeof(float));
-        for(unsigned int i = 0; i < size_f_send_vals; i++) {
+        for (unsigned int i = 0; i < size_f_send_vals; i++) {
 
             // Now the values
             // We limiting the sending of the values to 4 digits after the decimal point
@@ -196,7 +203,7 @@ namespace SBCQueens {
             length = strlen(num_buff);
             Serial.print(num_buff);
 
-            if((size_f_send_vals - 1) != i) {
+            if ((size_f_send_vals - 1) != i) {
                 Serial.print(",");
             }
             

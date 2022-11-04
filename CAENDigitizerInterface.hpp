@@ -1,5 +1,6 @@
 #ifndef CAENDIGITIZERINTERFACE_H
 #define CAENDIGITIZERINTERFACE_H
+#include <future>
 #include <optional>
 #pragma once
 
@@ -78,15 +79,11 @@ enum class VBRState {
 };
 
 struct BreakdownVoltageConfigData {
-    // In
     uint32_t SPEEstimationTotalPulses = 10000;
     uint32_t GainCalculationSPEPulses = 1000;
     uint32_t DataPulses = 1000000;
 
     VBRState State = VBRState::Idle;
-    // // Out
-    // double SPEEfficiency = 0.0;
-    // double CalculatedBreakdownVoltage = 0.0;
 };
 
 struct CAENInterfaceData {
@@ -109,7 +106,7 @@ struct CAENInterfaceData {
     bool ResetCaen = false;
 
     std::string SiPMVoltageSysPort = "";
-    int CellNumber;
+    int CellNumber = 0;
     float LatestTemperature = -1.f;
     bool SiPMVoltageSysChange = false;
     bool SiPMVoltageSysSupplyEN = false;
@@ -126,43 +123,35 @@ template<typename... Queues>
 class CAENDigitizerInterface {
     // Software related items
     std::tuple<Queues&...> _queues;
-    CAENInterfaceData doe;
-    IndicatorSender<IndicatorNames> _indicatorSender;
-    IndicatorSender<uint8_t> _plotSender;
+    CAENInterfaceData _doe;
+    IndicatorSender<IndicatorNames> _indicator_sender;
+    IndicatorSender<uint8_t> _plot_sender;
 
     // Files
-    DataFile<CAENEvent> _pulseFile;
-    DataFile<SiPMVoltageMeasure> _voltagesFile;
-    DataFile<SaveFileInfo> _saveinfoFile;
+    DataFile<CAENEvent> _pulse_file;
+    DataFile<SiPMVoltageMeasure> _voltages_file;
+    DataFile<SaveFileInfo> _saveinfo_file;
 
     // Hardware
-    CAEN Port = nullptr;
-    ClientController<serial_ptr, std::pair<double, double>> SiPMVoltageSystem;
+    CAEN _caen_port = nullptr;
+    ClientController<serial_ptr, SiPMVoltageMeasure> _sipm_volt_sys;
 
-    SiPMVoltageMeasure latest_measure;
+    SiPMVoltageMeasure _latest_measure;
     uint64_t SavedWaveforms = 0;
     uint64_t TriggeredWaveforms = 0;
 
     // tmp stuff
-    uint16_t* data;
-    size_t length;
-    std::vector<double> x_values, y_values;
-    CAENEvent osc_event, adj_osc_event;
+    uint16_t* _data;
+    size_t _length;
+    std::vector<double> _x_values, _y_values;
+    CAENEvent _osc_event, _adj_osc_event;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
-    CAENEvent processing_evts[1024];
+    CAENEvent _processing_evts[1024];
 
     // Analysis
-    arma::mat coords;
-      // coords(0, 0) = 100;
-      // coords(1, 0) = 35e3;
-      // coords(2, 0) = 20;
-      // coords(3, 0) = 5;
-      // coords(4, 0) = 7500;
-    std::unique_ptr< SPEAnalysis<SimplifiedSiPMFunction> > spe_analysis;
-    std::unique_ptr< GainVBDEstimation > vbe_analysis;
-    // SPEAnalysis<SimplifiedSiPMFunction> _speanalysis(
-    // 100, 1100, coords
-    // );
+    arma::mat _coords;
+    std::unique_ptr< SPEAnalysis<SimplifiedSiPMFunction> > _spe_analysis;
+    std::unique_ptr< GainVBDEstimation > _vbe_analysis;
 
     // As long as we make the Func template argument a std::fuction
     // we can then use pointer magic to initialize them
@@ -190,9 +179,9 @@ class CAENDigitizerInterface {
  public:
     explicit CAENDigitizerInterface(Queues&... queues) :
         _queues(forward_as_tuple(queues...)),
-        _indicatorSender(std::get<GeneralIndicatorQueue&>(_queues)),
-        _plotSender(std::get<SiPMPlotQueue&>(_queues)),
-        SiPMVoltageSystem("Keithley 2000/6487") {
+        _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
+        _plot_sender(std::get<SiPMPlotQueue&>(_queues)),
+        _sipm_volt_sys("Keithley 2000/6487") {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
         standby_state = std::make_shared<CAENInterfaceState>(
@@ -223,7 +212,7 @@ class CAENDigitizerInterface {
             std::chrono::milliseconds(1),
             std::bind(&CAENDigitizerInterface::closing_mode, this));
 
-        coords = arma::mat(5, 1, arma::fill::ones);
+        _coords = arma::mat(5, 1, arma::fill::ones);
     }
 
     // No copying
@@ -235,9 +224,9 @@ class CAENDigitizerInterface {
         spdlog::info("Initializing CAEN thread");
 
         main_loop_state = standby_state;
-        vbe_analysis.reset(new GainVBDEstimation());
+        _vbe_analysis.reset(new GainVBDEstimation());
 
-        SiPMVoltageSystem.init(
+        _sipm_volt_sys.init(
             [=](serial_ptr& port) -> bool {
                 static auto send_msg_slow = make_blocking_total_timed_event(
                     std::chrono::milliseconds(200),
@@ -250,7 +239,7 @@ class CAENDigitizerInterface {
                 SerialParams ssp;
                 ssp.Timeout = serial::Timeout::simpleTimeout(5000);
                 ssp.Baudrate = 115200;
-                connect_par(port, doe.SiPMVoltageSysPort, ssp);
+                connect_par(port, _doe.SiPMVoltageSysPort, ssp);
 
                 if (!port) {
                     return false;
@@ -294,7 +283,7 @@ class CAENDigitizerInterface {
                 send_msg_slow(":sour:volt:rang 55");
                 send_msg_slow(":sour:volt:ilim 250e-6");
                 send_msg_slow(":sour:volt "
-                    + std::to_string(doe.SiPMVoltageSysVoltage));
+                    + std::to_string(_doe.SiPMVoltageSysVoltage));
                 send_msg_slow(":sour:volt:stat OFF");
 
                 // Ammeter side
@@ -324,11 +313,11 @@ class CAENDigitizerInterface {
 
                 // send_msg_slow("++auto 1");
 
-                open(_voltagesFile, doe.RunDir
-                    + "/" + doe.RunName
+                open(_voltages_file, _doe.RunDir
+                    + "/" + _doe.RunName
                     + "/SIPM_VOLTAGES.txt");
 
-                bool s = _voltagesFile > 0;
+                bool s = _voltages_file > 0;
                 if (!s) {
                     spdlog::info("Failed to open voltage file");
                     return false;
@@ -338,6 +327,10 @@ class CAENDigitizerInterface {
             },
             [=](serial_ptr& port) -> bool {
                 if (port) {
+                    send_msg(port, "++addr 22\n", "");
+                    send_msg(port, ":sour:volt:stat OFF\n", "");
+                    send_msg(port, ":sour:volt 0.0\n", "");
+
                     if (port->isOpen()) {
                         disconnect(port);
                     }
@@ -364,20 +357,20 @@ class CAENDigitizerInterface {
 
         last_waveforms = TriggeredWaveforms;
         last_time = current_time;
-        _indicatorSender(IndicatorNames::TRIGGERRATE, dWaveforms / dt);
+        _indicator_sender(IndicatorNames::TRIGGERRATE, dWaveforms / dt);
     }
 
     // Local error checking. Checks if there was an error and prints it
     // using spdlog
     bool lec() {
-        return check_error(Port, [](const std::string& cmd) {
-                spdlog::error(cmd);
+        return check_error(_caen_port, [](const std::string& cmd) {
+            spdlog::error(cmd);
         });
     }
 
     void switch_state(const CAENInterfaceStates& newState) {
-        doe.CurrentState = newState;
-        switch (doe.CurrentState) {
+        _doe.CurrentState = newState;
+        switch (_doe.CurrentState) {
             case CAENInterfaceStates::Standby:
                 main_loop_state = standby_state;
             break;
@@ -426,10 +419,10 @@ class CAENDigitizerInterface {
         // setting the PID setpoints or constants
         // or an user driven reset
         if (guiQueueOut.try_dequeue(task)) {
-            if (!task(doe)) {
+            if (!task(_doe)) {
                 spdlog::warn("Something went wrong with a command!");
             } else {
-                switch_state(doe.CurrentState);
+                switch_state(_doe.CurrentState);
                 return true;
             }
         }
@@ -439,21 +432,21 @@ class CAENDigitizerInterface {
 
     // Logic to disconnect the CAEN and clear up memory
     void close_caen() {
-        for (CAENEvent& evt : processing_evts) {
+        for (CAENEvent& evt : _processing_evts) {
             if (evt) {
                 evt.reset();
             }
         }
 
-        if (osc_event) {
-            osc_event.reset();
+        if (_osc_event) {
+            _osc_event.reset();
         }
 
-        if (adj_osc_event) {
-            adj_osc_event.reset();
+        if (_adj_osc_event) {
+            _adj_osc_event.reset();
         }
 
-        auto err = disconnect(Port);
+        auto err = disconnect(_caen_port);
         check_error(err, [](const std::string& cmd) {
             spdlog::error(cmd);
         });
@@ -466,24 +459,24 @@ class CAENDigitizerInterface {
     }
 
     // Attempts a connection to the CAEN digitizer, setups the channels,
-    // starts acquisition, and moves the oscilloscope mode
+    // starts acquisition, and moves to the oscilloscope mode
     bool attempt_connection() {
         // If the port is open, clean up and close the port.
         // This will help turn attempt_connection into a reset
         // for the entire system.
-        if (Port) {
+        if (_caen_port) {
             close_caen();
         }
 
-        auto err = connect(Port,
-            doe.Model,
-            doe.ConnectionType,
-            doe.PortNum,
+        auto err = connect(_caen_port,
+            _doe.Model,
+            _doe.ConnectionType,
+            _doe.PortNum,
             0,
-            doe.VMEAddress);
+            _doe.VMEAddress);
 
         // If port resource was not created, it equals a failure!
-        if (!Port) {
+        if (!_caen_port) {
             // Print what was the error
             check_error(err, [](const std::string& cmd) {
                 spdlog::error(cmd);
@@ -491,36 +484,36 @@ class CAENDigitizerInterface {
 
             // We disconnect because this will free resources (in case
             // they were created)
-            disconnect(Port);
+            disconnect(_caen_port);
             switch_state(CAENInterfaceStates::Standby);
             return true;
         }
 
         spdlog::info("Connected to CAEN Digitizer!");
 
-        setup(Port, doe.GlobalConfig, doe.GroupConfigs);
+        setup(_caen_port, _doe.GlobalConfig, _doe.GroupConfigs);
 
         // Enable acquisition HAS to be called AFTER setup
-        enable_acquisition(Port);
+        enable_acquisition(_caen_port);
 
         // Trying to call once will initialize the port
         // but really this call is not important
-        // SiPMVoltageSystem.get([=](serial_ptr& port) -> std::optional<double> {
+        // _sipm_volt_sys.get([=](serial_ptr& port) -> std::optional<double> {
         //     return {};
         // });
 
         // Allocate memory for events
-        osc_event = std::make_shared<caenEvent>(Port->Handle);
+        _osc_event = std::make_shared<caenEvent>(_caen_port->Handle);
 
-        for (CAENEvent& evt : processing_evts) {
-            evt = std::make_shared<caenEvent>(Port->Handle);
+        for (CAENEvent& evt : _processing_evts) {
+            evt = std::make_shared<caenEvent>(_caen_port->Handle);
         }
 
         auto failed = lec();
 
         if (failed) {
             spdlog::warn("Failed to setup CAEN");
-            err = disconnect(Port);
+            err = disconnect(_caen_port);
             check_error(err, [](const std::string& cmd) {
                 spdlog::error(cmd);
             });
@@ -531,8 +524,9 @@ class CAENDigitizerInterface {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
         }
 
-        open(_saveinfoFile, doe.RunDir + "/" + doe.RunName + "/SaveInfo.txt");
-        bool s = (_saveinfoFile != nullptr);
+        open(_saveinfo_file,
+            _doe.RunDir + "/" + _doe.RunName + "/SaveInfo.txt");
+        bool s = (_saveinfo_file != nullptr);
 
         if (!s) {
             spdlog::error("Failed to open SaveInfo.txt");
@@ -548,23 +542,23 @@ class CAENDigitizerInterface {
     // as a mode in where the user can see what is happening.
     // Similar to an oscilloscope
     bool oscilloscope() {
-        auto events = get_events_in_buffer(Port);
-        _indicatorSender(IndicatorNames::CAENBUFFEREVENTS, events);
+        auto events = get_events_in_buffer(_caen_port);
+        _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
 
-        retrieve_data(Port);
+        retrieve_data(_caen_port);
 
-        if (doe.SoftwareTrigger) {
-            software_trigger(Port);
-            doe.SoftwareTrigger = false;
+        if (_doe.SoftwareTrigger) {
+            software_trigger(_caen_port);
+            _doe.SoftwareTrigger = false;
         }
 
-        if (Port->Data.DataSize > 0 && Port->Data.NumEvents > 0) {
-            TriggeredWaveforms += Port->Data.NumEvents;
+        if (_caen_port->Data.DataSize > 0 && _caen_port->Data.NumEvents > 0) {
+            TriggeredWaveforms += _caen_port->Data.NumEvents;
             // spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
             // spdlog::info("Data size: {0}", Port->Data.DataSize);
             // spdlog::info("Num events: {0}", Port->Data.NumEvents);
 
-            extract_event(Port, 0, osc_event);
+            extract_event(_caen_port, 0, _osc_event);
 
 
             // spdlog::info("Event size: {0}", osc_event->Info.EventSize);
@@ -575,7 +569,7 @@ class CAENDigitizerInterface {
             process_data_for_gui();
 
             // Clear events in buffer
-            clear_data(Port);
+            clear_data(_caen_port);
         }
 
         lec();
@@ -590,8 +584,8 @@ class CAENDigitizerInterface {
         static std::string file_name = "";
         static uint32_t num_events = 0;
         static auto process_events = [&]() -> bool {
-            bool isData = retrieve_data_until_n_events(Port,
-                Port->GlobalConfig.MaxEventsPerRead);
+            bool isData = retrieve_data_until_n_events(_caen_port,
+                _caen_port->GlobalConfig.MaxEventsPerRead);
 
             // While all of this is happening, the digitizer is taking data
             if (!isData) {
@@ -599,144 +593,178 @@ class CAENDigitizerInterface {
             }
 
             // double frequency = 0.0;
-            num_events = Port->Data.NumEvents;
+            num_events = _caen_port->Data.NumEvents;
             TriggeredWaveforms += num_events;
             for (uint32_t i = 0; i < num_events; i++) {
                 // Extract event i
-                extract_event(Port, i, processing_evts[i]);
+                extract_event(_caen_port, i, _processing_evts[i]);
             }
 
             return true;
         };
 
         bool new_data = process_events();
-        //SavedWaveforms += Port->Data.NumEvents;
+
         // startup!
         static arma::mat spe_estimation_pulse_buffer;
         static uint32_t acq_pulses = 0;
         static bool init_done = false;
-        switch (doe.VBDData.State) {
+        // This is to allow some time between voltage changes so it settles
+        // before a measurement is done.
+        static double reset_timer = 0;
+        if (reset_timer > 0) {
+            reset_timer -= get_current_time_epoch();
+        }
+
+        switch (_doe.VBDData.State) {
             case VBRState::Init:
             {
-                if (!init_done) {
+                if (!init_done && reset_timer <= 0.0) {
                     // Memory allocations and prepare the resources for whenever
                     // the user presses the next button, and prepares the file
 
                     // File preparation
                     std::ostringstream out;
                     out.precision(3);
-                    out << doe.LatestTemperature << "degC_";
-                    out << doe.SiPMVoltageSysVoltage << "V";
-                    file_name = doe.RunDir
-                        + "/" + doe.RunName
-                        + "/" + doe.SiPMName
-                        + doe.CellNumber + "cell_"
+                    out << _doe.LatestTemperature << "degC_";
+                    out << _doe.SiPMVoltageSysVoltage << "V";
+                    file_name = _doe.RunDir
+                        + "/" + _doe.RunName
+                        + "/" + _doe.SiPMName
+                        + std::to_string(_doe.CellNumber) + "cell_"
                         + out.str()
                         + "_spe_estimation.bin";
 
-                    open(_pulseFile,
+                    open(_pulse_file,
                         file_name,
                         // sbc_init_file is a function that saves the header
                         // of the sbc data format as a function of record length
                         // and number of channels
                         sbc_init_file,
-                        Port);
+                        _caen_port);
 
                     // Save into the log when the data saving started
                     double t = get_current_time_epoch() / 1000.0;
-                    _saveinfoFile->Add(SaveFileInfo(t, file_name));
+                    _saveinfo_file->Add(SaveFileInfo(t, file_name));
 
                     // It will hold this many pulses so let's allocate what we need
                     spe_estimation_pulse_buffer.resize(
-                        doe.VBDData.SPEEstimationTotalPulses,
-                        doe.GlobalConfig.RecordLength);
+                        _doe.VBDData.SPEEstimationTotalPulses,
+                        _doe.GlobalConfig.RecordLength);
 
-                    double prepulse_end_region_per =
-                        1.0 - 0.01*doe.GlobalConfig.PostTriggerPorcentage;
-                    int32_t prepulse_end_region
-                        = static_cast<int32_t>(
-                            doe.GlobalConfig.RecordLength*prepulse_end_region_per)
-                        - 125;  // the 70 is a constant delay in the trigger
+                    // To get the prepulse region in sp, we fuse post trigger %
+                    // turn it into pre-trigger %
+                    double prepulse_end_region =
+                        1.0 - 0.01*_doe.GlobalConfig.PostTriggerPorcentage;
 
+                    // Multiply by RecordLength to turn into sp
+                    // and subtract by the trigger lag roughly 125. Not accurate
+                    prepulse_end_region
+                        = _doe.GlobalConfig.RecordLength*prepulse_end_region
+                        - 125.0;  // the 70 is a constant delay in the trigger
+
+                    // We limit it to 0 and turn it into a uint32_t
                     uint32_t prepulse_end_region_u = prepulse_end_region < 0 ?
                         0 : static_cast<uint32_t>(prepulse_end_region);
 
+                    // We log the expected t0
                     t = get_current_time_epoch() / 1000.0;
-                    _saveinfoFile->Add(SaveFileInfo(t,
-                        "expected_t0 : " + std::to_string(prepulse_end_region_u)));
+                    _saveinfo_file->Add(SaveFileInfo(t,
+                        "expected_t0 : "
+                        + std::to_string(prepulse_end_region_u + 1)));
 
-                    coords(0, 0) = prepulse_end_region + 1;
-                    coords(1, 0) = 35e3;
-                    coords(2, 0) = v_threshold_cts_to_adc_cts(Port,
-                        doe.GroupConfigs[0].DCOffset);
-                    coords(3, 0) = 20;
-                    coords(4, 0) = 5;
+                    // _coords is the guesses for the analysis
+                    // 0 being the t0 guess
+                    _coords(0, 0) = prepulse_end_region + 1;
+                    // 1 is the gain guess
+                    _coords(1, 0) = 35e3;
+                    // 2 is the baseline guess
+                    _coords(2, 0) = v_threshold_cts_to_adc_cts(_caen_port,
+                        _doe.GroupConfigs[0].DCOffset);
+                    // fall time
+                    _coords(3, 0) = 20;
+                    // rise time
+                    _coords(4, 0) = 5;
 
-                    spdlog::info("Prepulse_end_region: {0}",
+                    spdlog::info("Expected analysis t0: {0}",
                         prepulse_end_region_u);
 
-                    arma::uword end_time = doe.GlobalConfig.RecordLength > 1000
-                        ? 1000 : doe.GlobalConfig.RecordLength;
+                    // We limit the analysis to a max of 1000 sp to speed up
+                    // the calculations
+                    arma::uword end_time = _doe.GlobalConfig.RecordLength > 1000
+                        ? 1000 : _doe.GlobalConfig.RecordLength;
+
+                    // We also log the tf to keep a record of it
+                    _saveinfo_file->Add(SaveFileInfo(t,
+                        "tf : "
+                        + std::to_string(end_time)));
+
+                    spdlog::info("Analysis tf: {0}",
+                        end_time);
 
                     // We create the analysis object with all the info, but
                     // this does not do the analysis!
-                    spe_analysis.reset(new SPEAnalysis<SimplifiedSiPMFunction>(
+                    _spe_analysis.reset(new SPEAnalysis<SimplifiedSiPMFunction>(
                         prepulse_end_region_u,
-                        end_time, coords));
+                        end_time, _coords));
 
                     acq_pulses = 0;
                     init_done = true;
                     SavedWaveforms = 0;
 
                     // Front end preparation
-                    _indicatorSender(IndicatorNames::FULL_ANALYSIS_DONE, false);
-                    _indicatorSender(IndicatorNames::CALCULATING_VBD, false);
-                    _indicatorSender(IndicatorNames::ANALYSIS_ONGOING, true);
+                    _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, false);
+                    _indicator_sender(IndicatorNames::CALCULATING_VBD, false);
+                    _indicator_sender(IndicatorNames::ANALYSIS_ONGOING, true);
 
-                    doe.VBDData.State = VBRState::Analysis;
+                    _doe.VBDData.State = VBRState::Analysis;
 
-                    async_save(_saveinfoFile, [](const SaveFileInfo& val){
-                        return std::to_string(val.Time) + "," + val.FileName + "\n";
+                    async_save(_saveinfo_file, [](const SaveFileInfo& val){
+                        return std::to_string(val.Time) + "," + val.FileName
+                            + "\n";
                     });
                 } else {
-                    doe.VBDData.State = VBRState::Idle;
+                    _doe.VBDData.State = VBRState::Idle;
                 }
             }
             break;
             case VBRState::Analysis:
+                // This case can stall if no data is coming in, maybe
+                // add a timeout later.
                 if (new_data) {
                     // k = 1, we always throw the first event
                     for (uint32_t k = 1; k < num_events; k++) {
 
                         // If we already have enough events, do not grab more
-                        if (acq_pulses >= doe.VBDData.SPEEstimationTotalPulses ) {
+                        if (acq_pulses >= _doe.VBDData.SPEEstimationTotalPulses ) {
                             continue;
                         }
 
                         // If the next even time is smaller than the previous
                         // it means the trigger tag overflowed. We ignore it
                         // because I do not feel like making the math right now
-                        if ( processing_evts[k]->Info.TriggerTimeTag <
-                            processing_evts[k - 1]->Info.TriggerTimeTag) {
+                        if (_processing_evts[k]->Info.TriggerTimeTag <
+                            _processing_evts[k - 1]->Info.TriggerTimeTag) {
                             continue;
                         }
 
-                        auto dtsp = processing_evts[k]->Info.TriggerTimeTag
-                            - processing_evts[k - 1]->Info.TriggerTimeTag;
+                        auto dtsp = _processing_evts[k]->Info.TriggerTimeTag
+                            - _processing_evts[k - 1]->Info.TriggerTimeTag;
 
                         // 1 tsp = 8 ns as per CAEN documentation
                         // dtsp * 8ns = time difference in ns
                         // In other words, do not add events with a time
                         // difference between the last pulse of 1000ns
-                        if(dtsp*8 < 1000) {
+                        if (dtsp*8 < 1000) {
                             continue;
                         }
 
-                        if (_pulseFile) {
-                            _pulseFile->Add(processing_evts[k]);
+                        if (_pulse_file) {
+                            _pulse_file->Add(_processing_evts[k]);
                         }
 
-                        arma::mat wave = caen_event_to_armadillo(processing_evts[k], 1);
+                        arma::mat wave = caen_event_to_armadillo(
+                            _processing_evts[k], 1);
                         spe_estimation_pulse_buffer.row(acq_pulses)
                             = wave;
 
@@ -745,106 +773,112 @@ class CAENDigitizerInterface {
 
                     // This is to update the indicator
                     SavedWaveforms = acq_pulses;
-                    save(_pulseFile, sbc_save_func, Port);
-                    if (acq_pulses >= doe.VBDData.SPEEstimationTotalPulses) {
+                    save(_pulse_file, sbc_save_func, _caen_port);
+                    if (acq_pulses >= _doe.VBDData.SPEEstimationTotalPulses) {
 
                         // This one is to note when the data taking ended
                         double t = get_current_time_epoch() / 1000.0;
-                        _saveinfoFile->Add(SaveFileInfo(t, fileName));
+                        _saveinfo_file->Add(SaveFileInfo(t, file_name));
 
                         spdlog::info("Finished taking data! Moving to analysis.");
                         // This is the line of code that runs the analysis!
-                        auto pars = spe_analysis->FullAnalysis(
+                        auto pars = _spe_analysis->FullAnalysis(
                             spe_estimation_pulse_buffer, 0.999);
 
                         spdlog::info("Finished analysis.");
 
-                        _indicatorSender(IndicatorNames::SPE_GAIN_MEAN,
+                        _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
                             pars.SPEParameters(1));
 
-                        _indicatorSender(IndicatorNames::WAVEFORM_NOISE,
+                        _indicator_sender(IndicatorNames::WAVEFORM_NOISE,
                             pars.BaselineParameters.NoiseSTD);
 
-                        _indicatorSender(IndicatorNames::WAVEFORM_BASELINE,
+                        _indicator_sender(IndicatorNames::WAVEFORM_BASELINE,
                             pars.BaselineParameters.Baseline);
 
-                        _indicatorSender(IndicatorNames::SPE_EFFICIENCTY,
+                        _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
                             pars.SPEEfficiency);
 
-                        _indicatorSender(IndicatorNames::INTEGRAL_THRESHOLD,
+                        _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
                             pars.IntegralThreshold);
 
-                        _indicatorSender(IndicatorNames::OFFSET,
+                        _indicator_sender(IndicatorNames::OFFSET,
                             pars.SPEParameters(2));
 
-                        _indicatorSender(IndicatorNames::RISE_TIME,
+                        _indicator_sender(IndicatorNames::RISE_TIME,
                             pars.SPEParameters(3));
 
-                        _indicatorSender(IndicatorNames::FALL_TIME,
+                        _indicator_sender(IndicatorNames::FALL_TIME,
                             pars.SPEParameters(4));
 
-                        _indicatorSender(IndicatorNames::FULL_ANALYSIS_DONE, true);
-                        _indicatorSender(IndicatorNames::ANALYSIS_ONGOING, false);
+                        // Let the front-end that the analysis is done
+                        _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE,
+                            true);
+                        _indicator_sender(IndicatorNames::ANALYSIS_ONGOING,
+                            false);
 
+                        // Sometimes the analysis can fail and this is
+                        // reflected in SPEEfficiency being 0
                         if (pars.SPEEfficiency != 0.0) {
-                            _indicatorSender(IndicatorNames::GAIN_VS_VOLTAGE,
-                                latest_measure.Volt,
+                            _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
+                                _latest_measure.Volt,
                                 pars.SPEParameters(1));
 
-                            vbe_analysis->add(pars.SPEParameters(1),
+                            _vbe_analysis->add(pars.SPEParameters(1),
                                 pars.SPEParametersErrors(1),
-                                latest_measure.Volt);
+                                _latest_measure.Volt);
 
                             t = get_current_time_epoch() / 1000.0;
-                            for (arma::uword i = 0; i < pars.SPEParameters.n_elem; i++) {
-                                _saveinfoFile->Add(
+                            for (arma::uword i = 0;
+                                i < pars.SPEParameters.n_elem; i++) {
+                                _saveinfo_file->Add(
                                     SaveFileInfo(t,
                                 std::to_string(pars.SPEParameters(i))));
 
-                                _saveinfoFile->Add(
+                                _saveinfo_file->Add(
                                     SaveFileInfo(t,
                                 std::to_string(pars.SPEParametersErrors(i))));
                             }
                         }
 
-                        async_save(_saveinfoFile, [](const SaveFileInfo& val){
-                            return std::to_string(val.Time) + "," + val.FileName + "\n";
+                        async_save(_saveinfo_file, [](const SaveFileInfo& val) {
+                            return std::to_string(val.Time) + ","
+                                + val.FileName + "\n";
                         });
 
-                        doe.VBDData.State = VBRState::Idle;
+                        _doe.VBDData.State = VBRState::Idle;
                     }
                 }
 
             break;
             case VBRState::CalculateBreakdownVoltage:
             {
-                if (vbe_analysis->size() >= 3) {
-                    auto values = vbe_analysis->calculate();
+                if (_vbe_analysis->size() >= 3) {
+                    auto values = _vbe_analysis->calculate();
 
                     if (values.BreakdownVoltageError != 0.0) {
-                        _indicatorSender(IndicatorNames::BREAKDOWN_VOLTAGE,
+                        _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
                             values.BreakdownVoltage);
-                        _indicatorSender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
+                        _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
                             values.BreakdownVoltageError);
-                        _indicatorSender(IndicatorNames::CALCULATING_VBD, true);
+                        _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
                     }
                 }
 
-                doe.VBDData.State = VBRState::Idle;
+                _doe.VBDData.State = VBRState::Idle;
             }
             break;
             case VBRState::ResetAll:
-                _indicatorSender(IndicatorNames::CALCULATING_VBD, false);
-                vbe_analysis.reset(new GainVBDEstimation());
+                _indicator_sender(IndicatorNames::CALCULATING_VBD, false);
+                _vbe_analysis.reset(new GainVBDEstimation());
             case VBRState::Reset:
-
-                close(_pulseFile);
+                close(_pulse_file);
                 init_done = false;
                 SavedWaveforms = 0;
                 acq_pulses = 0;
-                doe.VBDData.State = VBRState::Idle;
-                _indicatorSender(IndicatorNames::FULL_ANALYSIS_DONE, false);
-
+                _doe.VBDData.State = VBRState::Idle;
+                _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, false);
+                reset_timer = 20000.0; // ms
             break;
             case VBRState::Idle:
             default:
@@ -859,7 +893,7 @@ class CAENDigitizerInterface {
             std::chrono::seconds(1),
             std::bind(&CAENDigitizerInterface::lec, this));
 
-        _indicatorSender(IndicatorNames::SAVED_WAVEFORMS,
+        _indicator_sender(IndicatorNames::SAVED_WAVEFORMS,
                     SavedWaveforms);
         checkerror();
         if (new_data) {
@@ -878,35 +912,35 @@ class CAENDigitizerInterface {
             std::bind(&CAENDigitizerInterface::rdm_extract_for_gui, this));
 
         static auto process_events = [&]() {
-            bool isData = retrieve_data_until_n_events(Port,
-                Port->GlobalConfig.MaxEventsPerRead);
+            bool isData = retrieve_data_until_n_events(_caen_port,
+                _caen_port->GlobalConfig.MaxEventsPerRead);
 
             // While all of this is happening, the digitizer is taking data
             if (!isData) {
                 return;
             }
 
-            for (uint32_t k = 0; k < Port->Data.NumEvents; k++) {
+            for (uint32_t k = 0; k < _caen_port->Data.NumEvents; k++) {
                 // Extract event i
-                extract_event(Port, k, processing_evts[k]);
+                extract_event(_caen_port, k, _processing_evts[k]);
             }
 
-            for (uint32_t k = 1; k < Port->Data.NumEvents; k++) {
+            for (uint32_t k = 1; k < _caen_port->Data.NumEvents; k++) {
                           // If we already have enough events, do not grab more
-                if (SavedWaveforms >= doe.VBDData.DataPulses ) {
+                if (SavedWaveforms >= _doe.VBDData.DataPulses ) {
                     break;
                 }
 
                 // If the next even time is smaller than the previous
                 // it means the trigger tag overflowed. We ignore it
                 // because I do not feel like making the math right now
-                if ( processing_evts[k]->Info.TriggerTimeTag <
-                    processing_evts[k - 1]->Info.TriggerTimeTag) {
+                if (_processing_evts[k]->Info.TriggerTimeTag <
+                    _processing_evts[k - 1]->Info.TriggerTimeTag) {
                     continue;
                 }
 
-                auto dtsp = processing_evts[k]->Info.TriggerTimeTag
-                    - processing_evts[k - 1]->Info.TriggerTimeTag;
+                auto dtsp = _processing_evts[k]->Info.TriggerTimeTag
+                    - _processing_evts[k - 1]->Info.TriggerTimeTag;
 
                 // 1 tsp = 8 ns as per CAEN documentation
                 // dtsp * 8ns = time difference in ns
@@ -916,19 +950,19 @@ class CAENDigitizerInterface {
                     continue;
                 }
 
-                if (_pulseFile) {
+                if (_pulse_file) {
                     // Copy event to the file buffer
-                    _pulseFile->Add(processing_evts[k]);
+                    _pulse_file->Add(_processing_evts[k]);
                     SavedWaveforms++;
                 }
             }
 
-            _indicatorSender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
+            _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
         };
 
         if (isFileOpen) {
             // spdlog::info("Saving SIPM data");
-            save(_pulseFile, sbc_save_func, Port);
+            save(_pulse_file, sbc_save_func, _caen_port);
         } else {
             // Get current date and time, e.g. 202201051103
             std::chrono::system_clock::time_point now
@@ -940,51 +974,51 @@ class CAENDigitizerInterface {
 
             std::ostringstream out;
             out.precision(3);
-            out << doe.LatestTemperature << "degC_";
-            out << doe.SiPMVoltageSysVoltage << "V";
-            file_name = doe.RunDir
-                + "/" + doe.RunName
-                + "/" + doe.SiPMName
-                + doe.CellNumber + "cell_"
+            out << _doe.LatestTemperature << "degC_";
+            out << _doe.SiPMVoltageSysVoltage << "V";
+            file_name = _doe.RunDir
+                + "/" + _doe.RunName
+                + "/" + _doe.SiPMName
+                + std::to_string(_doe.CellNumber) + "cell_"
                 + out.str()
                 + "_data.bin";
-            open(_pulseFile,
-                fileName,
+            open(_pulse_file,
+                file_name,
                 // + doe.SiPMParameters + ".bin",
 
                 // sbc_init_file is a function that saves the header
                 // of the sbc data format as a function of record length
                 // and number of channels
                 sbc_init_file,
-                Port);
+                _caen_port);
 
             double t = get_current_time_epoch() / 1000.0;
-            _saveinfoFile->Add(SaveFileInfo(t, fileName));
+            _saveinfo_file->Add(SaveFileInfo(t, file_name));
 
-            async_save(_saveinfoFile, [](const SaveFileInfo& val){
+            async_save(_saveinfo_file, [](const SaveFileInfo& val){
                 return std::to_string(val.Time) + "," + val.FileName + "\n";
             });
 
-            isFileOpen = _pulseFile > 0;
+            isFileOpen = _pulse_file > 0;
             SavedWaveforms = 0;
         }
 
         process_events();
         extract_for_gui_nb();
-        if (SavedWaveforms >= doe.VBDData.DataPulses) {
+        if (SavedWaveforms >= _doe.VBDData.DataPulses) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
             double t = get_current_time_epoch() / 1000.0;
-            _saveinfoFile->Add(SaveFileInfo(t, fileName));
+            _saveinfo_file->Add(SaveFileInfo(t, file_name));
 
-            async_save(_saveinfoFile, [](const SaveFileInfo& val){
+            async_save(_saveinfo_file, [](const SaveFileInfo& val){
                 return std::to_string(val.Time) + "," + val.FileName + "\n";
             });
         }
 
         if (change_state()) {
             isFileOpen = false;
-            close(_pulseFile);
+            close(_pulse_file);
         }
 
         return true;
@@ -997,6 +1031,7 @@ class CAENDigitizerInterface {
         return true;
     }
 
+    // Only mode that stops the main_loop and frees all resources
     bool closing_mode() {
         spdlog::info("Going to close the CAEN thread.");
         close_caen();
@@ -1004,60 +1039,61 @@ class CAENDigitizerInterface {
     }
 
     void rdm_extract_for_gui() {
-        if (Port->Data.DataSize <= 0) {
+        if (_caen_port->Data.DataSize <= 0) {
             return;
         }
 
         // For the GUI
         static std::default_random_engine generator;
         std::uniform_int_distribution<uint32_t>
-            distribution(0, Port->Data.NumEvents);
+            distribution(0, _caen_port->Data.NumEvents);
         uint32_t rdm_num = distribution(generator);
 
-        extract_event(Port, rdm_num, osc_event);
+        extract_event(_caen_port, rdm_num, _osc_event);
 
         process_data_for_gui();
     }
 
     void process_data_for_gui() {
         calculate_trigger_frequency();
-        for (std::size_t j = 0; j < Port->ModelConstants.NumChannels; j++) {
+        for (std::size_t j = 0; j < _caen_port->ModelConstants.NumChannels; j++) {
             // auto& ch_num = ch.second.Number;
-            auto buf = osc_event->Data->DataChannel[j];
-            auto size = osc_event->Data->ChSize[j];
+            auto buf = _osc_event->Data->DataChannel[j];
+            auto size = _osc_event->Data->ChSize[j];
 
             if (size <= 0) {
                 continue;
             }
 
-            x_values.resize(size);
-            y_values.resize(size);
+            _x_values.resize(size);
+            _y_values.resize(size);
 
             for (uint32_t i = 0; i < size; i++) {
-                x_values[i] = i*(1.0/Port->ModelConstants.AcquisitionRate)*(1e9);
-                y_values[i] = static_cast<double>(buf[i]);
+                _x_values[i] = i*
+                    (1e9/_caen_port->ModelConstants.AcquisitionRate);
+                _y_values[i] = static_cast<double>(buf[i]);
             }
 
-            _plotSender(static_cast<uint8_t>(j),
-                x_values,
-                y_values);
+            _plot_sender(static_cast<uint8_t>(j),
+                _x_values,
+                _y_values);
         }
     }
 
     void sipm_voltage_system_update() {
-        static auto getVoltage = make_total_timed_event(
+        static auto get_voltage = make_total_timed_event(
             std::chrono::seconds(1),
             [&]() {
-                auto r = SiPMVoltageSystem.get(
+                auto r = _sipm_volt_sys.get(
                 [=](serial_ptr& port)
-                -> std::optional<std::pair<double, double>> {
+                    -> std::optional<SiPMVoltageMeasure> {
                     static auto send_msg_slow = make_blocking_total_timed_event(
                         std::chrono::milliseconds(10),
                         [&](const std::string& msg){
-                            // spdlog::info("Sending msg to Keithely: {0}", msg);
                             send_msg(port, msg + "\n", "");
                         }
                     );
+
                     send_msg_slow.ChangeWaitTime(
                         std::chrono::milliseconds(10));
                     send_msg_slow("++addr 10");
@@ -1070,6 +1106,7 @@ class CAENDigitizerInterface {
                         return {};
                     }
 
+                    double time = get_current_time_epoch() / 1000.0;
                     send_msg_slow.ChangeWaitTime(
                         std::chrono::milliseconds(100));
                     send_msg_slow("++addr 22");
@@ -1084,36 +1121,40 @@ class CAENDigitizerInterface {
                         return {};
                     }
 
-                    return std::make_optional(
-                        std::make_pair(volt.value(), curr.value()));
+                    SiPMVoltageMeasure out;
+                    out.Time = time;
+                    out.Volt = volt.value();
+                    out.Current = curr.value();
+
+                    return std::make_optional(out);
             });
 
             if (r) {
-                double time = get_current_time_epoch() / 1000.0;
-                double volt = r.value().first;
-                double curr = r.value().second;
+                double time = r.value().Time;
+                double volt = r.value().Volt;
+                double curr = r.value().Current;
 
                 volt = calculate_sipm_voltage(volt, curr);
 
                 // This measure is a NaN/Overflow from the picoammeter
                 if(curr < 9.9e37){
-                    latest_measure.Volt = volt;
-                    latest_measure.Time = time;
-                    latest_measure.Current = curr;
-                    _voltagesFile->Add(latest_measure);
-                    _indicatorSender(IndicatorNames::DMM_VOLTAGE, time, volt);
-                    _indicatorSender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
-                    _indicatorSender(IndicatorNames::PICO_CURRENT, time, curr);
-                    _indicatorSender(IndicatorNames::LATEST_PICO_CURRENT, curr);
+                    _latest_measure.Volt = volt;
+                    _latest_measure.Time = time;
+                    _latest_measure.Current = curr;
+                    _voltages_file->Add(_latest_measure);
+                    _indicator_sender(IndicatorNames::DMM_VOLTAGE, time, volt);
+                    _indicator_sender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
+                    _indicator_sender(IndicatorNames::PICO_CURRENT, time, curr);
+                    _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
                 }
             }
         });
 
-        static auto saveVoltages = make_total_timed_event(
+        static auto save_voltages = make_total_timed_event(
             std::chrono::seconds(30),
             [&]() {
                 spdlog::info("Saving voltage (Keithley 2000) voltages.");
-                async_save(_voltagesFile,
+                async_save(_voltages_file,
                 [](const SiPMVoltageMeasure& mes) {
                     std::ostringstream out;
                     out.precision(7);
@@ -1124,62 +1165,51 @@ class CAENDigitizerInterface {
             });
         });
 
-        switch (doe.CurrentState) {
+        switch (_doe.CurrentState) {
             case CAENInterfaceStates::OscilloscopeMode:
             case CAENInterfaceStates::BreakdownVoltageMode:
             case CAENInterfaceStates::RunMode:
-                getVoltage();
-                saveVoltages();
-            {
-                if (doe.SiPMVoltageSysChange) {
-                    SiPMVoltageSystem.get([=](serial_ptr& port)
-                    -> std::optional<std::pair<double, double>> {
+                get_voltage();
+                save_voltages();
+
+                if (_doe.SiPMVoltageSysChange) {
+                    _sipm_volt_sys.get([=](serial_ptr& port)
+                    -> std::optional<SiPMVoltageMeasure> {
                         send_msg(port, "++addr 22\n", "");
 
-                        if(doe.SiPMVoltageSysSupplyEN) {
+                        if (_doe.SiPMVoltageSysSupplyEN) {
                             send_msg(port, ":sour:volt:stat ON\n", "");
-                            spdlog::info("Turning on voltage supply");
+                            spdlog::warn("Turning on voltage supply.");
                         } else {
                             send_msg(port, ":sour:volt:stat OFF\n", "");
-                            spdlog::warn("Turning off voltage supply");
+                            spdlog::warn("Turning off voltage supply.");
                         }
 
                         send_msg(port, ":sour:volt "
-                            + std::to_string(doe.SiPMVoltageSysVoltage)
+                            + std::to_string(_doe.SiPMVoltageSysVoltage)
                             + "\n", "");
 
                         spdlog::info("Changing output voltage to {0}",
-                            doe.SiPMVoltageSysVoltage);
+                            _doe.SiPMVoltageSysVoltage);
 
-                        // send_msg(port, "++auto 1\n", "");
                         return {};
                     });
 
                     // Reset
-                    doe.SiPMVoltageSysChange = false;
+                    _doe.SiPMVoltageSysChange = false;
                 }
-            }
             break;
 
             case CAENInterfaceStates::Standby:
             case CAENInterfaceStates::AttemptConnection:
             case CAENInterfaceStates::Disconnected:
-            break;
             case CAENInterfaceStates::Closing:
-                SiPMVoltageSystem.get([=](serial_ptr& port)
-                    -> std::optional<std::pair<double, double>> {
-                        send_msg(port, "++addr 22\n", "");
-                        send_msg(port, ":sour:volt:stat OFF\n", "");
-                        send_msg(port, ":sour:volt 0.0\n", "");
-                        return {};
-                    });
-                SiPMVoltageSystem.close();
-                spdlog::warn("Closing DMM port");
             case CAENInterfaceStates::NullState:
             default:
             break;
         }
     }
 };
+
 }  // namespace SBCQueens
 #endif

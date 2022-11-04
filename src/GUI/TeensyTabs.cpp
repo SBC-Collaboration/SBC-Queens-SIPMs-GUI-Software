@@ -92,9 +92,9 @@ namespace SBCQueens {
                     tgui_state.PidRTD,
                     ImGui::IsItemEdited,
                     [=](TeensyControllerData& oldState) {
-                            oldState.CommandToSend = TeensyCommands::SetPPIDRTD;
-                            oldState.PidRTD = tgui_state.PidRTD;
-                            return true;
+                        oldState.CommandToSend = TeensyCommands::SetPPIDRTD;
+                        oldState.PidRTD = tgui_state.PidRTD;
+                        return true;
                     }
                 );
 
