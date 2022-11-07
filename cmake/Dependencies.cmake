@@ -2,6 +2,8 @@ set(DEPENDENCY_DIR ${CMAKE_SOURCE_DIR}/deps
   CACHE FILEPATH "Directory where all the dependencies are found.
   Full path only.")
 
+include(cmake/CPM.cmake)
+
 # OpenGL
 find_package( OpenGL REQUIRED )
 
@@ -126,14 +128,14 @@ endif()
 
 # spdlog
 # https://github.com/gabime/spdlog
-set(SPDLOG_DIR ${DEPENDENCY_DIR}/spdlog)
-if(IS_DIRECTORY ${SPDLOG_DIR})
-  add_subdirectory(${SPDLOG_DIR} binary_dir/spdlog EXCLUDE_FROM_ALL)
-  include_directories(SYSTEM ${SPDLOG_DIR}/include)
-else()
-  message(FATAL_ERROR "spdlog not found.
-    Make sure to run git submodules init first")
-endif()
+# set(SPDLOG_DIR ${DEPENDENCY_DIR}/spdlog)
+# if(IS_DIRECTORY ${SPDLOG_DIR})
+#   add_subdirectory(${SPDLOG_DIR} binary_dir/spdlog EXCLUDE_FROM_ALL)
+#   include_directories(SYSTEM ${SPDLOG_DIR}/include)
+# else()
+#   message(FATAL_ERROR "spdlog not found.
+#     Make sure to run git submodules init first")
+# endif()
 
 # boost SML
 # set(BOOST_SML_DIR ./deps/sml)
@@ -167,13 +169,28 @@ else()
 endif()
 
 find_package(Armadillo 11.2.3 REQUIRED)
-include_directories(SYSTEM "${ARMADILLO_INCLUDE_DIR}")
+# CPMAddPackage(
+#   NAME ensmallen
+#   GIT_TAG  2.19.0
+#   GITHUB_REPOSITORY mlpack/ensmallen
+#   DOWNLOAD_ONLY YES
+# )
+# if(ensmallen_ADDED)
+#   add_library(ensmallen INTERFACE IMPORTED)
+#   target_link_libraries(ensmallen INTERFACE Armadillo)
+#   target_include_directories(ensmallen
+#     SYSTEM INTERFACE
+#     $<INSTALL_INTERFACE:include>
+#     $<BUILD_INTERFACE:${ensmallen_SOURCE_DIR}>/include)
+# endif()
 
-set (SIPM_DIR /home/sbc-queens-linux/tmp/)
-if(IS_DIRECTORY ${SIPM_DIR})
-  link_directories(${SIPM_DIR}/lib)
-  include_directories(SYSTEM ${SIPM_DIR}/include)
-else()
-  message(FATAL_ERROR "${SIPM_DIR} not found.
-    Make sure to run git submodules init first")
-endif()
+# set (SIPM_DIR /home/sbc-queens-linux/tmp/)
+CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../../SiPMCharacteriazation)
+# set (SIPM_DIR ${CMAKE_SOURCE_DIR}/../SiPMCharacteriazation/tmp/)
+# if(IS_DIRECTORY ${SIPM_DIR})
+#   link_directories(${SIPM_DIR}/lib)
+#   include_directories(SYSTEM ${SIPM_DIR}/include/Sipmanalysis-0.1/)
+# else()
+#   message(FATAL_ERROR "${SIPM_DIR} not found.
+#     Make sure to run git submodules init first")
+# endif()

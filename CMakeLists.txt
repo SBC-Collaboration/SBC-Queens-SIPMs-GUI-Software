@@ -5,6 +5,8 @@
 #  cmake ../ -G "MinGW Makefiles" -DUSE_VULKAN=ON -DCAEN_DIR="X:\\Program Files\\CAEN" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
 cmake_minimum_required(VERSION 3.11)
 
+include(cmake/CPM.cmake)
+
 project(SiPMControlGUI
   VERSION 0.1.0
   LANGUAGES C CXX)
@@ -142,8 +144,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${OPENMP_LIBRARIES})
 
 # setupapi -> for serial
 target_link_libraries(${PROJECT_NAME} PUBLIC ${LIBRARIES} ${IMGUI_LIBRARIES}
-  ${ARMADILLO_LIBRARIES}
-  sipmcharacterization
+  Armadillo
+  Sipmanalysis::Sipmanalysis
   glfw imgui implot
   serial atomic spdlog
   CAENVME

@@ -37,9 +37,9 @@
 #include "include/HardwareHelpers/ClientController.hpp"
 #include "include/HardwareHelpers/Calibration.hpp"
 
-#include "sipmcharacterization/PulseFunctions.hpp"
-#include "sipmcharacterization/SPEAnalysis.hpp"
-#include "sipmcharacterization/GainVBDEstimation.hpp"
+#include "sipmanalysis/PulseFunctions.hpp"
+#include "sipmanalysis/SPEAnalysis.hpp"
+#include "sipmanalysis/GainVBDEstimation.hpp"
 
 namespace SBCQueens {
 
