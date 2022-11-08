@@ -1,4 +1,4 @@
-#include "serial_helper.hpp"
+#include "sbcqueens-gui/serial_helper.hpp"
 
 namespace SBCQueens {
 

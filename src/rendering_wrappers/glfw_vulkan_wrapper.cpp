@@ -1,5 +1,5 @@
 #ifdef USE_VULKAN
-#include "rendering_wrappers/glfw_vulkan_wrapper.h"
+#include "sbcqueens-gui/rendering_wrappers/glfw_vulkan_wrapper.h"
 
 namespace ImGUIWrappers {
 

@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.11)
 
 include(cmake/CPM.cmake)
 
-project(SiPMControlGUI
+project(SBCQueensGUIHelpers
   VERSION 0.1.0
   LANGUAGES C CXX)
 
@@ -27,8 +27,6 @@ else()
 endif()
 
 # Default to debug
-set(DEPENDENCY_DIR ${CMAKE_SOURCE_DIR}/deps 
-  CACHE FILEPATH "Directory where all the dependencies are found. Full path only.")
 set(CAEN_DIR "C:\\Program Files\\CAEN" 
   CACHE FILEPATH "Directory where CAEN VME, Comm, and digitizer files are found")
 option(USE_VULKAN OFF)
@@ -43,20 +41,9 @@ endif()
 message(STATUS "Started CMake for ${PROJECT_NAME} v${PROJECT_VERSION}...\n")
 
 if (UNIX)
-    add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")    #this will allow to use same _DEBUG macro available in both Linux as well as Windows - MSCV environment. Easy to put Debug specific code.
+  add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")    #this will allow to use same _DEBUG macro available in both Linux as well as Windows - MSCV environment. Easy to put Debug specific code.
 endif (UNIX)
 
-
-# if(NOT CMAKE_BUILD_TYPE)
-#   set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
-# endif()
-
-# There are no C files in this other than coming from dependencies
-# C/C++ hard mode: "-Wall"
-# C/C++ expert mode: "-Wpedantic" "-Wextra"
-#
-# Set the project standard and warnings
-#
 
 add_compile_options(
   "$<$<CONFIG:DEBUG>:-Og;-ggdb;>"
@@ -70,6 +57,7 @@ add_compile_options(
 # set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -Wall -O3")
 
 # CAEN comm library
+CPMAddPackage("gh:TheLartians/PackageProject.cmake@1.10.0")
 
 include(cmake/Dependencies.cmake)
 ## First VME as it is the main component
@@ -77,78 +65,116 @@ if(IS_DIRECTORY ${CAEN_DIR})
   message("-- ${CAEN_DIR} Found!")
 
   if(LINUX)
-    include_directories(SYSTEM ${CAEN_DIR}/CAENVMElib/include)
-    link_directories(${CAEN_DIR}/CAENVMElib/lib/x64)
-    #target_link_libraries(SiPMControlGUI CAENVMElib)
       ## Then Comm libs
-    include_directories(SYSTEM ${CAEN_DIR}/CAENComm/include)
     link_directories(${CAEN_DIR}/CAENComm/lib/x64)
 
     ## Then digitizers
-    include_directories(SYSTEM ${CAEN_DIR}/CAENDigitizer/include)
     link_directories(${CAEN_DIR}/CAENDigitizer/lib/x86_64)
-  else()
-    include_directories(SYSTEM ${CAEN_DIR}/VME/include)
-    link_directories(${CAEN_DIR}/VME/lib/x86_64)
+        target_include_directories(serial PUBLIC SYSTEM
+    $<BUILD_INTERFACE:${CAEN_DIR}>/CAENVMElib/include
+    $<BUILD_INTERFACE:${CAEN_DIR}>/CAENComm/include
+    $<BUILD_INTERFACE:${CAEN_DIR}>/CAENDigitizer/Library/include)
+
+    # include_directories(SYSTEM ${CAEN_DIR}/VME/include)
+    add_library(CAENVME SHARED IMPORTED GLOBAL)
+    # set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB_DEBUG  ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
+    set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/CAENVMElib/lib/x64/CAENVME.so)
+    # link_directories(${CAEN_DIR}/VME/lib/x86_64)
     #target_link_libraries(SiPMControlGUI CAENVMElib)
       ## Then Comm libs
-    include_directories(SYSTEM ${CAEN_DIR}/Comm/include)
-    link_directories(${CAEN_DIR}/Comm/lib/x86_64)
+    # include_directories(SYSTEM ${CAEN_DIR}/Comm/include)
+    add_library(CAENComm SHARED IMPORTED GLOBAL)
+    set_target_properties(CAENComm PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/CAENComm/lib/x64/CAENComm.so)
+
+    # Then digitizers
+    add_library(CAENDigitizer SHARED IMPORTED GLOBAL)
+    set_target_properties(CAENDigitizer PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/CAENDigitizer/lib/x86_64/CAENDigitizer.so)
+  else()
+    target_include_directories(serial PUBLIC SYSTEM
+    $<BUILD_INTERFACE:${CAEN_DIR}>/VME/include
+    $<BUILD_INTERFACE:${CAEN_DIR}>/Comm/include
+    $<BUILD_INTERFACE:${CAEN_DIR}>/Digitizers/Library/include)
+
+    # include_directories(SYSTEM ${CAEN_DIR}/VME/include)
+    add_library(CAENVME SHARED IMPORTED GLOBAL)
+    # set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB_DEBUG  ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
+    set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
+    # link_directories(${CAEN_DIR}/VME/lib/x86_64)
+    #target_link_libraries(SiPMControlGUI CAENVMElib)
+      ## Then Comm libs
+    # include_directories(SYSTEM ${CAEN_DIR}/Comm/include)
+    add_library(CAENComm SHARED IMPORTED GLOBAL)
+    set_target_properties(CAENComm PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/Comm/lib/x86_64/CAENComm.lib)
 
     ## Then digitizers
-    include_directories(SYSTEM ${CAEN_DIR}/Digitizers/Library/include)
-    link_directories(${CAEN_DIR}/Digitizers/Library/lib/x86_64)
+    # include_directories(SYSTEM ${CAEN_DIR}/Digitizers/Library/include)
+    add_library(CAENDigitizer SHARED IMPORTED GLOBAL)
+    set_target_properties(CAENDigitizer PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/Digitizers/Library/lib/x86_64/CAENDigitizer.lib)
   endif()
 
 else()
   message(FATAL_ERROR "CAEN not found. Make sure to install VME, Comm and "
-    "Digitizers libraries. ${CAEN_DIR}")
+    "Digitizers libraries at ${CAEN_DIR}")
 endif()
 
 #target_link_libraries(SiPMControlGUI CAENComm)
 
 # my files
-include_directories(./include)
+file(GLOB_RECURSE headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
-file(GLOB sources *.cpp)
-file(GLOB srcsources ./src/*.cpp)
-file(GLOB renderers ./src/rendering_wrappers/*.cpp)
-file(GLOB guis ./src/GUI/*.cpp)
-file(GLOB hardware ./src/HardwareHelpers/*.cpp)
+add_library(${PROJECT_NAME} ${sources} ${headers})
 
-add_executable(SiPMControlGUI ${sources} ${srcsources} ${renderers} ${guis} ${hardware})
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if(${PROJECT_NAME}_BUILD_HEADERS_ONLY)
-  target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
-else()
-  target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
-
-  if(${PROJECT_NAME}_BUILD_EXECUTABLE AND ${PROJECT_NAME}_ENABLE_UNIT_TESTING)
-    target_compile_features(${PROJECT_NAME}_LIB PUBLIC cxx_std_17)
-  endif()
-endif()
 include(cmake/CompilerWarnings.cmake)
+set(CMAKE_CXX_STANDARD 17)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 set_project_warnings(${PROJECT_NAME})
 
-if(MINGW)
-    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++)
-endif()
+# if(MINGW)
+#     set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++)
+# endif()
 
 file(GLOB GUI_CONFIG_FILE gui_setup.toml)
 file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 
-find_package(OpenMP REQUIRED)
-target_link_libraries(${PROJECT_NAME} PUBLIC ${OPENMP_LIBRARIES})
-
 # setupapi -> for serial
-target_link_libraries(${PROJECT_NAME} PUBLIC ${LIBRARIES} ${IMGUI_LIBRARIES}
+target_link_libraries(${PROJECT_NAME}
+  PUBLIC
   Armadillo
+  spdlog::spdlog
+  nlohmann_json::nlohmann_json
   Sipmanalysis::Sipmanalysis
-  glfw imgui implot
-  serial atomic spdlog
+  imgui implot
+  readerwriterqueue
+  concurrentqueue
+  tomlplusplus
+
+  serial
+  glfw
+  atomic
+  ${OPENMP_LIBRARIES}
   CAENVME
   CAENComm
   CAENDigitizer
 )
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>/include
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION})
+
+string(TOLOWER ${PROJECT_NAME}/version.h VERSION_HEADER_LOCATION)
+
+add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+
+# packageProject(
+#   NAME ${PROJECT_NAME}
+#   VERSION ${PROJECT_VERSION}
+#   NAMESPACE ${PROJECT_NAME}
+#   BINARY_DIR ${PROJECT_BINARY_DIR}
+#   INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include
+#   INCLUDE_DESTINATION include/${PROJECT_NAME}-${PROJECT_VERSION}
+#   VERSION_HEADER "${VERSION_HEADER_LOCATION}"
+#   COMPATIBILITY SameMajorVersion
+#   DEPENDENCIES "spdlog;Armadillo;nlohmann_json;imgui;implot;tomlplusplus;serial"
+# )

@@ -52,10 +52,9 @@
 			"name": "Build GUI Windows Debug",
 			"shell" : true,
 			"working_dir" : "$project_path",
-			"shell_cmd": "cmake . -B build -G \"MinGW Makefiles\" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCAEN_DIR=\"X:/Program Files/CAEN\" -DCMAKE_BUILD_TYPE=Debug -DUSE_VULKAN=OFF && cmake --build build -j",
+			"shell_cmd": "cmake all -B build -G \"MinGW Makefiles\" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCAEN_DIR=\"X:/Program Files/CAEN\" -DCMAKE_BUILD_TYPE=Debug -DUSE_VULKAN=OFF && cmake --build build -j",
 			"syntax" : "Packages/Makefile/Make Output.sublime-syntax",
 		}
-
 
 	],
 }

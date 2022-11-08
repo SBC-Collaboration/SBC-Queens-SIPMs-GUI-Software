@@ -1,4 +1,4 @@
-#include "armadillo_helpers.hpp"
+#include "sbcqueens-gui/armadillo_helpers.hpp"
 
 // C STD includes
 // C 3rd party includes

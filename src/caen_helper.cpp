@@ -1,4 +1,4 @@
-#include "caen_helper.hpp"
+#include "sbcqueens-gui/caen_helper.hpp"
 
 // C STD includes
 // C 3rd party includes
@@ -21,12 +21,7 @@
 
 // my includes
 
-
 namespace SBCQueens {
-
-std::string translate_caen_code(const CAENComm_ErrorCode& err) noexcept {
-    return "";
-}
 
 CAENError connect(CAEN& res, const CAENDigitizerModel& model,
     const CAENConnectionType& ct,
@@ -724,7 +719,7 @@ uint32_t t_to_record_length(CAEN& res, const double& nsTime) noexcept {
     return static_cast<uint32_t>(nsTime*1e-9*res->GetCommTransferRate());
 }
 
-uint32_t v_threshold_cts_to_adc_cts(CAEN& res, const uint32_t& cts) noexcept {
+uint32_t v_threshold_cts_to_adc_cts(const CAEN& res, const uint32_t& cts) noexcept {
     const uint32_t kVthresholdRangeCts = std::exp2(16);
     uint32_t ADCRange = std::exp2(res->ModelConstants.ADCResolution);
 
@@ -733,13 +728,15 @@ uint32_t v_threshold_cts_to_adc_cts(CAEN& res, const uint32_t& cts) noexcept {
 }
 
 // Turns a voltage (V) into trigger counts
-uint32_t v_to_threshold_counts(CAEN& res, const double& volt) noexcept {
-    return 0;
+uint32_t v_to_threshold_counts(const double& volt) noexcept {
+    const uint32_t kVthresholdRangeCts = std::exp2(16);
+    return static_cast<uint32_t>(volt / kVthresholdRangeCts);
 }
 
 // Turns a voltage (V) into count offset
-uint32_t v_offset_to_count_offset(CAEN&, const double& volt) noexcept {
-    return 0;
+uint32_t v_offset_to_count_offset(const CAEN& res, const double& volt) noexcept {
+    uint32_t ADCRange = std::exp2(res->ModelConstants.ADCResolution);
+    return static_cast<uint32_t>(volt / ADCRange);
 }
 
 // Calculates the number of buffers that are going to be used
@@ -954,7 +951,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
         return acq_mask == 0 ? 0: (acq_mask & 1) + n_channels_acq(acq_mask>>1);
     };
 
-    uint64_t offset = 0;
+    uint64_t file_offset = 0;
     auto append_cstr = [](auto num, uint64_t& offset, char* str) {
         char* ptr = reinterpret_cast<char*>(&num);
         for (size_t i = 0; i < sizeof(num) / sizeof(char); i++) {
@@ -993,7 +990,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     char out_str[kNumLines];
 
     // sample_rate
-    append_cstr(res->ModelConstants.AcquisitionRate, offset, &out_str[0]);
+    append_cstr(res->ModelConstants.AcquisitionRate, file_offset, &out_str[0]);
 
     // en_chs
     // for(auto gr_pair : res->GroupConfigs) {
@@ -1005,7 +1002,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     //  }
     // }
 
-    wrap_if_group(offset, &out_str[0],
+    wrap_if_group(file_offset, &out_str[0],
         [=](auto group, uint64_t& offset, char* str, uint8_t ch) {
             uint8_t channel = group.Number * ch_per_group + ch;
             append_cstr(channel, offset, str);
@@ -1019,7 +1016,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
         trg_mask |= (gr_pair.second.TriggerMask << pos);
     }
 
-    append_cstr(trg_mask, offset, &out_str[0]);
+    append_cstr(trg_mask, file_offset, &out_str[0]);
 
     // thresholds
     // for(auto gr_pair : res->GroupConfigs) {
@@ -1034,7 +1031,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     //  }
     // }
 
-    wrap_if_group(offset, &out_str[0],
+    wrap_if_group(file_offset, &out_str[0],
         [=](auto group, uint64_t& offset, char* str, uint8_t) {
             append_cstr(group.TriggerThreshold, offset, str);
         });
@@ -1047,8 +1044,8 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     //    }
     //  }
     // }
-    wrap_if_group(offset, &out_str[0],
-        [=](auto group, uint64_t& offset, char* str, uint8_t ch) {
+    wrap_if_group(file_offset, &out_str[0],
+        [=](auto group, uint64_t& offset, char* str, uint8_t) {
             append_cstr(group.DCOffset, offset, str);
         });
 
@@ -1060,7 +1057,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     //    }
     //  }
     // }
-    wrap_if_group(offset, &out_str[0],
+    wrap_if_group(file_offset, &out_str[0],
         [=](auto group, uint64_t& offset, char* str, uint8_t ch) {
             if (group.DCCorrections.size() == 8) {
                 append_cstr(group.DCCorrections[ch], offset, str);
@@ -1080,17 +1077,17 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     //  }
     // }
 
-    wrap_if_group(offset, &out_str[0],
-        [&](auto group, uint64_t& off, char* str, uint8_t ch) {
+    wrap_if_group(file_offset, &out_str[0],
+        [&](auto group, uint64_t& off, char* str, uint8_t) {
             float val = res->GetVoltageRange(group.Number);
             append_cstr(val, off, str);
         });
 
     // time_stamp
-    append_cstr(evt->Info.TriggerTimeTag, offset, &out_str[0]);
+    append_cstr(evt->Info.TriggerTimeTag, file_offset, &out_str[0]);
 
     // tgr_source
-    append_cstr(evt->Info.Pattern, offset, &out_str[0]);
+    append_cstr(evt->Info.Pattern, file_offset, &out_str[0]);
 
 
     // For CAEN data, each line is an Event which contains a 2-D array
@@ -1105,7 +1102,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
                 if (gr_pair.second.AcquisitionMask & (1<<ch)) {
                     for(uint32_t xp = 0; xp < evtdata->ChSize[gr*ch_per_group+ch]; xp++) {
                         append_cstr(evtdata->DataChannel[ch][xp],
-                            offset, &out_str[0]);
+                            file_offset, &out_str[0]);
                     }
                 }
             }
@@ -1113,7 +1110,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
             if (evtdata->ChSize[gr] > 0) {
                 for (uint32_t xp = 0; xp < evtdata->ChSize[gr]; xp++) {
                     append_cstr(evtdata->DataChannel[gr][xp],
-                        offset, &out_str[0]);
+                        file_offset, &out_str[0]);
                 }
             }
         }
