@@ -281,7 +281,7 @@ class CAENDigitizerInterface {
 
                 // Volt supply side
                 send_msg_slow(":sour:volt:rang 55");
-                send_msg_slow(":sour:volt:ilim 250e-6");
+                send_msg_slow(":sour:volt:ilim 25e-6");
                 send_msg_slow(":sour:volt "
                     + std::to_string(_doe.SiPMVoltageSysVoltage));
                 send_msg_slow(":sour:volt:stat OFF");

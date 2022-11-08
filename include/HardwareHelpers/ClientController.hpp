@@ -1,6 +1,7 @@
 #ifndef CLIENTCONTROLLER_H
 #define CLIENTCONTROLLER_H
 #include <utility>
+#include <vector>
 #pragma once
 
 /*
@@ -25,10 +26,12 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <mutex>
 #include <future>
 
 // C++ 3rd party includes
 #include <spdlog/spdlog.h>
+#include <readerwriterqueue.h>
 // my includes
 
 namespace SBCQueens {
@@ -36,6 +39,8 @@ namespace SBCQueens {
 template<typename Port, typename T>
 class ClientController {
  public:
+    using return_type = T;
+    using queue_type = moodycamel::ReaderWriterQueue<T>;
     // Initialization function type to open the port
     using ControlFuncType = std::function<bool(Port&)>;
     // Return function type to retrieve the data from the port.
@@ -45,14 +50,17 @@ class ClientController {
  private:
     Port _port;
     std::string _name;
-    ControlFuncType _initFunc;
-    ControlFuncType _closeFunc;
+    ControlFuncType _init_func;
+    ControlFuncType _close_func;
+
+    queue_type _q;
+    mutable std::mutex _port_mutex;
 
  public:
     explicit ClientController(const std::string& name) : _name(name) {}
     ClientController(const std::string& name, ControlFuncType&& init,
         ControlFuncType&& close)
-        : _name(name), _initFunc(init), _closeFunc(close) {}
+        : _name(name), _init_func(init), _close_func(close), _q() {}
 
     // Moving allowed
     ClientController(ClientController&&) = default;
@@ -65,14 +73,14 @@ class ClientController {
 
     // Sets the init and close function.
     void build(ControlFuncType&& init, ControlFuncType&& close) noexcept {
-        _initFunc = init;
-        _closeFunc = close;
+        _init_func = init;
+        _close_func = close;
     }
 
     // Builds and initializes the port
     void init(ControlFuncType&& init, ControlFuncType&& close) noexcept {
-        _initFunc = init;
-        _closeFunc = close;
+        _init_func = init;
+        _close_func = close;
 
         if (!_port) {
             bool success = _initFunc(_port);
@@ -125,24 +133,30 @@ class ClientController {
         return get(std::forward<ReturnFuncType>(g));
     }
 
-    // std::future<std::optional<T>>  get_async(ReturnFuncType&& g) noexcept {
-    //     if (_port) {
-    //         return g(_port);
-    //     } else {
-    //         bool success = _initFunc(_port);
+    void async_get() noexcept {
+        std::packaged_task<std::optional<T>(queue_type&, std::mutex&, Port&)> async_task(
+            [&](queue_type& q, std::mutex& m, Port& port) {
+                std::lock_guard<std::mutex> guard(m);
+                std::optional<T> out = get(port);
+                if (out.has_value()) {
+                    q.try_enqueue(out.value());
+            }
+        });
 
-    //         if (!success) {
-    //             spdlog::error("Failed to open port under controller name {0}",
-    //                 _name);
+        async_task(_q, _port_mutex, _port);
+    }
 
-    //             // Sometimes the logic inside init would not close the
-    //             // port, so we close it here.
-    //             _closeFunc(_port);
-    //         }
+    std::vector<T> async_get_values() noexcept {
+        auto size = _q.size_approx();
 
-    //         return {};  // returns an empty optional
-    //     }
-    // }
+        if (size == 0) {
+            return {};
+        }
+
+        std::vector<T> out(size);
+        _q.try_dequeue(out);
+        return out;
+    }
 };
 
 }  // namespace SBCQueens
