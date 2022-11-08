@@ -227,7 +227,7 @@ class CAENDigitizerInterface {
         _vbe_analysis.reset(new GainVBDEstimation());
 
         _sipm_volt_sys.build(
-            [&](serial_ptr& port) -> bool {
+            [=] (serial_ptr& port) -> bool {
                 static auto send_msg_slow = make_blocking_total_timed_event(
                     std::chrono::milliseconds(200),
                     [&](const std::string& msg){
@@ -242,10 +242,14 @@ class CAENDigitizerInterface {
                 connect_par(port, _doe.SiPMVoltageSysPort, ssp);
 
                 if (!port) {
+                    spdlog::error("Port with port name {0} was not open",
+                        _doe.SiPMVoltageSysPort);
                     return false;
                 }
 
                 if (!port->isOpen()) {
+                    spdlog::error("Port with port name {0} was not open",
+                        _doe.SiPMVoltageSysPort);
                     return false;
                 }
 
@@ -263,7 +267,7 @@ class CAENDigitizerInterface {
                 // These parameters are constant for now
                 // but later they can become a parameter or the voltage
                 // system can be optional at all
-                send_msg_slow("*rst");
+                // send_msg_slow("*rst");
                 send_msg_slow(":init:cont on");
                 send_msg_slow(":volt:dc:nplc 10");
                 send_msg_slow(":volt:dc:rang:auto 0");
@@ -276,12 +280,12 @@ class CAENDigitizerInterface {
 
                 // Keithley 6487
                 send_msg_slow("++addr 22");
-                send_msg_slow("*rst");
+                // send_msg_slow("*rst");
                 send_msg_slow(":form:elem read");
 
                 // Volt supply side
                 send_msg_slow(":sour:volt:rang 55");
-                send_msg_slow(":sour:volt:ilim 25e-6");
+                send_msg_slow(":sour:volt:ilim 250e-6");
                 send_msg_slow(":sour:volt "
                     + std::to_string(_doe.SiPMVoltageSysVoltage));
                 send_msg_slow(":sour:volt:stat OFF");
@@ -292,7 +296,7 @@ class CAENDigitizerInterface {
 
                 // Zero check
                 send_msg_slow(":syst:zch ON");
-                send_msg_slow(":curr:rang 2E-4");
+                send_msg_slow(":curr:rang 2E-6");
                 send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1000));
                 send_msg_slow(":init");
                 send_msg_slow(":syst:zcor:stat OFF");
@@ -334,8 +338,6 @@ class CAENDigitizerInterface {
     }
 
  private:
-
-
     void calculate_trigger_frequency() {
         static double last_time = get_current_time_epoch() / 1000.0;
         static uint64_t last_waveforms = 0;
@@ -521,6 +523,18 @@ class CAENDigitizerInterface {
             switch_state(CAENInterfaceStates::Disconnected);
         }
 
+        spdlog::info("Trying to open file {0}", _doe.RunDir
+            + "/" + _doe.RunName
+            + "/SIPM_VOLTAGES.txt");
+        open(_voltages_file, _doe.RunDir
+            + "/" + _doe.RunName
+            + "/SIPM_VOLTAGES.txt");
+
+        s = _voltages_file > 0;
+        if (!s) {
+            spdlog::error("Failed to open voltage file");
+        }
+
         change_state();
         return true;
     }
@@ -541,7 +555,12 @@ class CAENDigitizerInterface {
         }
 
         if (_caen_port->Data.DataSize > 0 && _caen_port->Data.NumEvents > 0) {
-            TriggeredWaveforms += _caen_port->Data.NumEvents;
+            // TriggeredWaveforms += _caen_port->Data.NumEvents;
+            // Due to the slow rate oscilloscope mode is happening, using
+            // events instead of ..->Data.NumEvents is a better number to use
+            // to approximate the actual number of waveforms acquired.
+            // Specially because the buffer is cleared.
+            TriggeredWaveforms += events;
             // spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
             // spdlog::info("Data size: {0}", Port->Data.DataSize);
             // spdlog::info("Num events: {0}", Port->Data.NumEvents);
@@ -1069,30 +1088,12 @@ class CAENDigitizerInterface {
     }
 
     void sipm_voltage_system_update() {
-
-        static bool open_file = false;
-        if(!open_file) {
-            spdlog::info("Trying to open file {0}", _doe.RunDir
-                + "/" + _doe.RunName
-                + "/SIPM_VOLTAGES.txt");
-            open(_voltages_file, _doe.RunDir
-                + "/" + _doe.RunName
-                + "/SIPM_VOLTAGES.txt");
-
-            bool s = _voltages_file > 0;
-            if (!s) {
-                spdlog::error("Failed to open voltage file");
-            }
-            open_file = true;
-        }
-
         static auto get_voltage = make_total_timed_event(
             std::chrono::seconds(1),
             [&]() {
                 _sipm_volt_sys.async_get(
-                [&](serial_ptr& port)
+                [=](serial_ptr& port)
                     -> std::optional<SiPMVoltageMeasure> {
-                    spdlog::error("Starting new measurement");
                     static auto send_msg_slow = make_blocking_total_timed_event(
                         std::chrono::milliseconds(10),
                         [&](const std::string& msg){

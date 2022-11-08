@@ -53,6 +53,7 @@ class ClientController {
     std::string _name;
     ControlFuncType _init_func;
     ControlFuncType _close_func;
+    ReturnFuncType _tmp_g;
 
     queue_type _q;
     mutable std::mutex _port_mutex;
@@ -110,6 +111,7 @@ class ClientController {
     // until required. The code returns an optional to deal in the case the
     // port was not open or an error occur.
     std::optional<T> get(ReturnFuncType&& g) noexcept {
+        std::scoped_lock guard(_port_mutex);
         if (_port) {
             return g(_port);
         } else {
@@ -137,12 +139,29 @@ class ClientController {
     }
 
     void async_get(ReturnFuncType&& g) noexcept {
+        _tmp_g = g;
         std::thread async_task(
             [&]() {
                 std::scoped_lock guard(_port_mutex);
-                std::optional<T> out = get(std::forward<ReturnFuncType>(g));
+                std::optional<T> out = {};
+
+                if (_port) {
+                    out = _tmp_g(_port);
+                } else {
+                    bool success = _init_func(_port);
+
+                    if (!success) {
+                        spdlog::error("Failed to open port under controller name {0}",
+                            _name);
+
+                        // Sometimes the logic inside init would not close the
+                        // port, so we close it here.
+                        _close_func(_port);
+                    }
+                }
+
                 if (out.has_value()) {
-                    _q.try_enqueue(out.value());
+                    _q.enqueue(out.value());
                 }
         });
 
@@ -163,7 +182,6 @@ class ClientController {
             _q.try_dequeue(out_single);
             out.push_back(out_single);
         }
-
 
         return out;
     }

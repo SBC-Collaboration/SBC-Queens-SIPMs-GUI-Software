@@ -662,7 +662,7 @@ class TeensyControllerInterface {
                 _error_temp_cf(err);
 
                 TeensyIndicatorSender(IndicatorNames::PID_TEMP_ERROR,
-                    arma::stddev(_error_temp_cf));
+                    arma::mean(_error_temp_cf));
 
                 _RTDsFile->Add(rtds);
             } catch (... ) {
