@@ -34,7 +34,7 @@ TEST_CASE("GUI_TEST") {
         return std::make_optional(static_cast<double>(*i));
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
     fake_port.async_get([](std::unique_ptr<int>& i) -> std::optional<double> {
         *i = 69;
@@ -51,7 +51,7 @@ TEST_CASE("GUI_TEST") {
         std::cout << x << std::endl;
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    std::this_thread::sleep_for(std::chrono::seconds(3));
 
     std::cout << "We waited..." << std::endl;
     output = fake_port.async_get_values();
