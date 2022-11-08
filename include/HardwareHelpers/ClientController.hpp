@@ -136,7 +136,7 @@ class ClientController {
     void async_get() noexcept {
         std::packaged_task<std::optional<T>(queue_type&, std::mutex&, Port&)> async_task(
             [&](queue_type& q, std::mutex& m, Port& port) {
-                std::lock_guard<std::mutex> guard(m);
+                std::scoped_lock guard(m);
                 std::optional<T> out = get(port);
                 if (out.has_value()) {
                     q.try_enqueue(out.value());
