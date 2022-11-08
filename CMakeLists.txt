@@ -65,30 +65,16 @@ if(IS_DIRECTORY ${CAEN_DIR})
   message("-- ${CAEN_DIR} Found!")
 
   if(LINUX)
-      ## Then Comm libs
-    link_directories(${CAEN_DIR}/CAENComm/lib/x64)
-
-    ## Then digitizers
-    link_directories(${CAEN_DIR}/CAENDigitizer/lib/x86_64)
-        target_include_directories(serial PUBLIC SYSTEM
-    $<BUILD_INTERFACE:${CAEN_DIR}>/CAENVMElib/include
-    $<BUILD_INTERFACE:${CAEN_DIR}>/CAENComm/include
-    $<BUILD_INTERFACE:${CAEN_DIR}>/CAENDigitizer/Library/include)
+    target_include_directories(serial PUBLIC SYSTEM
+    $<BUILD_INTERFACE:${CAEN_DIR}>/include)
 
     # include_directories(SYSTEM ${CAEN_DIR}/VME/include)
     add_library(CAENVME SHARED IMPORTED GLOBAL)
-    # set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB_DEBUG  ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
-    set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/CAENVMElib/lib/x64/CAENVME.so)
-    # link_directories(${CAEN_DIR}/VME/lib/x86_64)
-    #target_link_libraries(SiPMControlGUI CAENVMElib)
-      ## Then Comm libs
-    # include_directories(SYSTEM ${CAEN_DIR}/Comm/include)
+    set_target_properties(CAENVME PROPERTIES IMPORTED_LOCATION ${CAEN_DIR}/lib/libCAENVME.so)
     add_library(CAENComm SHARED IMPORTED GLOBAL)
-    set_target_properties(CAENComm PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/CAENComm/lib/x64/CAENComm.so)
-
-    # Then digitizers
+    set_target_properties(CAENComm PROPERTIES IMPORTED_LOCATION ${CAEN_DIR}/lib/libCAENComm.so)
     add_library(CAENDigitizer SHARED IMPORTED GLOBAL)
-    set_target_properties(CAENDigitizer PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/CAENDigitizer/lib/x86_64/CAENDigitizer.so)
+    set_target_properties(CAENDigitizer PROPERTIES IMPORTED_LOCATION ${CAEN_DIR}/lib/libCAENDigitizer.so)
   else()
     target_include_directories(serial PUBLIC SYSTEM
     $<BUILD_INTERFACE:${CAEN_DIR}>/VME/include
@@ -97,17 +83,9 @@ if(IS_DIRECTORY ${CAEN_DIR})
 
     # include_directories(SYSTEM ${CAEN_DIR}/VME/include)
     add_library(CAENVME SHARED IMPORTED GLOBAL)
-    # set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB_DEBUG  ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
     set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
-    # link_directories(${CAEN_DIR}/VME/lib/x86_64)
-    #target_link_libraries(SiPMControlGUI CAENVMElib)
-      ## Then Comm libs
-    # include_directories(SYSTEM ${CAEN_DIR}/Comm/include)
     add_library(CAENComm SHARED IMPORTED GLOBAL)
     set_target_properties(CAENComm PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/Comm/lib/x86_64/CAENComm.lib)
-
-    ## Then digitizers
-    # include_directories(SYSTEM ${CAEN_DIR}/Digitizers/Library/include)
     add_library(CAENDigitizer SHARED IMPORTED GLOBAL)
     set_target_properties(CAENDigitizer PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/Digitizers/Library/lib/x86_64/CAENDigitizer.lib)
   endif()
@@ -141,31 +119,30 @@ file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 # setupapi -> for serial
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
-  Armadillo
-  spdlog::spdlog
+  spdlog::spdlog_header_only
   nlohmann_json::nlohmann_json
-  Sipmanalysis::Sipmanalysis
-  imgui implot
+  imgui
+  implot
   readerwriterqueue
   concurrentqueue
   tomlplusplus
-
   serial
   glfw
   atomic
-  ${OPENMP_LIBRARIES}
   CAENVME
   CAENComm
   CAENDigitizer
+  Sipmanalysis::Sipmanalysis
 )
+
 
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>/include
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION})
 
-string(TOLOWER ${PROJECT_NAME}/version.h VERSION_HEADER_LOCATION)
+# string(TOLOWER ${PROJECT_NAME}/version.h VERSION_HEADER_LOCATION)
 
-add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+
 
 # packageProject(
 #   NAME ${PROJECT_NAME}

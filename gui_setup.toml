@@ -1,5 +1,5 @@
 [File]
-RunDir = "./RUNS"
+RunDir = "/hdd/SBC-Queens-SiPMs-Runs"
 RunName = "TESTING"
 
 [Teensy]
@@ -77,6 +77,6 @@ InitVoltage = 52.5
 
 [Other.PFEIFFERSingleGauge]
 Port = "COM7"
-Enabled = true
+Enabled = false
 # 0 = 100ms, 1 = 1s, 2 = 1min
 Rate = 1

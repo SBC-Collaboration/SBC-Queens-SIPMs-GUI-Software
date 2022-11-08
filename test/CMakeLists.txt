@@ -28,7 +28,7 @@ endif()
 
 file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp)
 add_executable(${PROJECT_NAME} ${sources})
-target_link_libraries(${PROJECT_NAME} PUBLIC doctest::doctest SBCQueensGUIHelpers::SBCQueensGUIHelpers)
+target_link_libraries(${PROJECT_NAME} PUBLIC doctest::doctest SBCQueensGUIHelpers)
 set(CMAKE_CXX_STANDARD 17)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)

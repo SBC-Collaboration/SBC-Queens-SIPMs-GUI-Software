@@ -226,8 +226,8 @@ class CAENDigitizerInterface {
         main_loop_state = standby_state;
         _vbe_analysis.reset(new GainVBDEstimation());
 
-        _sipm_volt_sys.init(
-            [=](serial_ptr& port) -> bool {
+        _sipm_volt_sys.build(
+            [&](serial_ptr& port) -> bool {
                 static auto send_msg_slow = make_blocking_total_timed_event(
                     std::chrono::milliseconds(200),
                     [&](const std::string& msg){
@@ -310,18 +310,6 @@ class CAENDigitizerInterface {
 
                 send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1100));
                 send_msg_slow(":init");
-
-                // send_msg_slow("++auto 1");
-
-                open(_voltages_file, _doe.RunDir
-                    + "/" + _doe.RunName
-                    + "/SIPM_VOLTAGES.txt");
-
-                bool s = _voltages_file > 0;
-                if (!s) {
-                    spdlog::info("Failed to open voltage file");
-                    return false;
-                }
 
                 return true;
             },
@@ -1081,12 +1069,30 @@ class CAENDigitizerInterface {
     }
 
     void sipm_voltage_system_update() {
+
+        static bool open_file = false;
+        if(!open_file) {
+            spdlog::info("Trying to open file {0}", _doe.RunDir
+                + "/" + _doe.RunName
+                + "/SIPM_VOLTAGES.txt");
+            open(_voltages_file, _doe.RunDir
+                + "/" + _doe.RunName
+                + "/SIPM_VOLTAGES.txt");
+
+            bool s = _voltages_file > 0;
+            if (!s) {
+                spdlog::error("Failed to open voltage file");
+            }
+            open_file = true;
+        }
+
         static auto get_voltage = make_total_timed_event(
             std::chrono::seconds(1),
             [&]() {
-                auto r = _sipm_volt_sys.get(
-                [=](serial_ptr& port)
+                _sipm_volt_sys.async_get(
+                [&](serial_ptr& port)
                     -> std::optional<SiPMVoltageMeasure> {
+                    spdlog::error("Starting new measurement");
                     static auto send_msg_slow = make_blocking_total_timed_event(
                         std::chrono::milliseconds(10),
                         [&](const std::string& msg){
@@ -1129,10 +1135,11 @@ class CAENDigitizerInterface {
                     return std::make_optional(out);
             });
 
-            if (r) {
-                double time = r.value().Time;
-                double volt = r.value().Volt;
-                double curr = r.value().Current;
+            auto latest_values = _sipm_volt_sys.async_get_values();
+            for(auto r : latest_values) {
+                double time = r.Time;
+                double volt = r.Volt;
+                double curr = r.Current;
 
                 volt = calculate_sipm_voltage(volt, curr);
 
@@ -1148,6 +1155,7 @@ class CAENDigitizerInterface {
                     _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
                 }
             }
+
         });
 
         static auto save_voltages = make_total_timed_event(

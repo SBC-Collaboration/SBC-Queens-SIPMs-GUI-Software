@@ -69,6 +69,7 @@ class ClientController {
     ClientController(const ClientController&) = delete;
 
     ~ClientController() {
+        std::scoped_lock guard(_port_mutex);
         _close_func(_port);
     }
 
@@ -100,6 +101,7 @@ class ClientController {
     // Forces to close.
     // The deconstructor also calls this function
     void close() noexcept {
+        std::scoped_lock guard(_port_mutex);
         _close_func(_port);
     }
 
@@ -122,7 +124,7 @@ class ClientController {
                 _close_func(_port);
             }
 
-            return {};  // returns an empty optional
+            return std::optional<T>();  // returns an empty optional
         }
     }
 
@@ -155,11 +157,11 @@ class ClientController {
         }
 
         T out_single;
-        std::vector<T> out(size);
+        std::vector<T> out;
 
-        for(std::size_t i = 0; i < size; i++) {
-
-            _q.try_dequeue(out[i]);
+        for (std::size_t i = 0; i < size; i++) {
+            _q.try_dequeue(out_single);
+            out.push_back(out_single);
         }
 
 

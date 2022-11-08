@@ -7,6 +7,7 @@ include(cmake/CPM.cmake)
 # OpenGL
 find_package(OpenGL REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(Armadillo 11.2.3 REQUIRED)
 
 # What is SYSTEM?
 # From CMAKE documentation
@@ -91,7 +92,6 @@ endif()
 
 # serial
 # https://github.com/wjwwood/serial
-# Do not add as add_subdirectory, it will not work
 CPMAddPackage(NAME serial
   GIT_TAG 1.2.1
   GITHUB_REPOSITORY wjwwood/serial
@@ -130,23 +130,10 @@ CPMAddPackage("gh:gabime/spdlog@1.8.2")
 # readerwriterqueue
 CPMAddPackage("gh:cameron314/readerwriterqueue@1.0.6")
 
-# if(IS_DIRECTORY ${RWQUEUE_DIR})
-#   include_directories(SYSTEM ${RWQUEUE_DIR})
-# else()
-#   message(FATAL_ERROR "readerwriterqueue not found.
-#     Make sure to run git submodules init first")
-# endif()
-
 # # concurrentqueue
 # # its a multi-user of the above library
 CPMAddPackage("gh:cameron314/concurrentqueue@1.0.3")
-# set (CONCURRENTQ_DIR ${DEPENDENCY_DIR}/concurrentqueue)
-# if(IS_DIRECTORY ${CONCURRENTQ_DIR})
-#   include_directories(SYSTEM ${CONCURRENTQ_DIR})
-# else()
-#   message(FATAL_ERROR "concurrentqueue not found.
-#     Make sure to run git submodules init first")
-# endif()
+
 
 CPMAddPackage(NAME tomlplusplus
   VERSION 3.2.0
@@ -157,73 +144,5 @@ if(tomlplusplus_ADDED)
   target_include_directories(tomlplusplus SYSTEM INTERFACE
     $<BUILD_INTERFACE:${tomlplusplus_SOURCE_DIR}>/)
 endif()
-# CPMAddPackage(NAME readerwriterqueue
-#   VERSION 1.0.6
-#   GITHUB_REPOSITORY cameron314/readerwriterqueue
-#   DOWNLOAD_ONLY YES)
-# if(concurrentqueue_ADDED)
-#   add_library(readerwriterqueue INTERFACE IMPORTED)
-#   target_include_directories(readerwriterqueue SYSTEM INTERFACE
-#     $<BUILD_INTERFACE:${readerwriterqueue_SOURCE_DIR}>/)
-# endif()
-# # if(IS_DIRECTORY ${RWQUEUE_DIR})
-# #   include_directories(SYSTEM ${RWQUEUE_DIR})
-# # else()
-# #   message(FATAL_ERROR "readerwriterqueue not found.
-# #     Make sure to run git submodules init first")
-# # endif()
 
-# # # concurrentqueue
-# # # its a multi-user of the above library
-# CPMAddPackage(NAME concurrentqueue
-#   VERSION 1.0.3
-#   GITHUB_REPOSITORY cameron314/concurrentqueue
-#   DOWNLOAD_ONLY YES)
-# if(concurrentqueue_ADDED)
-#   add_library(concurrentqueue INTERFACE IMPORTED)
-#   target_include_directories(concurrentqueue SYSTEM INTERFACE
-#     $<BUILD_INTERFACE:${concurrentqueue_SOURCE_DIR}>/)
-# endif()
-# # set (CONCURRENTQ_DIR ${DEPENDENCY_DIR}/concurrentqueue)
-# # if(IS_DIRECTORY ${CONCURRENTQ_DIR})
-# #   include_directories(SYSTEM ${CONCURRENTQ_DIR})
-# # else()
-# #   message(FATAL_ERROR "concurrentqueue not found.
-# #     Make sure to run git submodules init first")
-# # endif()
-
-
-# set(TOML_DIR ${DEPENDENCY_DIR}/tomlplusplus)
-# if(IS_DIRECTORY ${TOML_DIR})
-#   include_directories(SYSTEM ${TOML_DIR})
-# else()
-#   message(FATAL_ERROR "TOML++ not found.
-#     Make sure to run git submodules init first")
-# endif()
-
-# find_package(Armadillo 11.2.3 REQUIRED)
-# CPMAddPackage(
-#   NAME ensmallen
-#   GIT_TAG  2.19.0
-#   GITHUB_REPOSITORY mlpack/ensmallen
-#   DOWNLOAD_ONLY YES
-# )
-# if(ensmallen_ADDED)
-#   add_library(ensmallen INTERFACE IMPORTED)
-#   target_link_libraries(ensmallen INTERFACE Armadillo)
-#   target_include_directories(ensmallen
-#     SYSTEM INTERFACE
-#     $<INSTALL_INTERFACE:include>
-#     $<BUILD_INTERFACE:${ensmallen_SOURCE_DIR}>/include)
-# endif()
-
-# set (SIPM_DIR /home/sbc-queens-linux/tmp/)
-CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../../SiPMCharacteriazation)
-# set (SIPM_DIR ${CMAKE_SOURCE_DIR}/../SiPMCharacteriazation/tmp/)
-# if(IS_DIRECTORY ${SIPM_DIR})
-#   link_directories(${SIPM_DIR}/lib)
-#   include_directories(SYSTEM ${SIPM_DIR}/include/Sipmanalysis-0.1/)
-# else()
-#   message(FATAL_ERROR "${SIPM_DIR} not found.
-#     Make sure to run git submodules init first")
-# endif()
+CPMAddPackage(NAME Sipmanalysis SOURCE_DIR /home/sbc-queens-linux/Desktop/SiPMQharacterization++)

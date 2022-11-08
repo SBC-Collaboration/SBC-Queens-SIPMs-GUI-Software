@@ -195,6 +195,10 @@ void close(DataFile<T>& res) {
 // for all of these cases.
 template<typename T, typename FormatFunc, typename... Args>
 void save(DataFile<T>& file, FormatFunc&& f,  Args&&... args) noexcept {
+    if(!file) {
+        return;
+    }
+
     if (file->IsOpen()) {
         // GetData becomes a thread-safe operation
         // because of the concurrent queue
