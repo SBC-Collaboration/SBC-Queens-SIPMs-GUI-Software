@@ -71,5 +71,7 @@ namespace SBCQueens {
 	const float c_Z4 = 2 * c_RTD_B;
 
 	float __register_to_temperature(const uint16_t& Rt);
+	float __register_to_temperature_90(const uint16_t& Rt);
+	float __register_to_resistance(const uint16_t& Rt);
 	
 } // namespace SBCQueens

@@ -53,7 +53,7 @@ namespace SBCQueens {
     end_spi(controller.CS_PIN);
 
 
-    float temp_measurement = __register_to_temperature(latest_temp_reg);
+    float temp_measurement = __register_to_temperature_90(latest_temp_reg);
     take_reg_mux();
       controller.REGISTERS.LAST_TEMP_REG = temp_measurement;
       controller.REGISTERS.ERROR |= tmp_error;
@@ -82,7 +82,7 @@ namespace SBCQueens {
     temp = c_Z2 + (c_Z3 * Rtf);
     temp = (sqrt(temp) + c_Z1) / c_Z4;
 
-    // if (temp >= 0.0)
+    if (temp >= 0.0)
       return temp;
 
     // ugh.
@@ -103,6 +103,61 @@ namespace SBCQueens {
     temp += 1.5243e-10 * rpoly;
 
     return temp;
+  }
+
+  float __register_to_temperature_90(const uint16_t& Rt) {
+    // Obtained from
+    // https://us.flukecal.com/pt100-calculator
+    // With T = 273.16K
+    const double kRTDTRIPLEPOINT = 100.004;
+    const double Rtf = __register_to_resistance(Rt);
+    const double W = Rtf / kRTDTRIPLEPOINT;
+
+    // These constants obtained from 
+    // https://www.bipm.org/en/committees/cc/cct/guides-to-thermometry
+    // Part 5, Pg 8
+    const double D[] = {439.932854, 472.418020, 37.684494, 7.472018,
+                      2.920828, 0.005184, -0.963864, -0.188732,
+                      0.191203, 0.049025};
+
+    double x = (W - 2.64f) / 1.64f;
+    // This is the polynomial evaluation done in a more efficient way.
+    // See https://en.wikipedia.org/wiki/Horner%27s_method
+    // for more details
+    double out = D[9];
+    for(int i = 8; i >= 0; i--) {
+      out = x*out + D[i];
+    }
+
+    // This equation is valid for 0.01degC or below
+    if (out < 0.01) {
+      // These constants obtained from 
+      // https://www.bipm.org/en/committees/cc/cct/guides-to-thermometry
+      // Part 5, Pg 8
+      const double B[] = {0.183324722, 0.240975303, 0.209108711, 0.190439972,
+                        0.142648498, 0.077993465, 0.012475611, -0.032267127,
+                        -0.075291522, -0.056470670, 0.076201285, 0.123893204,
+                        -0.029201193, -0.091173542, 0.001317696, 0.026025526};
+
+      x = (pow(W, 1.0/6.0) - 0.65f) / 0.35f;
+      out = B[15];
+      for(int i = 14; i >= 0; i--) {
+        out = x*out + B[i];
+      }
+
+      return static_cast<float>(273.16*out - 273.15);
+    } else {
+      return static_cast<float>(out);
+    }
+
+    return out;
+  }
+
+	float __register_to_resistance(const uint16_t& Rt) {
+    float Rtf = static_cast<float>(Rt);
+    Rtf /= 32768.0;
+    Rtf *= c_REF_RESISTOR;
+    return Rtf;
   }
   
 } // namespace SBCQueens

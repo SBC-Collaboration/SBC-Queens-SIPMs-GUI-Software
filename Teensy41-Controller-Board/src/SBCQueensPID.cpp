@@ -97,9 +97,6 @@ namespace SBCQueens {
 				
 			case PID_STATE::TEMP_MODE:
 			{
-
-
-
 				float& latest_temp_error  = controller._last_cont_err;
 
 				float& kp = controller.REGISTERS.CONTROL_KP;

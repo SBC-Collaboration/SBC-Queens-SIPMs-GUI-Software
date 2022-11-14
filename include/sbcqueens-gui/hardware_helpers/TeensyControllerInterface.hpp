@@ -658,7 +658,7 @@ class TeensyControllerInterface {
                 }
 
                 double err = rtds.RTDS[doe.PidRTD]
-                    - static_cast<double>(doe.PIDTempValues.SetPoint);
+                    - static_cast<double>(doe.PIDTempValues.SetPoint) - 273.15;
                 _error_temp_cf(err);
 
                 TeensyIndicatorSender(IndicatorNames::PID_TEMP_ERROR,
