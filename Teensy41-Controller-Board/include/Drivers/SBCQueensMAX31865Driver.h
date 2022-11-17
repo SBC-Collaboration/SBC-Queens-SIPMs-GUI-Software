@@ -7,6 +7,7 @@ namespace SBCQueens {
 	// They might or not have relationship with internal registers
 	// Or read control bytes
 	struct MAX31865Registers_t {
+		uint16_t LAST_REG = 0u;
 		float LAST_TEMP_REG  	= 0.0;
 		uint8_t ERROR 			= 0;
 	};

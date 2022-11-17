@@ -28,7 +28,5 @@ namespace SBCQueens {
 	extern uint16_t PIDUpdateTime;
 	extern uint16_t BMESamplingTime;
 	extern uint16_t PressureTransSamplingTime;
-
-
 }
 

@@ -55,6 +55,7 @@ namespace SBCQueens {
 
     float temp_measurement = __register_to_temperature_90(latest_temp_reg);
     take_reg_mux();
+      controller.REGISTERS.LAST_REG = latest_temp_reg;
       controller.REGISTERS.LAST_TEMP_REG = temp_measurement;
       controller.REGISTERS.ERROR |= tmp_error;
     give_reg_mux();

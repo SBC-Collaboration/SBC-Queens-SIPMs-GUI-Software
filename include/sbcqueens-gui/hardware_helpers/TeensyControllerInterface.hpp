@@ -98,7 +98,9 @@ struct RTDs {
 
 struct RawRTDs {
     double time;
-    std::vector<uint16_t> RTDS;
+    std::vector<uint16_t> RTDREGS;
+    std::vector<double> Resistances;
+    std::vector<double> Temps;
 };
 
 struct PressureValues {
@@ -193,7 +195,7 @@ template<BME_TYPE T>
 double BME280_compensate_H_double(const int32_t& adc_H, const int32_t& t_fine);
 
 double __calibrate_curve(const size_t& i, const uint16_t& count);
-double __res_to_temperature(const double& res);
+double register_to_T90(const double& Rtf);
 
 // These functions are required for json to convert to our types.
 // Turns PIDs type to Json.
@@ -343,7 +345,7 @@ class TeensyControllerInterface {
 
     DataFile<Peltiers> _PeltiersFile;
     DataFile<Pressures> _PressuresFile;
-    DataFile<RTDs> _RTDsFile;
+    DataFile<RawRTDs> _RTDsFile;
     DataFile<BMEs> _BMEsFile;
 
     serial_ptr port;
@@ -631,33 +633,33 @@ class TeensyControllerInterface {
 
     void retrieve_rtds() {
         static CircularBuffer<100> _error_temp_cf;
-        retrieve_data(TeensyCommands::GetRTDs,
+        retrieve_data(TeensyCommands::GetRawRTDs,
         [&](json& parse, auto& msg) {
             try {
-                auto rtds = parse.get<RTDs>();
+                auto rtds = parse.get<RawRTDs>();
 
                 // Send them to GUI to draw them
-                for (uint16_t i = 0; i < rtds.RTDS.size(); i++) {
-                    rtds.RTDS[i] += 273.15;
-                    MultiPlotSender(i, rtds.time, rtds.RTDS[i]);
+                for (uint16_t i = 0; i < rtds.Temps.size(); i++) {
+                    const double temp = rtds.Temps[i];
+                    MultiPlotSender(i, rtds.time, temp);
 
                     switch (i) {
                         case 0:
                         TeensyIndicatorSender(IndicatorNames::LATEST_RTD1_TEMP,
-                            rtds.RTDS[i]);
+                            temp);
                         break;
                         case 1:
                         TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
-                            rtds.RTDS[i]);
+                            temp);
                         break;
                         case 2:
                         TeensyIndicatorSender(IndicatorNames::LATEST_RTD3_TEMP,
-                            rtds.RTDS[i]);
+                            temp);
                         break;
                     }
                 }
 
-                double err = rtds.RTDS[doe.PidRTD]
+                double err = rtds.Temps[doe.PidRTD]
                     - static_cast<double>(doe.PIDTempValues.SetPoint) - 273.15;
                 _error_temp_cf(err);
 

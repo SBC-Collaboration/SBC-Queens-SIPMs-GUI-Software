@@ -178,8 +178,6 @@ namespace SBCQueens {
                 f_send_vals[i*NUM_RTD_PER_BOARD + j] = RTD_BOARDS[i].LAST_TEMP_VAL[j];
             }
         }
-
-        
 #else
         float f_send_vals[NUM_RTD_BOARDS * NUM_RTD_PER_BOARD];
         for(uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
@@ -221,27 +219,31 @@ namespace SBCQueens {
 #ifdef NEW_RTD_BOARD
         uint16_t i_send_vals[NUM_RTD_BOARDS*NUM_RTD_PER_BOARD] = {0};
 
-        for(uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
-            for(uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
+        for (uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
+            for (uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
                 i_send_vals[NUM_RTD_PER_BOARD*i + j] = RTD_BOARDS[i].LAST_ADC_VAL[j];
             }
         }
-
+#else
+        uint16_t i_send_vals[NUM_RTD_BOARDS * NUM_RTD_PER_BOARD];
+        for (uint8_t i = 0; i < NUM_RTD_BOARDS; i++) {
+            for (uint8_t j = 0; j < NUM_RTD_PER_BOARD; j++) {
+                i_send_vals[i] = RTD_BOARDS[i].REGISTERS.LAST_REG;
+            }
+        }
+#endif
         Serial.print("\"RTDR\":[");
 
-        const uint16_t size_i_send_vals = NUM_RTD_BOARDS*NUM_RTD_PER_BOARD;
-        for(unsigned int i = 0; i < size_i_send_vals; i++) {
-
+        const uint16_t size_i_send_vals = sizeof(i_send_vals) / sizeof(uint16_t);
+        for (unsigned int i = 0; i < size_i_send_vals; i++) {
             Serial.print(i_send_vals[i]);
 
-            if((size_i_send_vals - 1) != i) {
+            if ((size_i_send_vals - 1) != i) {
                 Serial.print(",");
             }
-            
         }
 
         Serial.print("]");
-#endif
         Serial.println("}");
     }
 
