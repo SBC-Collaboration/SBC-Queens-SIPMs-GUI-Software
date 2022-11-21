@@ -50,7 +50,12 @@ bool SiPMControlWindow::operator()() {
 
     ImGui::Separator();
 
-    ImGui::InputInt("SiPM Cell #", &cgui_state.CellNumber);
+    // ImGui::InputInt("SiPM Cell #", &cgui_state.CellNumber);
+    CAENControlFac.InputScalar("SiPM Cell #", cgui_state.CellNumber,
+        ImGui::IsItemDeactivated, [=](CAENInterfaceData& old){
+            old.CellNumber = cgui_state.CellNumber;
+            return true;
+        });
 
     ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
     CAENControlFac.Checkbox("PS Enable", cgui_state.SiPMVoltageSysSupplyEN,

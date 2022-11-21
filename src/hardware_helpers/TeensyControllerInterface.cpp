@@ -51,6 +51,7 @@ void from_json(const json& j, RawRTDs& p) {
     const double kRESREFERENCE = 350.0;
 
     p.Resistances = std::vector<double>(p.RTDREGS.size());
+    p.Temps = std::vector<double>(p.RTDREGS.size());
     for (std::size_t i = 0; i < p.RTDREGS.size(); i++) {
         p.Resistances[i] = p.RTDREGS[i] /  32768.0;
         p.Resistances[i] *= kRESREFERENCE;
@@ -294,7 +295,7 @@ double register_to_T90(const double& Rtf) {
         out = x*out + B[i];
       }
 
-      return 273.16*out - 273.15;
+      return 273.16*out;
     } else {
       return out + 273.15;
     }

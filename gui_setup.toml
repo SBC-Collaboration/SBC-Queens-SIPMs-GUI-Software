@@ -17,7 +17,7 @@ RTDMask = 0xFFFF
 RTDNames = ["SiPM 1", "SiPM 2", "Water Block"]
 
 PIDEnable = false
-PeltierTempSetpoint = -15
+PeltierTempSetpoint = -20
 
 PeltierTKp = -500
 PeltierTTi = 1000000.0
@@ -73,7 +73,7 @@ Threshold = 7800
 [Other]
 [Other.SiPMVoltageSystem]
 Port = "/dev/ttyUSB0"
-InitVoltage = 52.5
+InitVoltage = 52.0
 
 [Other.PFEIFFERSingleGauge]
 Port = "COM7"

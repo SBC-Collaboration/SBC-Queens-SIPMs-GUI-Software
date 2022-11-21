@@ -1,19 +1,19 @@
-# Example usage:
-#  mkdir build
-#  cd build
-#  cmake ../ -G "MinGW Makefiles" -DUSE_VULKAN=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
-#  cmake ../ -G "MinGW Makefiles" -DUSE_VULKAN=ON -DCAEN_DIR="X:\\Program Files\\CAEN" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
+#
+# See sipm_control_gui.sublime-project to see examples on how to compile it.
+#
+
 cmake_minimum_required(VERSION 3.11)
 
 include(cmake/CPM.cmake)
 
 project(SBCQueensGUIHelpers
-  VERSION 0.1.0
+  VERSION 0.2.0
   LANGUAGES C CXX)
 
 if(UNIX AND NOT APPLE)
   set(LINUX TRUE)
 endif()
+
 #
 # Setup alternative names
 #
@@ -119,7 +119,6 @@ file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 # setupapi -> for serial
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
-  spdlog::spdlog_header_only
   nlohmann_json::nlohmann_json
   imgui
   implot
@@ -133,6 +132,7 @@ target_link_libraries(${PROJECT_NAME}
   CAENComm
   CAENDigitizer
   Sipmanalysis::Sipmanalysis
+  spdlog::spdlog
 )
 
 

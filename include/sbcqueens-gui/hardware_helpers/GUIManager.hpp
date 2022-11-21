@@ -361,7 +361,7 @@ class GUIManager {
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Keithley")) {
+            if (ImGui::BeginTabItem("I-V")) {
                 static ImPlotScale curr_scale_axis = ImPlotScale_Linear;
                 ImGui::CheckboxFlags("Current Log Axis",
                     &curr_scale_axis, ImPlotScale_Log10);
@@ -374,7 +374,7 @@ class GUIManager {
                         g_axis_flags);
                     ImPlot::SetupAxis(ImAxis_Y2, "Current [uA]",
                             g_axis_flags | ImPlotAxisFlags_Opposite);
-                    ImPlot::SetupAxisScale(ImAxis_Y2, rtd_scale_axis);
+                    ImPlot::SetupAxisScale(ImAxis_Y2, curr_scale_axis);
 
                     GeneralIndicatorReceiver.plot(IndicatorNames::DMM_VOLTAGE,
                         "Voltage");
@@ -387,8 +387,6 @@ class GUIManager {
                 }
                 ImGui::EndTabItem();
             }
-
-
 
             if (ImGui::BeginTabItem("Gain")) {
                 if (ImGui::Button("Clear")) {

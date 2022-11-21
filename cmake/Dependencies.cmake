@@ -122,17 +122,28 @@ endif()
 # https://github.com/nlohmann/json
 CPMAddPackage("gh:nlohmann/json@3.10.5")
 
-
 # spdlog
 # https://github.com/gabime/spdlog
-CPMAddPackage("gh:gabime/spdlog@1.8.2")
+CPMAddPackage(NAME spdlog
+  GITHUB_REPOSITORY gabime/spdlog
+  VERSION 1.8.2)
 
 # readerwriterqueue
 CPMAddPackage("gh:cameron314/readerwriterqueue@1.0.6")
 
-# # concurrentqueue
-# # its a multi-user of the above library
-CPMAddPackage("gh:cameron314/concurrentqueue@1.0.3")
+# concurrentqueue
+# its a multi-user of the above library
+# We use the download_only option here because the library has some warnings
+# which drown this project warnings
+CPMAddPackage(NAME concurrentqueue
+  GITHUB_REPOSITORY cameron314/concurrentqueue
+  VERSION 1.0.3
+  DOWNLOAD_ONLY YES)
+if(concurrentqueue_ADDED)
+  add_library(concurrentqueue INTERFACE IMPORTED)
+  target_include_directories(concurrentqueue SYSTEM INTERFACE
+    $<BUILD_INTERFACE:${concurrentqueue_SOURCE_DIR}>/)
+endif()
 
 
 CPMAddPackage(NAME tomlplusplus

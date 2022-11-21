@@ -204,7 +204,6 @@ namespace SBCQueens {
             if ((size_f_send_vals - 1) != i) {
                 Serial.print(",");
             }
-            
         }
 
         Serial.print("]");

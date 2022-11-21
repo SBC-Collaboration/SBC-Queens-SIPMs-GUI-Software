@@ -90,13 +90,6 @@ bool IndicatorWindow::operator()() {
 
     ImGui::Separator();
     ImGui::Text("SiPM Statistics");
-    _indicator_receiver.indicator(IndicatorNames::WAVEFORM_NOISE,
-        "STD noise", 200, 4);
-    ImGui::SameLine(300); ImGui::Text("[counts]");
-
-    _indicator_receiver.indicator(IndicatorNames::WAVEFORM_BASELINE,
-        "Baseline", 200, 4);
-    ImGui::SameLine(300); ImGui::Text("[counts]");
 
     _indicator_receiver.indicator(IndicatorNames::SPE_GAIN_MEAN,
         "1SPE Gain Mean", 200, 4);
@@ -123,7 +116,7 @@ bool IndicatorWindow::operator()() {
     ImGui::SameLine(300); ImGui::Text("[arb.]");
 
     _indicator_receiver.indicator(IndicatorNames::BREAKDOWN_VOLTAGE,
-        "VBD", 200, 3);
+        "VBD", 200, 5);
     ImGui::SameLine(300); ImGui::Text("[V]");
 
     _indicator_receiver.indicator(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,

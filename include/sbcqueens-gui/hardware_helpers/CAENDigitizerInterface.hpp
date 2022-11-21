@@ -18,6 +18,7 @@
 #include <chrono>
 #include <random>
 #include <iostream>
+#include <algorithm>
 
 // C++ 3rd party includes
 #include <armadillo>
@@ -141,6 +142,7 @@ class CAENDigitizerInterface {
     uint64_t TriggeredWaveforms = 0;
 
     // tmp stuff
+    double _reset_timer = 20000;
     uint16_t* _data;
     size_t _length;
     std::vector<double> _x_values, _y_values;
@@ -296,7 +298,7 @@ class CAENDigitizerInterface {
 
                 // Zero check
                 send_msg_slow(":syst:zch ON");
-                send_msg_slow(":curr:rang 2E-6");
+                send_msg_slow(":curr:rang 2E-7");
                 send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1000));
                 send_msg_slow(":init");
                 send_msg_slow(":syst:zcor:stat OFF");
@@ -618,15 +620,15 @@ class CAENDigitizerInterface {
         static bool init_done = false;
         // This is to allow some time between voltage changes so it settles
         // before a measurement is done.
-        static double reset_timer = 0;
-        if (reset_timer > 0) {
-            reset_timer -= get_current_time_epoch();
+
+        if (_reset_timer > 0) {
+            _reset_timer -= get_current_time_epoch();
         }
 
         switch (_doe.VBDData.State) {
             case VBRState::Init:
             {
-                if (!init_done && reset_timer <= 0.0) {
+                if (!init_done && _reset_timer <= 0.0) {
                     // Memory allocations and prepare the resources for whenever
                     // the user presses the next button, and prepares the file
 
@@ -696,24 +698,26 @@ class CAENDigitizerInterface {
                     spdlog::info("Expected analysis t0: {0}",
                         prepulse_end_region_u);
 
-                    // We limit the analysis to a max of 1000 sp to speed up
+                    // We limit the analysis to a window of 400sp to speed up
                     // the calculations
-                    arma::uword end_time = _doe.GlobalConfig.RecordLength > 1000
-                        ? 1000 : _doe.GlobalConfig.RecordLength;
+                    arma::uword window =
+                        _doe.GlobalConfig.RecordLength - prepulse_end_region_u;
+
+                    window = std::clamp(window, window, 400ull);
 
                     // We also log the tf to keep a record of it
                     _saveinfo_file->Add(SaveFileInfo(t,
-                        "tf : "
-                        + std::to_string(end_time)));
+                        "window : "
+                        + std::to_string(window)));
 
-                    spdlog::info("Analysis tf: {0}",
-                        end_time);
+                    spdlog::info("Analysis window: {0}",
+                        window);
 
                     // We create the analysis object with all the info, but
                     // this does not do the analysis!
                     _spe_analysis.reset(new SPEAnalysis<SimplifiedSiPMFunction>(
                         prepulse_end_region_u,
-                        end_time, _coords));
+                        window, _coords));
 
                     acq_pulses = 0;
                     init_done = true;
@@ -790,18 +794,13 @@ class CAENDigitizerInterface {
                         spdlog::info("Finished taking data! Moving to analysis.");
                         // This is the line of code that runs the analysis!
                         auto pars = _spe_analysis->FullAnalysis(
-                            spe_estimation_pulse_buffer, 0.999);
+                            spe_estimation_pulse_buffer,
+                            _doe.GroupConfigs[0].TriggerThreshold, 1.0);
 
                         spdlog::info("Finished analysis.");
 
                         _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
                             pars.SPEParameters(1));
-
-                        _indicator_sender(IndicatorNames::WAVEFORM_NOISE,
-                            pars.BaselineParameters.NoiseSTD);
-
-                        _indicator_sender(IndicatorNames::WAVEFORM_BASELINE,
-                            pars.BaselineParameters.Baseline);
 
                         _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
                             pars.SPEEfficiency);
@@ -861,6 +860,7 @@ class CAENDigitizerInterface {
             case VBRState::CalculateBreakdownVoltage:
             {
                 if (_vbe_analysis->size() >= 3) {
+                    double t = get_current_time_epoch() / 1000.0;
                     auto values = _vbe_analysis->calculate();
 
                     if (values.BreakdownVoltageError != 0.0) {
@@ -869,6 +869,22 @@ class CAENDigitizerInterface {
                         _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
                             values.BreakdownVoltageError);
                         _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
+
+                        _saveinfo_file->Add(
+                                    SaveFileInfo(t, "breakdown_voltage : " +
+                                std::to_string(values.BreakdownVoltage)));
+
+                        _saveinfo_file->Add(
+                                    SaveFileInfo(t, "breakdown_voltage_std : " +
+                                std::to_string(values.BreakdownVoltageError)));
+
+                        _saveinfo_file->Add(
+                                    SaveFileInfo(t, "dgain_dV : " +
+                                std::to_string(values.Rate)));
+
+                        _saveinfo_file->Add(
+                                    SaveFileInfo(t, "dgain_dV_std : " +
+                                std::to_string(values.RateError)));
                     }
                 }
 
@@ -885,7 +901,6 @@ class CAENDigitizerInterface {
                 acq_pulses = 0;
                 _doe.VBDData.State = VBRState::Idle;
                 _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, false);
-                reset_timer = 20000.0; // ms
             break;
             case VBRState::Idle:
             default:
@@ -999,6 +1014,7 @@ class CAENDigitizerInterface {
                 sbc_init_file,
                 _caen_port);
 
+            // Save when the file was opened
             double t = get_current_time_epoch() / 1000.0;
             _saveinfo_file->Add(SaveFileInfo(t, file_name));
 
@@ -1015,12 +1031,15 @@ class CAENDigitizerInterface {
         if (SavedWaveforms >= _doe.VBDData.DataPulses) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
+            // Closing remarks
             double t = get_current_time_epoch() / 1000.0;
             _saveinfo_file->Add(SaveFileInfo(t, file_name));
 
             async_save(_saveinfo_file, [](const SaveFileInfo& val){
                 return std::to_string(val.Time) + "," + val.FileName + "\n";
             });
+
+            isFileOpen = false;
         }
 
         if (change_state()) {
@@ -1182,7 +1201,7 @@ class CAENDigitizerInterface {
                 save_voltages();
 
                 if (_doe.SiPMVoltageSysChange) {
-                    _sipm_volt_sys.get([=](serial_ptr& port)
+                    _sipm_volt_sys.get([&](serial_ptr& port)
                     -> std::optional<SiPMVoltageMeasure> {
                         send_msg(port, "++addr 22\n", "");
 
@@ -1200,6 +1219,10 @@ class CAENDigitizerInterface {
 
                         spdlog::info("Changing output voltage to {0}",
                             _doe.SiPMVoltageSysVoltage);
+
+                        // Setting a delay when other functionalities can start
+                        // working as normal
+                        _reset_timer = 20000.0; // ms
 
                         return {};
                     });

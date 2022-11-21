@@ -731,7 +731,7 @@ class TeensyControllerInterface {
         // We do not need this function to be out of this scope
         // and make it static to call it once
         static auto retrieve_pids_nb = make_total_timed_event(
-            std::chrono::milliseconds(500),
+            std::chrono::milliseconds(1000),
             // Lambda hacking to allow the class function to be pass to
             // make_total_timed_event. Is there any other way?
             [&]() {
@@ -739,7 +739,7 @@ class TeensyControllerInterface {
         });
 
         static auto retrieve_rtds_nb = make_total_timed_event(
-            std::chrono::milliseconds(100),
+            std::chrono::milliseconds(1000),
             // Lambda hacking to allow the class function to be pass to
             // make_total_timed_event. Is there any other way?
             [&]() {
@@ -747,7 +747,7 @@ class TeensyControllerInterface {
         });
 
         static auto retrieve_pres_nb = make_total_timed_event(
-            std::chrono::milliseconds(500),
+            std::chrono::milliseconds(1000),
             // Lambda hacking to allow the class function to be pass to
             // make_total_timed_event. Is there any other way?
             [&]() {
@@ -773,19 +773,20 @@ class TeensyControllerInterface {
                 spdlog::info("Saving teensy data...");
 
                 async_save(_RTDsFile,
-                    [](const RTDs& rtds) {
-                        std::string out = "";
-                        for (const auto& rtd : rtds.RTDS) {
-                            out += std::to_string(rtd);
+                    [](const RawRTDs& rtds) {
+                        std::ostringstream out;
+                        for (std::size_t i = 0; i < rtds.RTDREGS.size(); i++) {
+                            out << rtds.Resistances[i] << ","
+                                << rtds.Temps[i];
 
-                            if (&rtd == &rtds.RTDS.back()) {
-                                out += '\n';
+                            if (i == rtds.RTDREGS.size() - 1) {
+                                out << '\n';
                             } else {
-                                out += ',';
+                                out << ',';
                             }
                         }
 
-                        return  std::to_string(rtds.time) + "," + out;
+                        return  std::to_string(rtds.time) + "," + out.str();
                 });
 
                 if (!doe.SystemParameters.InRTDOnlyMode){
