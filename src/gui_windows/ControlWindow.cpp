@@ -22,15 +22,17 @@ void ControlWindow::init(const toml::table& tb) {
     auto file_conf = _config_table["File"];
 
     // These two guys are shared between CAEN and Teensy
-    i_run_dir   = _config_table["File"]["RunDir"].value_or("./RUNS");
-    i_run_name  = _config_table["File"]["RunName"].value_or("Testing");
+    i_run_dir  = file_conf["RunDir"].value_or("./RUNS");
+    cgui_state.VBDData.DataPulses
+        = file_conf["RunWaveforms"].value_or(1000000ull);
+    cgui_state.VBDData.SPEEstimationTotalPulses
+        = file_conf["GainWaveforms"].value_or(10000ull);
 
     /// Teensy config
     // Teensy initial state
     tgui_state.CurrentState = TeensyControllerStates::Standby;
     tgui_state.Port         = t_conf["Port"].value_or("COM3");
     tgui_state.RunDir       = i_run_dir;
-    tgui_state.RunName      = i_run_name;
 
     /// Teensy RTD config
     tgui_state.RTDSamplingPeriod
@@ -57,8 +59,6 @@ void ControlWindow::init(const toml::table& tb) {
     // CAEN initial state
     cgui_state.CurrentState = CAENInterfaceStates::Standby;
     cgui_state.RunDir = i_run_dir;
-    cgui_state.RunName = i_run_name;
-    cgui_state.SiPMParameters = file_conf["SiPMParameters"].value_or("default");
 
     /// CAEN model configs
     std::unordered_map<std::string, CAENConnectionType> connection_type_map =
@@ -131,7 +131,6 @@ void ControlWindow::init(const toml::table& tb) {
 
     /// Other config
     other_state.RunDir = i_run_dir;
-    other_state.RunName = i_run_name;
 
     /// Other PFEIFFERSingleGauge
     other_state.PFEIFFERPort
@@ -153,22 +152,6 @@ bool ControlWindow::operator()() {
                 ImGui::SetTooltip("Directory of where all the run "
                     "files are going to be saved at.\n"
                     "Fixed when the connect buttons are pressed.");
-            }
-
-            ImGui::InputText("Run name", &i_run_name);
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Name of the run.\n"
-                    "Fixed when the connect buttons are pressed.");
-            }
-
-            ImGui::InputText("SiPM run name", &cgui_state.SiPMParameters);
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("This will appended to the name "
-                    "of the SiPM pulse file to denote that the these "
-                    "SiPM pulses where taken during this run but "
-                    "with different parameters (OV for example).\n"
-                    "Fixed when the Start SiPM data taking buttons "
-                    "is pressed.");
             }
 
             ImGui::Separator();
@@ -204,7 +187,6 @@ bool ControlWindow::operator()() {
                     // We copy the local state.
                     oldState = tgui_state;
                     oldState.RunDir = i_run_dir;
-                    oldState.RunName = i_run_name;
                     // Except for the fact we are changing the state
                     oldState.CurrentState
                         = TeensyControllerStates::AttemptConnection;
@@ -281,8 +263,8 @@ bool ControlWindow::operator()() {
             if (CAENControlFac.Button("Connect##caen",
                 [=](CAENInterfaceData& state) {
                     state = cgui_state;
+                    state.VBDData = cgui_state.VBDData;
                     state.RunDir = i_run_dir;
-                    state.RunName = i_run_name;
                     state.GlobalConfig = cgui_state.GlobalConfig;
                     state.GroupConfigs = cgui_state.GroupConfigs;
                     state.CurrentState =
@@ -345,7 +327,6 @@ bool ControlWindow::operator()() {
                 [=](SlowDAQData& state) {
                     state = other_state;
                     state.RunDir = i_run_dir;
-                    state.RunName = i_run_name;
 
                     // Pfeiffer
                     state.PFEIFFERPort = other_port;

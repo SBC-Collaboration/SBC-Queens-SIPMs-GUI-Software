@@ -31,7 +31,7 @@ bool SiPMControlWindow::operator()() {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
         ImVec4(204.f / 255.f, 170.f / 255.f, 0.0f, 1.0f));
     CAENControlFac.Button("Reset CAEN", [&](CAENInterfaceData& old){
-        if(old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
+        if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
             old.CurrentState == CAENInterfaceStates::RunMode ||
             old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
             // Setting it to AttemptConnection will force it to reset
@@ -44,18 +44,35 @@ bool SiPMControlWindow::operator()() {
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-            "Resets the CAEN digitizer with new"
+            "Resets the CAEN digitizer with new "
             "values found in the control tabs.");
     }
 
     ImGui::Separator();
+    ImGui::PushItemWidth(120);
 
     // ImGui::InputInt("SiPM Cell #", &cgui_state.CellNumber);
-    CAENControlFac.InputScalar("SiPM Cell #", cgui_state.CellNumber,
+    CAENControlFac.InputScalar("SiPM ID", cgui_state.SiPMID,
+        ImGui::IsItemDeactivated, [=](CAENInterfaceData& old){
+            old.SiPMID = cgui_state.SiPMID;
+            return true;
+    });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("This is the SiPM ID as specified.");
+    }
+
+    CAENControlFac.InputScalar("SiPM Cell", cgui_state.CellNumber,
         ImGui::IsItemDeactivated, [=](CAENInterfaceData& old){
             old.CellNumber = cgui_state.CellNumber;
             return true;
-        });
+    });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("This is the SiPM cell being tested. "
+            "Be mindful that the number on the feedthrough corresponds to "
+            "different SiPMs and their cells.");
+    }
+
+    ImGui::Separator();
 
     ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
     CAENControlFac.Checkbox("PS Enable", cgui_state.SiPMVoltageSysSupplyEN,
@@ -64,9 +81,10 @@ bool SiPMControlWindow::operator()() {
             old.SiPMVoltageSysChange = true;
             return true;
         });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Enables or disabled the SiPM power supply.");
+    }
     ImGui::PopStyleColor(1);
-
-    ImGui::SameLine();
 
     CAENControlFac.InputFloat("SiPM Voltage", cgui_state.SiPMVoltageSysVoltage,
         0.01f, 60.00f, "%2.2f V",
@@ -146,8 +164,9 @@ bool SiPMControlWindow::operator()() {
             return true;
     });
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Given enough data points in the G vs V plot "
-            "the user can calculate the gain by pressing this button.");
+        ImGui::SetTooltip("Given enough data points (3 or more) "
+            "in the G vs V plot the user can calculate the gain by pressing "
+            "this button.");
     }
 
     ImGui::SameLine();
@@ -170,7 +189,8 @@ bool SiPMControlWindow::operator()() {
     });
     ImGui::PopStyleColor(2);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Resets the data taken.");
+        ImGui::SetTooltip("Resets the internal buffer for the breakdown buffer "
+            "calculations");
     }
 
     //  end VBD mode controls
@@ -184,10 +204,13 @@ bool SiPMControlWindow::operator()() {
         if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
             old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
             old.CurrentState = CAENInterfaceStates::RunMode;
-            old.SiPMParameters = cgui_state.SiPMParameters;
         }
         return true;
     });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Starts a data taking routine which ends until "
+            "the indicator 'Done data taking?' turns green.");
+    }
 
     // CAENControlFac.Button(
     //     "Stop SiPM Data Taking",

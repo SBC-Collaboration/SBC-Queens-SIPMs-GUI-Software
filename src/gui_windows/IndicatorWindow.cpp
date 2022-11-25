@@ -21,6 +21,13 @@ bool IndicatorWindow::operator()() {
     _indicator_receiver.indicator(
         IndicatorNames::SAVED_WAVEFORMS, "Saved SiPM Pulses", 200);
     ImGui::SameLine(300); ImGui::Text("[waveforms]");
+
+    bool tmp;
+    _indicator_receiver.booleanIndicator(
+        IndicatorNames::DONE_DATA_TAKING, "Done data taking?",
+        tmp, [=](const double& newVal) -> bool {
+            return newVal > 0;
+        }, 200);
     //
     ImGui::Separator();
     // Teensy

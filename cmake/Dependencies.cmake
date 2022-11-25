@@ -145,7 +145,6 @@ if(concurrentqueue_ADDED)
     $<BUILD_INTERFACE:${concurrentqueue_SOURCE_DIR}>/)
 endif()
 
-
 CPMAddPackage(NAME tomlplusplus
   VERSION 3.2.0
   GITHUB_REPOSITORY marzer/tomlplusplus
@@ -156,4 +155,16 @@ if(tomlplusplus_ADDED)
     $<BUILD_INTERFACE:${tomlplusplus_SOURCE_DIR}>/)
 endif()
 
-CPMAddPackage(NAME Sipmanalysis SOURCE_DIR /home/sbc-queens-linux/Desktop/SiPMQharacterization++)
+CPMAddPackage(NAME date
+  VERSION 3.0.1
+  GITHUB_REPOSITORY HowardHinnant/date
+  DOWNLOAD_ONLY YES)
+if(date_ADDED)
+  add_library(date INTERFACE IMPORTED)
+  target_include_directories(date SYSTEM INTERFACE
+    $<BUILD_INTERFACE:${date_SOURCE_DIR}>/include)
+endif()
+
+# CPMAddPackage(NAME Sipmanalysis SOURCE_DIR /home/sbc-queens-linux/Desktop/SiPMQharacterization++)
+
+CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacteriazation)

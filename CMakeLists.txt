@@ -119,6 +119,7 @@ file(COPY ${GUI_CONFIG_FILE} DESTINATION ${PROJECT_BINARY_DIR})
 # setupapi -> for serial
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
+  date
   nlohmann_json::nlohmann_json
   imgui
   implot

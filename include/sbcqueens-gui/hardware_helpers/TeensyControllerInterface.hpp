@@ -35,11 +35,13 @@
 #include <optional>
 #include <future>
 #include <map>
+#include <filesystem>
 
 // We need this because chrono has long names...
 namespace chrono = std::chrono;
 
 // C++ 3rd party includes
+#include <date/date.h>
 #include <armadillo>
 #include <readerwriterqueue.h>
 #include <spdlog/spdlog.h>
@@ -296,7 +298,6 @@ const std::unordered_map<TeensyCommands, std::string> cTeensyCommands = {
 // So far, I do not like teensy_serial is here.
 struct TeensyControllerData {
     std::string RunDir      = "";
-    std::string RunName     = "";
 
     std::string Port        = "COM4";
 
@@ -337,24 +338,25 @@ class TeensyControllerInterface {
     std::tuple<Queues&...> _queues;
     std::map<std::string, std::string> _crc_cmds;
 
-    TeensyControllerData doe;
-    IndicatorSender<IndicatorNames> TeensyIndicatorSender;
-    IndicatorSender<uint16_t> MultiPlotSender;
+    TeensyControllerData _doe;
+    IndicatorSender<IndicatorNames> _indicator_sender;
+    IndicatorSender<uint16_t> _plot_sender;
 
     double _init_time;
 
-    DataFile<Peltiers> _PeltiersFile;
-    DataFile<Pressures> _PressuresFile;
-    DataFile<RawRTDs> _RTDsFile;
-    DataFile<BMEs> _BMEsFile;
+    std::string _run_name     = "";
+    DataFile<Peltiers> _peltiers_file;
+    DataFile<Pressures> _pressures_file;
+    DataFile<RawRTDs> _RTDs_file;
+    DataFile<BMEs> _BMEs_file;
 
-    serial_ptr port;
+    serial_ptr _port;
 
  public:
     explicit TeensyControllerInterface(Queues&... queues)
         : _queues(std::forward_as_tuple(queues...)),
-        TeensyIndicatorSender(std::get<GeneralIndicatorQueue&>(_queues)),
-        MultiPlotSender(std::get<MultiplePlotQueue&>(_queues)) { }
+        _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
+        _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
 
     // No copying
     TeensyControllerInterface(const TeensyControllerInterface&) = delete;
@@ -388,7 +390,6 @@ class TeensyControllerInterface {
             }
         };
 
-
         // Main loop lambda
         auto main_loop = [&]() -> bool {
             TeensyQueueType task = guiQueueFunc();
@@ -398,17 +399,17 @@ class TeensyControllerInterface {
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (!task(doe)) {
+            if (!task(_doe)) {
                 spdlog::warn("Something went wrong with a command!");
             }
             // End Communication with the GUI
 
             // This will send a command only if its not none
-            send_teensy_cmd(doe.CommandToSend);
-            doe.CommandToSend = TeensyCommands::None;
+            send_teensy_cmd(_doe.CommandToSend);
+            _doe.CommandToSend = TeensyCommands::None;
 
             // This will turn into an SML soon*
-            switch (doe.CurrentState) {
+            switch (_doe.CurrentState) {
                 case TeensyControllerStates::Standby:
                 // do nothing
                 // only way to get out of this state is by the GUI
@@ -419,12 +420,12 @@ class TeensyControllerInterface {
 
                 case TeensyControllerStates::Disconnected:
                     spdlog::warn("Manually losing connection to "
-                        "Teensy with port {}", doe.Port);
+                        "Teensy with port {}", _doe.Port);
 
-                    disconnect(port);
+                    disconnect(_port);
 
                     // Move to standby
-                    doe.CurrentState
+                    _doe.CurrentState
                         = TeensyControllerStates::Standby;
                     break;
 
@@ -435,64 +436,74 @@ class TeensyControllerInterface {
 
                 case TeensyControllerStates::AttemptConnection:
 
-                    connect_bt(port, doe.Port);
+                    connect_bt(_port, _doe.Port);
 
-                    if (port) {
-                        if (port->isOpen()) {
+                    if (_port) {
+                        if (_port->isOpen()) {
                             // t0 = time when the communication was 100%
                             _init_time = get_current_time_epoch();
 
                             // Open files to start saving!
-                            open(_PressuresFile,
-                                doe.RunDir
-                                + "/" + doe.RunName
+                            open(_pressures_file,
+                                _doe.RunDir
+                                + "/" + _run_name
                                 + "/Pressures.txt");
-                            bool s = (_PressuresFile != nullptr);
+                            bool s = (_pressures_file != nullptr);
 
-                            open(_RTDsFile,
-                                doe.RunDir
-                                + "/" + doe.RunName
+                            open(_RTDs_file,
+                                _doe.RunDir
+                                + "/" + _run_name
                                 + "/RTDs.txt");
-                            s = (_RTDsFile != nullptr) && s;
+                            s = (_RTDs_file != nullptr) && s;
 
-                            open(_PeltiersFile,
-                                doe.RunDir
-                                + "/" + doe.RunName
+                            open(_peltiers_file,
+                                _doe.RunDir
+                                + "/" + _run_name
                                 + "/Peltiers.txt");
-                            s = (_PeltiersFile != nullptr)  && s;
+                            s = (_peltiers_file != nullptr)  && s;
 
-                            open(_BMEsFile,
-                                doe.RunDir
-                                + "/" + doe.RunName
+                            open(_BMEs_file,
+                                _doe.RunDir
+                                + "/" + _run_name
                                 + "/BMEs.txt");
-                            s = (_BMEsFile != nullptr)  && s;
+                            s = (_BMEs_file != nullptr)  && s;
 
 
                             if (!s) {
                                 spdlog::error("Failed to open files.");
-                                doe.CurrentState =
+                                _doe.CurrentState =
                                     TeensyControllerStates::Standby;
                             } else {
                                 spdlog::info(
                                     "Connected to Teensy with port {}",
-                                doe.Port);
+                                _doe.Port);
 
                                 send_initial_config();
 
-                                doe.CurrentState =
+                                std::ostringstream out;
+                                auto today = date::year_month_day{
+                                    date::floor<date::days>(
+                                        std::chrono::system_clock::now())};
+                                out << today;
+                                _run_name = out.str();
+
+                                std::filesystem::create_directory(_doe.RunDir
+                                    + "/" + _run_name);
+
+                                _doe.CurrentState =
                                     TeensyControllerStates::Connected;
                             }
 
                         } else {
                             spdlog::error("Failed to connect to port {}",
-                                doe.Port);
+                                _doe.Port);
 
-                            doe.CurrentState
+                            _doe.CurrentState
                                 = TeensyControllerStates::Standby;
                         }
                     } else {
                         // No need for a message
-                        doe.CurrentState
+                        _doe.CurrentState
                             = TeensyControllerStates::Standby;
                     }
 
@@ -500,13 +511,13 @@ class TeensyControllerInterface {
 
                 case TeensyControllerStates::Closing:
                     spdlog::info("Going to close the Teensy thread.");
-                    disconnect(port);
+                    disconnect(_port);
                     return false;
 
                 case TeensyControllerStates::NullState:
                 default:
                     // do nothing other than set to standby state
-                    doe.CurrentState
+                    _doe.CurrentState
                         = TeensyControllerStates::Standby;
             }
 
@@ -531,16 +542,16 @@ class TeensyControllerInterface {
         if (!send_teensy_cmd(cmd)) {
             spdlog::warn("Failed to send {0} to Teensy.",
                 cTeensyCommands.at(cmd));
-            flush(port);
+            flush(_port);
             return;
         }
 
-        auto msg_opt = retrieve_msg<std::string>(port);
+        auto msg_opt = retrieve_msg<std::string>(_port);
 
         if (!msg_opt.has_value()) {
             spdlog::warn("Failed to retrieve data from {0} command.",
                 cTeensyCommands.at(cmd));
-            flush(port);
+            flush(_port);
             return;
         }
 
@@ -550,7 +561,7 @@ class TeensyControllerInterface {
             spdlog::warn("Invalid json string. "
                         "Message received from Teensy: {0}",
                         msg_opt.value());
-            flush(port);
+            flush(_port);
             return;
         }
 
@@ -573,38 +584,38 @@ class TeensyControllerInterface {
         send_ts_cmd_b(TeensyCommands::SetPPIDTempTd);
         send_ts_cmd_b(TeensyCommands::SetPPIDTempTi);
 
-        flush(port);
+        flush(_port);
 
         retrieve_data(TeensyCommands::GetSystemParameters,
         [&](json& parse, auto& msg) {
             try {
                 auto system_pars = parse.get<TeensySystemPars>();
 
-                doe.SystemParameters = system_pars;
+                _doe.SystemParameters = system_pars;
 
                 spdlog::info("{0}, {1}, {2}", system_pars.NumRtdBoards,
                     system_pars.NumRtdsPerBoard, system_pars.InRTDOnlyMode);
 
-                TeensyIndicatorSender(IndicatorNames::NUM_RTD_BOARDS,
-                    doe.SystemParameters.NumRtdBoards);
+                _indicator_sender(IndicatorNames::NUM_RTD_BOARDS,
+                    _doe.SystemParameters.NumRtdBoards);
 
-                TeensyIndicatorSender(IndicatorNames::NUM_RTDS_PER_BOARD,
-                    doe.SystemParameters.NumRtdsPerBoard);
+                _indicator_sender(IndicatorNames::NUM_RTDS_PER_BOARD,
+                    _doe.SystemParameters.NumRtdsPerBoard);
 
-                TeensyIndicatorSender(IndicatorNames::IS_RTD_ONLY,
-                    doe.SystemParameters.InRTDOnlyMode);
+                _indicator_sender(IndicatorNames::IS_RTD_ONLY,
+                    _doe.SystemParameters.InRTDOnlyMode);
             } catch (... ) {
                 spdlog::warn("Failed to parse system data from {0}. "
                     "Message received from Teensy: {1}",
                     cTeensyCommands.at(TeensyCommands::GetSystemParameters),
                     msg.value());
-                flush(port);
+                flush(_port);
             }
         });
 
         // Flush so there is nothing in the buffer
         // making everything annoying
-        flush(port);
+        flush(_port);
     }
 
     void retrieve_pids() {
@@ -614,19 +625,19 @@ class TeensyControllerInterface {
                 auto pids = parse.get<Peltiers>();
 
                 // Send them to GUI to draw them
-                TeensyIndicatorSender(IndicatorNames::PELTIER_CURR,
+                _indicator_sender(IndicatorNames::PELTIER_CURR,
                     pids.time, pids.PID.Current);
 
-                TeensyIndicatorSender(IndicatorNames::LATEST_PELTIER_CURR,
+                _indicator_sender(IndicatorNames::LATEST_PELTIER_CURR,
                     pids.PID.Current);
 
-                _PeltiersFile->Add(pids);
+                _peltiers_file->Add(pids);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetPeltiers),
                             msg.value());
-                flush(port);
+                flush(_port);
             }
         });
     }
@@ -641,38 +652,38 @@ class TeensyControllerInterface {
                 // Send them to GUI to draw them
                 for (uint16_t i = 0; i < rtds.Temps.size(); i++) {
                     const double temp = rtds.Temps[i];
-                    MultiPlotSender(i, rtds.time, temp);
+                    _plot_sender(i, rtds.time, temp);
 
                     switch (i) {
                         case 0:
-                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD1_TEMP,
+                        _indicator_sender(IndicatorNames::LATEST_RTD1_TEMP,
                             temp);
                         break;
                         case 1:
-                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD2_TEMP,
+                        _indicator_sender(IndicatorNames::LATEST_RTD2_TEMP,
                             temp);
                         break;
                         case 2:
-                        TeensyIndicatorSender(IndicatorNames::LATEST_RTD3_TEMP,
+                        _indicator_sender(IndicatorNames::LATEST_RTD3_TEMP,
                             temp);
                         break;
                     }
                 }
 
-                double err = rtds.Temps[doe.PidRTD]
-                    - static_cast<double>(doe.PIDTempValues.SetPoint) - 273.15;
+                double err = rtds.Temps[_doe.PidRTD]
+                    - static_cast<double>(_doe.PIDTempValues.SetPoint) - 273.15;
                 _error_temp_cf(err);
 
-                TeensyIndicatorSender(IndicatorNames::PID_TEMP_ERROR,
+                _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
                     arma::mean(_error_temp_cf));
 
-                _RTDsFile->Add(rtds);
+                _RTDs_file->Add(rtds);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetRTDs),
                             msg.value());
-                flush(port);
+                flush(_port);
             }
         });
     }
@@ -684,19 +695,19 @@ class TeensyControllerInterface {
                 auto press = parse.get<Pressures>();
 
                 // Send them to GUI to draw them
-                TeensyIndicatorSender(IndicatorNames::VACUUM_PRESS,
+                _indicator_sender(IndicatorNames::VACUUM_PRESS,
                     press.time , press.Vacuum.Pressure);
-                TeensyIndicatorSender(IndicatorNames::LATEST_VACUUM_PRESS,
+                _indicator_sender(IndicatorNames::LATEST_VACUUM_PRESS,
                     press.Vacuum.Pressure);
 
-                _PressuresFile->Add(press);
+                _pressures_file->Add(press);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetPressures),
                             msg.value());
 
-                flush(port);
+                flush(_port);
             }
         });
     }
@@ -707,20 +718,20 @@ class TeensyControllerInterface {
             try {
                 auto bmes = parse.get<BMEs>();
 
-                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_TEMPS,
+                _indicator_sender(IndicatorNames::LOCAL_BME_TEMPS,
                     bmes.time , bmes.LocalBME.Temperature);
-                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_PRESS,
+                _indicator_sender(IndicatorNames::LOCAL_BME_PRESS,
                     bmes.time , bmes.LocalBME.Pressure);
-                TeensyIndicatorSender(IndicatorNames::LOCAL_BME_HUMD,
+                _indicator_sender(IndicatorNames::LOCAL_BME_HUMD,
                     bmes.time , bmes.LocalBME.Humidity);
 
-                _BMEsFile->Add(bmes);
+                _BMEs_file->Add(bmes);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetBMEs),
                             msg.value());
-                flush(port);
+                flush(_port);
             }
         });
     }
@@ -772,7 +783,7 @@ class TeensyControllerInterface {
             [&]() {
                 spdlog::info("Saving teensy data...");
 
-                async_save(_RTDsFile,
+                async_save(_RTDs_file,
                     [](const RawRTDs& rtds) {
                         std::ostringstream out;
                         for (std::size_t i = 0; i < rtds.RTDREGS.size(); i++) {
@@ -789,21 +800,21 @@ class TeensyControllerInterface {
                         return  std::to_string(rtds.time) + "," + out.str();
                 });
 
-                if (!doe.SystemParameters.InRTDOnlyMode){
-                    async_save(_PeltiersFile,
+                if (!_doe.SystemParameters.InRTDOnlyMode){
+                    async_save(_peltiers_file,
                         [](const Peltiers& pid) {
                             return  std::to_string(pid.time) + "," +
                                     std::to_string(pid.PID.Current) + "\n";
                     });
 
-                    async_save(_PressuresFile,
+                    async_save(_pressures_file,
                         [](const Pressures& press) {
                             return  std::to_string(press.time) + "," +
                                     std::to_string(press.Vacuum.Pressure) + "\n";
 
                     });
 
-                    async_save(_BMEsFile,
+                    async_save(_BMEs_file,
                         [](const BMEs& bme) {
                             return  std::to_string(bme.time) + "," +
                                     std::to_string(bme.LocalBME.Temperature) + "," +
@@ -819,7 +830,7 @@ class TeensyControllerInterface {
         // Checks the status of the Teensy and sees if there are any errors
 
         // This should be called every 100ms
-        if (!doe.SystemParameters.InRTDOnlyMode) {
+        if (!_doe.SystemParameters.InRTDOnlyMode) {
             retrieve_pids_nb();
             retrieve_pres_nb();
 
@@ -830,7 +841,7 @@ class TeensyControllerInterface {
         retrieve_rtds_nb();
 
         retrieve_rtds_nb.ChangeWaitTime(
-            std::chrono::milliseconds(doe.RTDSamplingPeriod));
+            std::chrono::milliseconds(_doe.RTDSamplingPeriod));
 
         // These should be called every 30 seconds
         save_files();
@@ -838,7 +849,7 @@ class TeensyControllerInterface {
 
     // Sends an specific command from the available commands
     bool send_teensy_cmd(const TeensyCommands& cmd) {
-        if (!port) {
+        if (!_port) {
             return false;
         }
 
@@ -846,7 +857,7 @@ class TeensyControllerInterface {
             return false;
         }
 
-        auto tcs = doe;
+        const auto& tcs = _doe;
         // This functions essentially wraps the send_msg function with
         // the map to get the command from the map.
         auto str_cmd = cTeensyCommands.at(cmd);
@@ -917,7 +928,7 @@ class TeensyControllerInterface {
         str_cmd += " " + out.str();
         str_cmd += ";\n";
 
-        return send_msg(port, str_cmd);
+        return send_msg(_port, str_cmd);
     }
 };
 }  // namespace SBCQueens

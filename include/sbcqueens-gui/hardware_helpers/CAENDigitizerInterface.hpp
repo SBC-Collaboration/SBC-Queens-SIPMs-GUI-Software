@@ -19,8 +19,10 @@
 #include <random>
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
 
 // C++ 3rd party includes
+#include <date/date.h>
 #include <armadillo>
 #include <serial/serial.h>
 #include <readerwriterqueue.h>
@@ -81,7 +83,6 @@ enum class VBRState {
 
 struct BreakdownVoltageConfigData {
     uint32_t SPEEstimationTotalPulses = 10000;
-    uint32_t GainCalculationSPEPulses = 1000;
     uint32_t DataPulses = 1000000;
 
     VBRState State = VBRState::Idle;
@@ -89,8 +90,6 @@ struct BreakdownVoltageConfigData {
 
 struct CAENInterfaceData {
     std::string RunDir = "";
-    std::string RunName =  "";
-    std::string SiPMParameters = "";
 
     CAENConnectionType ConnectionType;
 
@@ -107,6 +106,7 @@ struct CAENInterfaceData {
     bool ResetCaen = false;
 
     std::string SiPMVoltageSysPort = "";
+    int SiPMID = 0;
     int CellNumber = 0;
     float LatestTemperature = -1.f;
     bool SiPMVoltageSysChange = false;
@@ -129,6 +129,7 @@ class CAENDigitizerInterface {
     IndicatorSender<uint8_t> _plot_sender;
 
     // Files
+    std::string _run_name =  "";
     DataFile<CAENEvent> _pulse_file;
     DataFile<SiPMVoltageMeasure> _voltages_file;
     DataFile<SaveFileInfo> _saveinfo_file;
@@ -517,7 +518,7 @@ class CAENDigitizerInterface {
         }
 
         open(_saveinfo_file,
-            _doe.RunDir + "/" + _doe.RunName + "/SaveInfo.txt");
+            _doe.RunDir + "/" + _run_name + "/SaveInfo.txt");
         bool s = (_saveinfo_file != nullptr);
 
         if (!s) {
@@ -526,16 +527,25 @@ class CAENDigitizerInterface {
         }
 
         spdlog::info("Trying to open file {0}", _doe.RunDir
-            + "/" + _doe.RunName
+            + "/" + _run_name
             + "/SIPM_VOLTAGES.txt");
         open(_voltages_file, _doe.RunDir
-            + "/" + _doe.RunName
+            + "/" + _run_name
             + "/SIPM_VOLTAGES.txt");
 
         s = _voltages_file > 0;
         if (!s) {
             spdlog::error("Failed to open voltage file");
         }
+
+        std::ostringstream out;
+        auto today = date::year_month_day{
+            date::floor<date::days>(std::chrono::system_clock::now())};
+        out << today;
+        _run_name = out.str();
+
+        std::filesystem::create_directory(_doe.RunDir
+            + "/" + _run_name);
 
         change_state();
         return true;
@@ -638,8 +648,8 @@ class CAENDigitizerInterface {
                     out << _doe.LatestTemperature << "degC_";
                     out << _doe.SiPMVoltageSysVoltage << "V";
                     file_name = _doe.RunDir
-                        + "/" + _doe.RunName
-                        + "/" + _doe.SiPMName
+                        + "/" + _run_name
+                        + "/" + std::to_string(_doe.SiPMID) + "_"
                         + std::to_string(_doe.CellNumber) + "cell_"
                         + out.str()
                         + "_spe_estimation.bin";
@@ -999,8 +1009,8 @@ class CAENDigitizerInterface {
             out << _doe.LatestTemperature << "degC_";
             out << _doe.SiPMVoltageSysVoltage << "V";
             file_name = _doe.RunDir
-                + "/" + _doe.RunName
-                + "/" + _doe.SiPMName
+                + "/" + _run_name
+                + "/" + std::to_string(_doe.SiPMID) + "_"
                 + std::to_string(_doe.CellNumber) + "cell_"
                 + out.str()
                 + "_data.bin";
@@ -1022,6 +1032,8 @@ class CAENDigitizerInterface {
                 return std::to_string(val.Time) + "," + val.FileName + "\n";
             });
 
+            _indicator_sender(IndicatorNames::DONE_DATA_TAKING, false);
+
             isFileOpen = _pulse_file > 0;
             SavedWaveforms = 0;
         }
@@ -1040,6 +1052,7 @@ class CAENDigitizerInterface {
             });
 
             isFileOpen = false;
+            _indicator_sender(IndicatorNames::DONE_DATA_TAKING, true);
         }
 
         if (change_state()) {

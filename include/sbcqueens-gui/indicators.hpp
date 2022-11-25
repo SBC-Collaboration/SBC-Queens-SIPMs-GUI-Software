@@ -66,7 +66,8 @@ enum class IndicatorNames {
     BREAKDOWN_VOLTAGE,
     BREAKDOWN_VOLTAGE_ERR,
 
-    SAVED_WAVEFORMS
+    SAVED_WAVEFORMS,
+    DONE_DATA_TAKING
 };
 
 using GeneralIndicatorQueue = IndicatorsQueue<IndicatorNames, double>;

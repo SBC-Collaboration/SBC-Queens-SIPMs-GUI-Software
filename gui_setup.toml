@@ -1,6 +1,9 @@
 [File]
 RunDir = "/hdd/SBC-Queens-SiPMs-Runs"
-RunName = "TESTING"
+# Number of waveforms to take and save to file when in run mode
+RunWaveforms = 1000000
+# Number of waveforms to take and save to file when in breakdown voltage mode
+GainWaveforms = 10000
 
 [Teensy]
 Port = "/dev/ttyACM0"
