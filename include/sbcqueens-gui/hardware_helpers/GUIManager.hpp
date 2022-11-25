@@ -311,7 +311,7 @@ class GUIManager {
         /// SiPM Plots
 
 
-        ImGui::Begin("##SiPMs");
+        ImGui::Begin("SiPMs Plots");
 
         if (ImGui::BeginTabBar("SiPMs Plots")) {
             if (ImGui::BeginTabItem("SiPM Waveforms")) {
@@ -323,7 +323,7 @@ class GUIManager {
                 // const int numchpergroup = model_constants.NumChannels / numgroups;
                 // Let's work on const auto& because we really do not want to change
                 // anything in these next lines
-                if (ImPlot::BeginPlot("SiPM Plots", ImVec2(-1, -1),
+                if (ImPlot::BeginPlot("##SiPMWaveforms", ImVec2(-1, -1),
                     ImPlotFlags_NoTitle)) {
                     ImPlot::SetupAxes("time [ns]", "Counts", g_axis_flags,
                         g_axis_flags);
@@ -386,7 +386,7 @@ class GUIManager {
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Gain")) {
+            if (ImGui::BeginTabItem("G-V")) {
                 if (ImGui::Button("Clear")) {
                     GeneralIndicatorReceiver.ClearPlot(
                         IndicatorNames::GAIN_VS_VOLTAGE);

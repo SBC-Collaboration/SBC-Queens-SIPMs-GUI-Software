@@ -443,6 +443,20 @@ class TeensyControllerInterface {
                             // t0 = time when the communication was 100%
                             _init_time = get_current_time_epoch();
 
+                            // These lines get today's date and creates a folder
+                            // under that date
+                            // There is a similar code in the CAEN
+                            // interface file
+                            std::ostringstream out;
+                            auto today = date::year_month_day{
+                                date::floor<date::days>(
+                                    std::chrono::system_clock::now())};
+                            out << today;
+                            _run_name = out.str();
+
+                            std::filesystem::create_directory(_doe.RunDir
+                                + "/" + _run_name);
+
                             // Open files to start saving!
                             open(_pressures_file,
                                 _doe.RunDir
@@ -479,16 +493,6 @@ class TeensyControllerInterface {
                                 _doe.Port);
 
                                 send_initial_config();
-
-                                std::ostringstream out;
-                                auto today = date::year_month_day{
-                                    date::floor<date::days>(
-                                        std::chrono::system_clock::now())};
-                                out << today;
-                                _run_name = out.str();
-
-                                std::filesystem::create_directory(_doe.RunDir
-                                    + "/" + _run_name);
 
                                 _doe.CurrentState =
                                     TeensyControllerStates::Connected;

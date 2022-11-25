@@ -517,6 +517,17 @@ class CAENDigitizerInterface {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
         }
 
+        // These lines get today's date and creates a folder under that date
+        // There is a similar code in the Teensy interface file
+        std::ostringstream out;
+        auto today = date::year_month_day{
+            date::floor<date::days>(std::chrono::system_clock::now())};
+        out << today;
+        _run_name = out.str();
+
+        std::filesystem::create_directory(_doe.RunDir
+            + "/" + _run_name);
+
         open(_saveinfo_file,
             _doe.RunDir + "/" + _run_name + "/SaveInfo.txt");
         bool s = (_saveinfo_file != nullptr);
