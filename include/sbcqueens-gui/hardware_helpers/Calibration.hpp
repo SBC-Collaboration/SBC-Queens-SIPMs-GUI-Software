@@ -11,6 +11,8 @@
 
 namespace SBCQueens {
 
+
+const double kPICOAMMCURRSTD = 100e-9;
 const double DMM_CAL_PRIME_PARS[] = {1.00000790e+00,  -7.03796763e-06};
 const double DMM_CAL_VAR[] = { 5.79188926e-10, 6.74259920e-07};
 const double kDMMCALCOV = -1.71253999e-08;

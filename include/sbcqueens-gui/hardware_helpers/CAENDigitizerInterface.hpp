@@ -43,6 +43,8 @@
 #include "sipmanalysis/PulseFunctions.hpp"
 #include "sipmanalysis/SPEAnalysis.hpp"
 #include "sipmanalysis/GainVBDEstimation.hpp"
+#include "sipmanalysis/StabilityTools.hpp"
+
 
 namespace SBCQueens {
 
@@ -143,6 +145,7 @@ class CAENDigitizerInterface {
     uint64_t TriggeredWaveforms = 0;
 
     // tmp stuff
+    CircularBuffer<100> _curr_cf;
     double _reset_timer = 20000;
     uint16_t* _data;
     size_t _length;
@@ -548,12 +551,6 @@ class CAENDigitizerInterface {
         if (!s) {
             spdlog::error("Failed to open voltage file");
         }
-
-        std::ostringstream out;
-        auto today = date::year_month_day{
-            date::floor<date::days>(std::chrono::system_clock::now())};
-        out << today;
-        _run_name = out.str();
 
         std::filesystem::create_directory(_doe.RunDir
             + "/" + _run_name);
@@ -1180,15 +1177,15 @@ class CAENDigitizerInterface {
             });
 
             auto latest_values = _sipm_volt_sys.async_get_values();
-            for(auto r : latest_values) {
+            for (auto r : latest_values) {
                 double time = r.Time;
                 double volt = r.Volt;
                 double curr = r.Current;
 
                 volt = calculate_sipm_voltage(volt, curr);
-
+                _curr_cf(curr);
                 // This measure is a NaN/Overflow from the picoammeter
-                if(curr < 9.9e37){
+                if (curr < 9.9e37){
                     _latest_measure.Volt = volt;
                     _latest_measure.Time = time;
                     _latest_measure.Current = curr;
@@ -1201,6 +1198,19 @@ class CAENDigitizerInterface {
             }
 
         });
+
+        static auto check_stability = make_total_timed_event(
+            std::chrono::seconds(15),
+            [&]() {
+
+                bool is_steady = is_steady_state_poly(_curr_cf,
+                    _curr_cf.GetOffset());
+
+                _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+                    is_steady);
+
+            }
+        );
 
         static auto save_voltages = make_total_timed_event(
             std::chrono::seconds(30),
@@ -1223,6 +1233,7 @@ class CAENDigitizerInterface {
             case CAENInterfaceStates::RunMode:
                 get_voltage();
                 save_voltages();
+                check_stability();
 
                 if (_doe.SiPMVoltageSysChange) {
                     _sipm_volt_sys.get([&](serial_ptr& port)

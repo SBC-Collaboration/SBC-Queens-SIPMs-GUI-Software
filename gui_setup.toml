@@ -8,16 +8,10 @@ GainWaveforms = 10000
 [Teensy]
 Port = "/dev/ttyACM0"
 
-# If true, the Teensy is in RTD only mode.
-# cannot be changed during GUI
-RTDMode = true
 # RTD sampling period in ms
 RTDSamplingPeriod = 1000
-# If bit n is set, it enabled the RTD at position (i, k)
-# where i is the board and k is the RTD
-# Depends on how many boards and RTDs are in each board.
-RTDMask = 0xFFFF
-RTDNames = ["SiPM 1", "SiPM 2", "Water Block"]
+
+RTDNames = ["SiPM (1)", "SiPM (2)", "Water Block"]
 
 PIDEnable = false
 PeltierTempSetpoint = -20

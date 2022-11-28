@@ -1,11 +1,11 @@
 #include "sbcqueens-gui/gui_windows/SiPMControlWindow.hpp"
-#include "imgui.h"
 
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
 // C++ 3rd party includes
 // my includes
+#include "sbcqueens-gui/hardware_helpers/Calibration.hpp"
 
 namespace SBCQueens {
 
@@ -108,6 +108,15 @@ bool SiPMControlWindow::operator()() {
         ImGui::SetTooltip("Max voltage allowed is 60V");
     }
 
+    bool tmp;
+    indicatorReceiver.booleanIndicator(IndicatorNames::CURRENT_STABILIZED,
+        "Current stabilized?",
+        tmp,
+        [=](const double& newVal) -> bool {
+            return newVal > 0;
+        }
+    );
+
     ImGui::Separator();
     //  VBD mode controls
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
@@ -138,14 +147,15 @@ bool SiPMControlWindow::operator()() {
             "Then it grabs another sample to calculate the gain");
     }
 
-
-    bool tmp;
     indicatorReceiver.booleanIndicator(IndicatorNames::ANALYSIS_ONGOING,
         "Processing...",
         tmp,
         [=](const double& newVal) -> bool {
                 return newVal > 0;
     });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Shows the calculations are ongoing");
+    }
 
     indicatorReceiver.booleanIndicator(IndicatorNames::FULL_ANALYSIS_DONE,
         "Done?",
@@ -153,6 +163,9 @@ bool SiPMControlWindow::operator()() {
         [=](const double& newVal) -> bool {
                 return newVal > 0;
     });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Shows the calculations finished.");
+    }
 
     CAENControlFac.Button("Calculate VBD",
         [](CAENInterfaceData& old) {
@@ -174,8 +187,12 @@ bool SiPMControlWindow::operator()() {
         "Done?",
         tmp,
         [=](const double& newVal) -> bool {
-                return newVal > 0;
+                return newVal < 0;
     });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Shows if the breakdown voltage calculations "
+            "have finalized.");
+    }
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.0f, 0.0f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,

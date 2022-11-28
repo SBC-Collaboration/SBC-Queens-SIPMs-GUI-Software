@@ -34,6 +34,10 @@ class CircularBuffer : public arma::vec::fixed<N> {
         _current_index++;
         _current_index = _current_index % N;
     }
+
+    arma::uword GetOffset() {
+        return _current_index;
+    }
 };
 
 }  // namespace SBCQueens
