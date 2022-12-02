@@ -145,7 +145,7 @@ class CAENDigitizerInterface {
     uint64_t TriggeredWaveforms = 0;
 
     // tmp stuff
-    CircularBuffer<100> _curr_cf;
+    CircularBuffer<50> _curr_cf;
     double _reset_timer = 20000;
     uint16_t* _data;
     size_t _length;
@@ -636,17 +636,11 @@ class CAENDigitizerInterface {
         static arma::mat spe_estimation_pulse_buffer;
         static uint32_t acq_pulses = 0;
         static bool init_done = false;
-        // This is to allow some time between voltage changes so it settles
-        // before a measurement is done.
-
-        if (_reset_timer > 0) {
-            _reset_timer -= get_current_time_epoch();
-        }
 
         switch (_doe.VBDData.State) {
             case VBRState::Init:
             {
-                if (!init_done && _reset_timer <= 0.0) {
+                if (!init_done) {
                     // Memory allocations and prepare the resources for whenever
                     // the user presses the next button, and prepares the file
 
@@ -765,7 +759,7 @@ class CAENDigitizerInterface {
                     for (uint32_t k = 1; k < num_events; k++) {
 
                         // If we already have enough events, do not grab more
-                        if (acq_pulses >= _doe.VBDData.SPEEstimationTotalPulses ) {
+                        if (acq_pulses >= _doe.VBDData.SPEEstimationTotalPulses) {
                             continue;
                         }
 
@@ -784,7 +778,7 @@ class CAENDigitizerInterface {
                         // dtsp * 8ns = time difference in ns
                         // In other words, do not add events with a time
                         // difference between the last pulse of 1000ns
-                        if (dtsp*8 < 1000) {
+                        if (dtsp*8 < 10000) {
                             continue;
                         }
 
@@ -985,8 +979,8 @@ class CAENDigitizerInterface {
                 // 1 tsp = 8 ns as per CAEN documentation
                 // dtsp * 8ns = time difference in ns
                 // In other words, do not add events with a time
-                // difference between the last pulse of 1000ns or less
-                if (dtsp*8 < 1000) {
+                // difference between the last pulse of 10000ns or less
+                if (dtsp*8 < 10000) {
                     continue;
                 }
 
@@ -1183,9 +1177,22 @@ class CAENDigitizerInterface {
                 double curr = r.Current;
 
                 volt = calculate_sipm_voltage(volt, curr);
-                _curr_cf(curr);
+
                 // This measure is a NaN/Overflow from the picoammeter
                 if (curr < 9.9e37){
+                    _curr_cf.Add(curr);
+
+                    if (_curr_cf.GetOffset() > 5) {
+                       bool is_steady = is_steady_state_poly(_curr_cf.GetBuffer(),
+                        _curr_cf.GetOffset());
+
+                        _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+                        is_steady);
+                    } else {
+                        _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+                        false);
+                    }
+
                     _latest_measure.Volt = volt;
                     _latest_measure.Time = time;
                     _latest_measure.Current = curr;
@@ -1194,23 +1201,13 @@ class CAENDigitizerInterface {
                     _indicator_sender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
                     _indicator_sender(IndicatorNames::PICO_CURRENT, time, curr);
                     _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
+                } else {
+                    _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+                        false);
                 }
             }
 
         });
-
-        static auto check_stability = make_total_timed_event(
-            std::chrono::seconds(15),
-            [&]() {
-
-                bool is_steady = is_steady_state_poly(_curr_cf,
-                    _curr_cf.GetOffset());
-
-                _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
-                    is_steady);
-
-            }
-        );
 
         static auto save_voltages = make_total_timed_event(
             std::chrono::seconds(30),
@@ -1233,7 +1230,6 @@ class CAENDigitizerInterface {
             case CAENInterfaceStates::RunMode:
                 get_voltage();
                 save_voltages();
-                check_stability();
 
                 if (_doe.SiPMVoltageSysChange) {
                     _sipm_volt_sys.get([&](serial_ptr& port)
@@ -1258,6 +1254,7 @@ class CAENDigitizerInterface {
                         // Setting a delay when other functionalities can start
                         // working as normal
                         _reset_timer = 20000.0; // ms
+                        _curr_cf.Clear();
 
                         return {};
                     });

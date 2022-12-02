@@ -23,20 +23,39 @@ namespace SBCQueens {
 arma::mat caen_event_to_armadillo(CAENEvent& evt, const uint32_t& n_chs = 64);
 
 template<size_t N>
-class CircularBuffer : public arma::vec::fixed<N> {
+class CircularBuffer {
+    arma::vec _buffer;
     arma::uword _current_index;
+    arma::uword _size;
  public:
-    CircularBuffer() : arma::vec::fixed<N>(arma::fill::randn),
-        _current_index(0u) { }
+    CircularBuffer() : _buffer(),
+        _current_index(0u), _size(0u) { }
 
-    void operator()(const double& new_val) {
-        arma::vec::fixed<N>::operator()(_current_index) = new_val;
-        _current_index++;
-        _current_index = _current_index % N;
+    void Add(const double& new_val) {
+        if (_size < N) {
+            _size++;
+            _buffer.resize(_size);
+            _current_index = _size - 1;
+        } else {
+            _current_index = (_current_index + 1) % _size;
+        }
+
+        _buffer(_current_index) = new_val;
     }
 
     arma::uword GetOffset() {
         return _current_index;
+    }
+
+    void Clear() {
+        _size = 0u;
+        _current_index = 0u;
+
+        _buffer.clear();
+    }
+
+    arma::vec GetBuffer() {
+        return _buffer;
     }
 };
 

@@ -676,10 +676,10 @@ class TeensyControllerInterface {
 
                 double err = rtds.Temps[_doe.PidRTD]
                     - static_cast<double>(_doe.PIDTempValues.SetPoint) - 273.15;
-                _error_temp_cf(err);
+                _error_temp_cf.Add(err);
 
                 _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
-                    arma::mean(_error_temp_cf));
+                    arma::mean(_error_temp_cf.GetBuffer()));
 
                 _RTDs_file->Add(rtds);
             } catch (... ) {
