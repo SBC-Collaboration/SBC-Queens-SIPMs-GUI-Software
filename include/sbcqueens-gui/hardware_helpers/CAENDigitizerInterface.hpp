@@ -145,8 +145,7 @@ class CAENDigitizerInterface {
     uint64_t TriggeredWaveforms = 0;
 
     // tmp stuff
-    CircularBuffer<50> _curr_cf;
-    double _reset_timer = 20000;
+    double _reset_timer = 30000.0;
     uint16_t* _data;
     size_t _length;
     std::vector<double> _x_values, _y_values;
@@ -542,10 +541,10 @@ class CAENDigitizerInterface {
 
         spdlog::info("Trying to open file {0}", _doe.RunDir
             + "/" + _run_name
-            + "/SIPM_VOLTAGES.txt");
+            + "/SiPMIV.txt");
         open(_voltages_file, _doe.RunDir
             + "/" + _run_name
-            + "/SIPM_VOLTAGES.txt");
+            + "/SiPMIV.txt");
 
         s = _voltages_file > 0;
         if (!s) {
@@ -1180,19 +1179,6 @@ class CAENDigitizerInterface {
 
                 // This measure is a NaN/Overflow from the picoammeter
                 if (curr < 9.9e37){
-                    _curr_cf.Add(curr);
-
-                    if (_curr_cf.GetOffset() > 5) {
-                       bool is_steady = is_steady_state_poly(_curr_cf.GetBuffer(),
-                        _curr_cf.GetOffset());
-
-                        _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
-                        is_steady);
-                    } else {
-                        _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
-                        false);
-                    }
-
                     _latest_measure.Volt = volt;
                     _latest_measure.Time = time;
                     _latest_measure.Current = curr;
@@ -1228,6 +1214,17 @@ class CAENDigitizerInterface {
             case CAENInterfaceStates::OscilloscopeMode:
             case CAENInterfaceStates::BreakdownVoltageMode:
             case CAENInterfaceStates::RunMode:
+                // This is to allow some time between voltage changes so it
+                // settles before a measurement is done.
+                if (_reset_timer > 0) {
+                    _reset_timer -= get_current_time_epoch();
+                    _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+                        false);
+                } else {
+                    _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+                        true);
+                }
+
                 get_voltage();
                 save_voltages();
 
@@ -1253,8 +1250,7 @@ class CAENDigitizerInterface {
 
                         // Setting a delay when other functionalities can start
                         // working as normal
-                        _reset_timer = 20000.0; // ms
-                        _curr_cf.Clear();
+                        _reset_timer = 30000.0; // ms
 
                         return {};
                     });
