@@ -23,62 +23,124 @@
 
 namespace SBCQueens {
 
-CAENError connect(CAEN& res, const CAENDigitizerModel& model,
-    const CAENConnectionType& ct,
-    const int& ln, const int& cn, const uint32_t& addr) noexcept {
-    CAENError err;
-
-    // If the item exists, pass on the creation
-    if (res) {
-        err = CAENError {
-            "Resource already connected",  // ErrorMessage
-            CAEN_DGTZ_ErrorCode::CAEN_DGTZ_GenericError,  // ErrorCode
-            true  // isError
-        };
-
-        return err;
+std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode& err) {
+    switch (err) {
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Success:
+        return "No error";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_CommError:
+        return "Communication error";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_GenericError:
+        return "Unspecified error";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidParam:
+        return "Invalid parameter";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidLinkType:
+        return "Invalid link type";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidHandle:
+        return "Invalid handle";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_MaxDevicesError:
+        return "Maximum number of devices exceeded";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_BadBoardType:
+        return "The operation is not allowed on this type of board";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_BadInterruptLev:
+        return "The interrupt level is not allowed";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_BadEventNumber:
+        return "The event number is bad";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_ReadDeviceRegisterFail:
+        return "Unable to read the registry";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_WriteDeviceRegisterFail:
+        return "Unable to write into the registry";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidChannelNumber:
+        return "The channel number is invalid";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_ChannelBusy:
+        return "The Channel is busy";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_FPIOModeInvalid:
+        return "Invalid FPIO Mode";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_WrongAcqMode:
+        return "Wrong acquisition mode  ";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_FunctionNotAllowed:
+        return "This function is not allowed for this module";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Timeout:
+        return "Communication timeout";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidBuffer:
+        return "The buffer is invalid";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidEvent:
+        return "The event is invalid";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_EventNotFound:
+        return "The event is not found";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_OutOfMemory:
+        return "Out of memory";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_CalibrationError:
+        return "Unable to calibrate the board";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DigitizerNotFound:
+        return "Unable to open the digitizer ";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DigitizerAlreadyOpen:
+        return "The Digitizer is already open";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DigitizerNotReady:
+        return "The Digitizer is not ready to operate";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InterruptNotConfigured:
+        return "The Digitizer has not the IRQ configured";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DigitizerMemoryCorrupted:
+        return "The digitizer flash memory is corrupted";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DPPFirmwareNotSupported:
+        return "The digitizer dpp firmware is not supported in this lib version";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidLicense:
+        return "Invalid firmware license";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidDigitizerStatus:
+        return "The digitizer is found in a corrupted status";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_UnsupportedTrace:
+        return "The given trace is not supported by the digitizer";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_InvalidProbe:
+        return "The given probe is not supported for the given digitizer's trace";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_UnsupportedBaseAddress:
+        return "The Base Address is not supported, it's a Desktop device?";
+    break;
+    case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_NotYetImplemented:
+        return "The function is not yet implemented";
+    default:
+    break;
     }
-
-    int handle = 0;
-    int errCode;
-    switch (ct) {
-        case CAENConnectionType::A4818:
-
-            errCode = CAEN_DGTZ_OpenDigitizer(
-                CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB_A4818,
-                ln, 0, addr, &handle);
-
-        break;
-
-        case CAENConnectionType::USB:
-        default:
-            errCode = CAEN_DGTZ_OpenDigitizer(
-                CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
-                ln, cn, 0, 0);
-        break;
-    }
-    // errCode = CAEN_DGTZ_OpenDigitizer(ct, ln, cn, addr, &handle);
-
-    if (errCode >= 0) {
-        res = std::make_unique<caen>(model, ct, ln, cn, addr,
-            handle, err);
-    } else {
-        return CAENError {
-            "Failed to connect to the resource",  // ErrorMessage
-            static_cast<CAEN_DGTZ_ErrorCode>(errCode),  // ErrorCode
-            true   // isError
-        };
-    }
-
-    return CAENError();
 }
+
+
 
 // CAENError connect_usb(CAEN& res, const CAENDigitizerModel& model,
 //  const int& linkNum) noexcept {
 //  return connect(res, model, CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
 //    linkNum, 0, 0);
 // }
-
 CAENError disconnect(CAEN& res) noexcept {
     if (!res) {
         return CAENError();
@@ -91,7 +153,7 @@ CAENError disconnect(CAEN& res) noexcept {
     // Resources are freed when the pointer is released
     int errCode = CAEN_DGTZ_SWStopAcquisition(handle);
 
-    errCode |= CAEN_DGTZ_FreeReadoutBuffer(&res->Data.Buffer);
+    errCode |= CAEN_DGTZ_FreeReadoutBuffer(res->Data.Buffer.get());
     // errCode |= CAEN_DGTZ_ClearData(handle);
     errCode |= CAEN_DGTZ_CloseDigitizer(handle);
 
@@ -375,7 +437,7 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
         bool trg_out = false;
 
         // For 740, to use TRG-IN as Gate / anti-veto
-        if (g_config.EXTasGate) {
+        if (g_config.EXTAsGate) {
             write_bits(res, 0x810C, 1, 27);  // TRG-IN AND internal trigger,
             // and to serve as gate
             write_bits(res, 0x811C, 1, 10);  // TRG-IN as gate
@@ -417,11 +479,24 @@ void enable_acquisition(CAEN& res) noexcept {
 
     int& handle = res->Handle;
 
+    // We need this to interface to the better C++ API
+    char* tmp_ptr = nullptr;
     int err = CAEN_DGTZ_MallocReadoutBuffer(handle,
-        &res->Data.Buffer, &res->Data.TotalSizeBuffer);
+        &tmp_ptr, &res->Data.TotalSizeBuffer);
+
+    // Now we create our own with better memory management
+    res->Data.Buffer.reset(new char[res->Data.TotalSizeBuffer]);
+
+    // We copy the values because we do not know if they have significance
+    // for the CAEN API
+    std::memcpy(res->Data.Buffer.get(), tmp_ptr,
+        sizeof(char)*res->Data.TotalSizeBuffer);
 
     err |= CAEN_DGTZ_ClearData(handle);
     err |= CAEN_DGTZ_SWStartAcquisition(handle);
+
+    // We delete the c pointer as all the memory should be in our C++ pointer
+    delete tmp_ptr;
 
     if (err < 0) {
         res->LatestError = CAENError {
@@ -565,12 +640,12 @@ void retrieve_data(CAEN& res) noexcept {
 
     int err = CAEN_DGTZ_ReadData(handle,
         CAEN_DGTZ_ReadMode_t::CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT,
-        res->Data.Buffer,
+        res->Data.Buffer.get(),
         &res->Data.DataSize);
 
     if (err >= 0) {
         err = CAEN_DGTZ_GetNumEvents(handle,
-            res->Data.Buffer,
+            res->Data.Buffer.get(),
             res->Data.DataSize,
             &res->Data.NumEvents);
     }
@@ -619,7 +694,7 @@ bool retrieve_data_until_n_events(CAEN& res, uint32_t& n,
     // so dont do it!
     res->LatestError.ErrorCode = CAEN_DGTZ_ReadData(handle,
         CAEN_DGTZ_ReadMode_t::CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT,
-        res->Data.Buffer,
+        res->Data.Buffer.get(),
         &res->Data.DataSize);
 
     if (res->LatestError.ErrorCode < 0){
@@ -630,7 +705,7 @@ bool retrieve_data_until_n_events(CAEN& res, uint32_t& n,
     }
 
     res->LatestError.ErrorCode = CAEN_DGTZ_GetNumEvents(handle,
-            res->Data.Buffer,
+            res->Data.Buffer.get(),
             res->Data.DataSize,
             &res->Data.NumEvents);
 
@@ -677,7 +752,7 @@ void extract_event(CAEN& res, const uint32_t& i, CAENEvent& evt) noexcept {
     }
 
         CAEN_DGTZ_GetEventInfo(handle,
-            res->Data.Buffer,
+            res->Data.Buffer.get(),
             res->Data.DataSize,
             i,
             &evt->Info,

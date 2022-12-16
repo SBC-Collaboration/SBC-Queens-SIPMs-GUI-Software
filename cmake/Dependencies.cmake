@@ -126,7 +126,7 @@ CPMAddPackage("gh:nlohmann/json@3.10.5")
 # https://github.com/gabime/spdlog
 CPMAddPackage(NAME spdlog
   GITHUB_REPOSITORY gabime/spdlog
-  VERSION 1.8.2)
+  VERSION 1.11.0)
 
 # readerwriterqueue
 CPMAddPackage("gh:cameron314/readerwriterqueue@1.0.6")
