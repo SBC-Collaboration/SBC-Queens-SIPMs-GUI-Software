@@ -25,7 +25,8 @@
 
 namespace SBCQueens {
 
-std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode& err);
+// Translates the CAEN API error code to a string.
+constexpr std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode& err);
 
 // This list is incomplete
 enum class CAENConnectionType {
@@ -35,6 +36,9 @@ enum class CAENConnectionType {
 
 // This list is incomplete
 enum class CAENDigitizerModel {
+#ifndef NDEBUG
+    DEBUG,
+#endif
     DT5730B = 0,
     DT5740D = 1
 };
@@ -54,26 +58,29 @@ struct CAENDigitizerModelConstants {
     // Number of channels per group
     uint8_t NumChannelsPerGroup = 1;
 
+    // Max number of internal buffers the digitizer can have.
     uint32_t MaxNumBuffers = 1024;
 
     // Constant to transform Nloc to Recordlength
-    float NLOCToRecordLength = 1;
+    float NLOCToRecordLength = 1.0f;
 
-    std::vector<double> VoltageRanges;
+    // Voltage ranges the digitizer has.
+    std::vector<double> VoltageRanges = {};
 };
 
 // This is here so we can transform string to enums
 // If it the key does not exist, this will throw an error
-const std::unordered_map<std::string, CAENDigitizerModel>
-    CAENDigitizerModels_map {
+const static inline std::unordered_map<std::string, CAENDigitizerModel>
+    CAENDigitizerModelsMap {
         {"DT5730B", CAENDigitizerModel::DT5730B},
         {"DT5740D", CAENDigitizerModel::DT5740D}
 };
 
 // These maps are here to link all the enums with their constants or properties
-// that are fixed per digitizer. They can only be fixed by hand.
-const std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
-    CAENDigitizerModelsConstants_map {
+// that are fixed per digitizer. They can only be fixed at compile time.
+const static inline
+std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
+    CAENDigitizerModelsConstantsMap {
         {CAENDigitizerModel::DT5730B,
         CAENDigitizerModelConstants {
             14,  // ADCResolution
@@ -193,8 +200,8 @@ struct CAENGroupConfig {
     // 0x1000 no offset if 14 bit DAC
     // 0x400 no offset if 14 bit DAC
     // DC offsets of each channel in the group
-    uint16_t DCOffset;
-    std::vector<uint8_t> DCCorrections;
+    uint16_t DCOffset = 0;
+    std::vector<uint8_t> DCCorrections = {};
 
     // For DT5730
     // 0 = 2Vpp, 1 = 0.5Vpp
@@ -274,7 +281,7 @@ struct CAEN {
         uint32_t DataSize = 0;
         uint32_t NumEvents = 0;
 
-        CAENData() : Buffer(new char, &CAENData::_clear_memory) { }
+        CAENData() : Buffer{nullptr, &CAENData::_clear_memory} { }
     };
 
     static inline std::unordered_map<int, bool> _connection_info_map;
@@ -282,7 +289,9 @@ struct CAEN {
     // THis is a number that the CAEN API uses to manage its own resources.
     int _caen_api_handle = -1;
     bool _is_connected = false;
+    bool _is_acquiring = false;
     CAEN_DGTZ_ErrorCode _err_code;
+
     bool _has_error = false;
     bool _has_warning = false;
 
@@ -292,10 +301,10 @@ struct CAEN {
     // Communicated with the outside world: errors, warnings and debug msgs
     // Assumes it is a pointer of any form and this class does not manage
     // its deletion
-    Logger& _logger;
+    Logger _logger;
 
     CAENGlobalConfig _global_config;
-    std::map<uint8_t, CAENGroupConfig> _group_configs;
+    std::vector<CAENGroupConfig> _group_configs;
     uint32_t _current_max_buffers;
 
     // Translates the connection info data to a single number that should*
@@ -318,22 +327,40 @@ struct CAEN {
 
     // Private helper function to wrap the logic behind checking for an error
     // and printing the error message
-    template<typename ...Args>
-    void _print_if_err(const std::string& msg, Args&&... args) noexcept {
+    void _print_if_err(const std::string& CAEN_func_name,
+        const std::string& location,
+        const std::string& extra_msg = "") noexcept {
+
+        const std::string expression_str =
+            "{1} at {0} in CAEN function named {2} with CAEN message {3}. "
+            "Additional info: {2}";
+
         switch (_err_code) {
         case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Success:
             break;
+
+        case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_ChannelBusy:
+        case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_FunctionNotAllowed:
+        case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Timeout:
+        case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DigitizerAlreadyOpen:
+        case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DPPFirmwareNotSupported:
+        case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_NotYetImplemented:
+            _has_warning = true;
+            _logger->warning(expression_str, "Warning", location,
+                CAEN_func_name, translate_caen_error_code(_err_code),
+                extra_msg);
+            break;
         default:
             _has_error = true;
-            _logger.error("CAEN ERR = "
-                + translate_caen_error_code(_err_code) + "."
-                + msg, std::forward<Args...>(args...));
+            _logger->warning(expression_str, "Warning", location,
+                CAEN_func_name, translate_caen_error_code(_err_code),
+                extra_msg);
         }
     }
 
  public:
     // Model
-    CAENDigitizerModel Model;
+    const CAENDigitizerModel Model;
     // Constants associated with the model.
     const CAENDigitizerModelConstants ModelConstants;
     // Type of connection (USB, VME...)
@@ -367,11 +394,18 @@ struct CAEN {
     CAEN(Logger& logger, const CAENDigitizerModel model,
         const CAENConnectionType& ct, const int& ln, const int& cn,
         const uint32_t& addr) :
-        _logger(logger), Model(model),
-        ModelConstants(CAENDigitizerModelsConstants_map.at(model)),
-        ConnectionType(ct), LinkNum(ln), ConetNode(cn),
-        VMEBaseAddress(addr)
+        _logger{logger},
+        Model{model},
+        ModelConstants{CAENDigitizerModelsConstantsMap.at(model)},
+        ConnectionType{ct},
+        LinkNum{ln},
+        ConetNode{cn},
+        VMEBaseAddress{addr}
     {
+        if (not logger) {
+            throw "Logger is not an existing resource.";
+        }
+
         /// We turn Connection type, linknum, conectnode and VMEBaseAddress
         /// into a single container so we know we are not repeating connections
         auto id = _hash_connection_info(ct, ln, cn, addr);
@@ -406,11 +440,10 @@ struct CAEN {
         _is_connected = (_err_code < 0) && (_caen_api_handle > 0);
         if (!_is_connected) {
             _caen_api_handle = -1;
-            _logger.error(
-                "Failed to connect to resource at with CAEN error : {0}",
-                translate_caen_error_code(_err_code));
+            _print_if_err("CAEN_DGTZ_OpenDigitizer", __FUNCTION__, "Failed"
+                "to open the port to the digitizer.");
         } else {
-            _logger.info("Connected resource with handle {0} with "
+            _logger->info("Connected resource with handle {0} with "
                 "link number {1}, conet node {2} and VME address {3}.",
                 _caen_api_handle, ln, cn, addr);
         }
@@ -427,11 +460,13 @@ struct CAEN {
             _caen_api_handle, LinkNum, ConetNode, VMEBaseAddress);
 
             _err_code = CAEN_DGTZ_SWStopAcquisition(_caen_api_handle);
-            _print_if_err("Failed to stop acquisition during cleaning of "
+            _print_if_err("CAEN_DGTZ_SWStopAcquisition", __FUNCTION__,
+                "Failed to stop acquisition during cleaning of "
                 "resources, what went wrong?");
 
             _err_code = CAEN_DGTZ_CloseDigitizer(_caen_api_handle);
-            _print_if_err("Failed to close digitizer, whaaat?");
+            _print_if_err("CAEN_DGTZ_CloseDigitizer", __FUNCTION__,
+                "Failed to close digitizer, whaaat?");
         }
         // Everything should be cleared by their own destructors!
     }
@@ -508,7 +543,7 @@ struct CAEN {
         return _current_max_buffers;
     }
 
-    uint32_t GetCommTransferRate() const {
+    constexpr uint32_t GetCommTransferRate() {
         if(ConnectionType == CAENConnectionType::USB){
             return 15000000u;  // S/s
         } else if (ConnectionType == CAENConnectionType::A4818) {
@@ -529,6 +564,76 @@ struct CAEN {
         }
         return 0.0;
     }
+
+    // Turns a time (in nanoseconds) into counts
+    // Reminder that some digitizers take data in chunks or only allow
+    // some record lengths, so some record lengths are not possible.
+    // Ex: x5730 record length can only be multiples of 10
+    constexpr uint32_t TimeToRecordLength(const double& nsTime) noexcept {
+        return static_cast<uint32_t>(nsTime*1e-9*GetCommTransferRate());
+    }
+
+    // Turns a voltage threshold counts to ADC cts
+    constexpr uint32_t VoltThresholdCtsToADCCts(const uint32_t& cts) noexcept {
+        const uint32_t kVthresholdRangeCts = std::exp2(16);
+        uint32_t ADCRange = std::exp2(ModelConstants.ADCResolution);
+
+        uint32_t out = ADCRange*cts;
+        return out / kVthresholdRangeCts;
+    }
+
+    // Turns a voltage (V) into trigger counts
+    constexpr uint32_t VoltToThresholdCounts(const double& volt) noexcept {
+        const uint32_t kVthresholdRangeCts = std::exp2(16);
+        return static_cast<uint32_t>(volt / kVthresholdRangeCts);
+    }
+
+    // Turns a voltage (V) into count offset
+    constexpr uint32_t VoltOffsetToCountOffset(const double& volt) noexcept {
+        uint32_t ADCRange = std::exp2(res->ModelConstants.ADCResolution);
+        return static_cast<uint32_t>(volt / ADCRange);
+    }
+
+    // Calculates the max number of buffers for a given record length
+    constexpr uint32_t CalculateMaxBuffers() noexcept {
+        // Instead of using the stored RecordLength
+        // We will let CAEN functions do all the hard work for us
+        // uint32_t rl = res->GlobalConfig.RecordLength;
+        uint32_t rl = 0;
+
+        // Cannot be higher than the memory per channel
+        auto mem_per_ch = ModelConstants.MemoryPerChannel;
+        uint32_t nloc = 0;
+
+        // This contains nloc which if multiplied by the correct
+        // constant, will give us the record length exactly
+        ReadRegister(res, 0x8020, nloc);
+        rl =  ModelConstants.NLOCToRecordLength*nloc;
+
+        // Then we calculate the actual num buffs but...
+        auto max_num_buffs = mem_per_ch / rl;
+
+        // It cannot be higher than the max buffers
+        max_num_buffs = max_num_buffs >= res->ModelConstants.MaxNumBuffers ?
+            res->ModelConstants.MaxNumBuffers : max_num_buffs;
+
+        // It can only be a power of 2
+        uint32_t real_max_buffs
+            = static_cast<uint32_t>(exp2(floor(log2(max_num_buffs))));
+
+        // Unless this is enabled, then it is always that number minus one.
+        // Except when the buffers is 1
+        if (GlobalConfig.MemoryFullModeSelection) {
+            if (real_max_buffs > 2) {
+                real_max_buffs--;
+            } else {
+                real_max_buffs = 1;
+            }
+        }
+
+        // Phew, we are done!
+        return real_max_buffs;
+    }
 };
 
 
@@ -541,7 +646,7 @@ void CAEN<T>::Reset() noexcept {
     }
 
     _err_code = CAEN_DGTZ_Reset(_caen_api_handle);
-    _print_if_err("Failed to reset the CAEN");
+    _print_if_err("CAEN_DGTZ_Reset", __FUNCTION__);
 }
 
 template<typename T>
@@ -552,6 +657,7 @@ void CAEN<T>::Setup(const CAENGlobalConfig& g_config,
     }
 
     Reset();
+    DisableAcquisition():
 
     int &handle = _caen_api_handle;
     int latest_err = 0;
@@ -821,50 +927,36 @@ void CAEN<T>::EnableAcquisition() noexcept {
     int& handle = _caen_api_handle;
 
     // We need this to interface to the better C++ API
+    // No need to delete this pointer as its ownership is taken by the
+    // smart pointer later
     char* tmp_ptr = nullptr;
-    int err = CAEN_DGTZ_MallocReadoutBuffer(handle,
-        &tmp_ptr, &res->Data.TotalSizeBuffer);
+    _err_code = CAEN_DGTZ_MallocReadoutBuffer(handle, &tmp_ptr,
+        &Data.TotalSizeBuffer);
+    _print_if_err("CAEN_DGTZ_MallocReadoutBuffer", __FUNCTION__);
 
     // Now we create our own with better memory management
-    res->Data.Buffer.reset(new char[res->Data.TotalSizeBuffer]);
+    Data.Buffer.reset(tmp_ptr);
 
-    // We copy the values because we do not know if they have significance
-    // for the CAEN API
-    std::memcpy(res->Data.Buffer.get(), tmp_ptr,
-        sizeof(char)*res->Data.TotalSizeBuffer);
+    _err_code = CAEN_DGTZ_ClearData(handle);
+    _print_if_err("CAEN_DGTZ_ClearData", __FUNCTION__);
 
-    err |= CAEN_DGTZ_ClearData(handle);
-    err |= CAEN_DGTZ_SWStartAcquisition(handle);
+    _err_code = CAEN_DGTZ_SWStartAcquisition(handle);
+    _print_if_err("CAEN_DGTZ_SWStartAcquisition", __FUNCTION__);
 
-    // We delete the c pointer as all the memory should be in our C++ pointer
-    delete tmp_ptr;
-
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "There was en error while trying to enable"
-            "acquisition or allocate memory for buffers.",  // ErrorMessage
-            static_cast<CAEN_DGTZ_ErrorCode>(err),  // ErrorCode
-            true  // isError
-        };
+    if (not _has_error) {
+        _is_acquiring = true;
     }
 }
 
 template<typename T>
 void CAEN<T>::DisableAcquisition() noexcept {
-    if (_has_error || !_is_connected) {
+    if (_has_error || !_is_connected || !_is_acquiring) {
         return;
     }
 
-    auto err = CAEN_DGTZ_SWStopAcquisition(_caen_api_handle);
-
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "There was en error while trying to disable"
-            "acquisition.",  // ErrorMessage
-            err,  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = = CAEN_DGTZ_SWStopAcquisition(_caen_api_handle);
+    _print_if_err("CAEN_DGTZ_SWStopAcquisition", __FUNCTION__);
+    _is_acquiring = false;
 }
 
 template<typename T>
@@ -873,15 +965,8 @@ void CAEN<T>::WriteRegister(uint32_t&& addr, const uint32_t& value) noexcept {
         return;
     }
 
-    auto err = CAEN_DGTZ_WriteRegister(_caen_api_handle, addr, value);
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "There was en error while trying to write"
-            "to register.",  // ErrorMessage
-            err,  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = = CAEN_DGTZ_WriteRegister(_caen_api_handle, addr, value);
+    _print_if_err("CAEN_DGTZ_WriteRegister", __FUNCTION__);
 }
 
 template<typename T>
@@ -890,15 +975,8 @@ void CAEN<T>::ReadRegister(uint32_t&& addr, uint32_t& value) noexcept {
         return;
     }
 
-    auto err = CAEN_DGTZ_ReadRegister(_caen_api_handle, addr, &value);
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "There was en error while trying to read"
-            "to register " + std::to_string(addr),  // ErrorMessage
-            err,  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = = CAEN_DGTZ_ReadRegister(_caen_api_handle, addr, &value);
+    _print_if_err("CAEN_DGTZ_ReadRegister", __FUNCTION__);
 }
 
 template<typename T>
@@ -910,16 +988,8 @@ void CAEN<T>::WriteBits(uint32_t&& addr,
 
     // First read the register
     uint32_t read_word = 0;
-    auto err = CAEN_DGTZ_ReadRegister(_caen_api_handle, addr, &read_word);
-
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "There was en error while trying to read"
-            "to register " + std::to_string(addr),  // ErrorMessage
-            err,  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = CAEN_DGTZ_ReadRegister(_caen_api_handle, addr, &read_word);
+    _print_if_err("CAEN_DGTZ_ReadRegister", __FUNCTION__);
 
     uint32_t bit_mask = ~(((1 << len) - 1) << pos);
     read_word = read_word & bit_mask; //mask the register value
@@ -927,16 +997,8 @@ void CAEN<T>::WriteBits(uint32_t&& addr,
     // Get the lowest bits of value and shifted to the correct position
     uint32_t value_bits = (value & ((1 << len) - 1)) << pos;
     // Combine masked value read from register with new bits
-    err = CAEN_DGTZ_WriteRegister(_caen_api_handle, addr, read_word | value_bits);
-
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "There was en error while trying to write"
-            "to register " + std::to_string(addr),  // ErrorMessage
-            err,  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = CAEN_DGTZ_WriteRegister(_caen_api_handle, addr, read_word | value_bits);
+    _print_if_err("CAEN_DGTZ_WriteRegister", __FUNCTION__);
 }
 
 template<typename T>
@@ -945,26 +1007,15 @@ void CAEN<T>::SoftwareTrigger() noexcept {
         return;
     }
 
-    if (res->LatestError.isError) {
-        return;
-    }
-
-    auto err = CAEN_DGTZ_SendSWtrigger(_caen_api_handle);
-
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "Failed to send a software trigger",  // ErrorMessage
-            err,  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = CAEN_DGTZ_SendSWtrigger(_caen_api_handle);
+    _print_if_err("CAEN_DGTZ_SendSWtrigger", __FUNCTION__);
 }
 
 template<typename T>
 uint32_t CAEN<T>::GetEventsInBuffer() noexcept {
     uint32_t events = 0;
     // For 5730 it is the register 0x812C
-    read_register(res, 0x812C, events);
+    ReadRegister(res, 0x812C, events);
 
     return events;
 }
@@ -973,50 +1024,36 @@ template<typename T>
 void CAEN<T>::RetrieveData() noexcept {
     int& handle = _caen_api_handle;
 
-    if (_has_error || !_is_connected) {
+    if (_has_error || !_is_connected || !_is_acquiring) {
         return;
     }
 
-    int err = CAEN_DGTZ_ReadData(handle,
+    _err_code = CAEN_DGTZ_ReadData(handle,
         CAEN_DGTZ_ReadMode_t::CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT,
         res->Data.Buffer.get(),
         &res->Data.DataSize);
+    _print_if_err("CAEN_DGTZ_ReadData", __FUNCTION__);
 
-    if (err >= 0) {
-        err = CAEN_DGTZ_GetNumEvents(handle,
-            res->Data.Buffer.get(),
-            res->Data.DataSize,
-            &res->Data.NumEvents);
-    }
-
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "Failed to retrieve data!",  // ErrorMessage
-            static_cast<CAEN_DGTZ_ErrorCode>(err),  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = CAEN_DGTZ_GetNumEvents(handle,
+        res->Data.Buffer.get(),
+        res->Data.DataSize,
+        &res->Data.NumEvents);
+    _print_if_err("CAEN_DGTZ_GetNumEvents", __FUNCTION__);
 }
 
 template<typename T>
 bool CAEN<T>::RetrieveDataUntilNEvents(uint32_t& n, bool debug_info) noexcept {
     int& handle = _caen_api_handle;
 
-    if (_has_error->start_rate_calculation) {
-        res->ts = std::chrono::high_resolution_clock::now();
-        res->start_rate_calculation = true;
-        // When starting statistics mode, mark time
-    }
-
-    if (_has_error || !_is_connected) {
+    if (_has_error || !_is_connected || !_is_acquiring) {
         return false;
     }
 
     if (n >= res->CurrentMaxBuffers) {
-        if (get_events_in_buffer(res) < res->CurrentMaxBuffers) {
+        if (GetEventsInBuffer() < res->CurrentMaxBuffers) {
             return false;
         }
-    } else if (get_events_in_buffer(res) < n) {
+    } else if (GetEventsInBuffer() < n) {
         return false;
     }
 
@@ -1026,46 +1063,17 @@ bool CAEN<T>::RetrieveDataUntilNEvents(uint32_t& n, bool debug_info) noexcept {
     // returns more data than Buffer it can hold, why? Idk
     // but so far with the software as is, it won't work with that
     // so dont do it!
-    res->LatestError.ErrorCode = CAEN_DGTZ_ReadData(handle,
+    _err_code = CAEN_DGTZ_ReadData(handle,
         CAEN_DGTZ_ReadMode_t::CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT,
         res->Data.Buffer.get(),
         &res->Data.DataSize);
+    _print_if_err("CAEN_DGTZ_ReadData", __FUNCTION__);
 
-    if (res->LatestError.ErrorCode < 0){
-        res->LatestError.isError = true;
-        res->LatestError.ErrorMessage = "There was an error when trying "
-        "to read buffer";
-        return false;
-    }
-
-    res->LatestError.ErrorCode = CAEN_DGTZ_GetNumEvents(handle,
+    _err_code = CAEN_DGTZ_GetNumEvents(handle,
             res->Data.Buffer.get(),
             res->Data.DataSize,
             &res->Data.NumEvents);
-
-    // Calculate trigger rate
-    res->te = std::chrono::high_resolution_clock::now();
-    res->t_us = std::chrono::
-        duration_cast<std::chrono::microseconds>(res->te - res->ts).count();
-    res->n_events = res->Data.NumEvents;
-    res->ts = res->te;
-    res->duration += res->t_us;
-    res->trg_count += res->n_events;
-
-    if (debug_info){
-        spdlog::info(fmt::format("#Triggers: {:7d}, Duration: {:-6.2f}s, Inst Rate:{:-8.2f}Hz, Accl Rate:{:-8.2f}Hz",
-            res->trg_count,
-            res->duration/1e6,
-            res->n_events*1e6/res->t_us,
-            res->trg_count*1e6/res->duration));
-    }
-
-    if (res->LatestError.ErrorCode < 0){
-        res->LatestError.isError = true;
-        res->LatestError.ErrorMessage = "There was an error when trying"
-        "to recover number of events from buffer";
-        return false;
-    }
+    _print_if_err("CAEN_DGTZ_GetNumEvents", __FUNCTION__);
 
     return true;
 }
@@ -1082,16 +1090,16 @@ void CAEN::ExtractEvent(const uint32_t& i, CAENEvent& evt) noexcept {
         evt = std::make_shared<caenEvent>(handle);
     }
 
-        CAEN_DGTZ_GetEventInfo(handle,
-            res->Data.Buffer.get(),
-            res->Data.DataSize,
-            i,
-            &evt->Info,
-            &evt->DataPtr);
+    CAEN_DGTZ_GetEventInfo(handle,
+        res->Data.Buffer.get(),
+        res->Data.DataSize,
+        i,
+        &evt->Info,
+        &evt->DataPtr);
 
-        CAEN_DGTZ_DecodeEvent(handle,
-            evt->DataPtr,
-            reinterpret_cast<void**>(&evt->Data));
+    CAEN_DGTZ_DecodeEvent(handle,
+        evt->DataPtr,
+        reinterpret_cast<void**>(&evt->Data));
 }
 
 template<typename T>
@@ -1101,39 +1109,17 @@ void CAEN::ClearData() noexcept {
     }
 
     int& handle = _caen_api_handle;
-    int err = CAEN_DGTZ_SWStopAcquisition(handle);
-    err |= CAEN_DGTZ_ClearData(handle);
-    err |= CAEN_DGTZ_SWStartAcquisition(handle);
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "Failed to send a software trigger",  // ErrorMessage
-            static_cast<CAEN_DGTZ_ErrorCode>(err),  // ErrorCode
-            true  // isError
-        };
-    }
+    _err_code = CAEN_DGTZ_SWStopAcquisition(handle);
+    _err_code = CAEN_DGTZ_ClearData(handle);
+    _err_code = CAEN_DGTZ_SWStartAcquisition(handle);
+
 }
 
 /// End Data Acquisition functions
 //
 /// Mathematical functions
 
-// Turns a time (in nanoseconds) into counts
-// Reminder that some digitizers take data in chunks or only allow
-// some record lengths, so some record lengths are not possible.
-// Ex: x5730 record length can only be multiples of 10
-uint32_t t_to_record_length(CAEN&, const double&) noexcept;
 
-// Turns a voltage threshold counts to ADC cts
-uint32_t v_threshold_cts_to_adc_cts(const CAEN&, const uint32_t&) noexcept;
-
-// Turns a voltage (V) into trigger counts
-uint32_t v_to_threshold_counts(const double&) noexcept;
-
-// Turns a voltage (V) into count offset
-uint32_t v_offset_to_count_offset(const CAEN&, const double&) noexcept;
-
-// Calculates the max number of buffers for a given record length
-uint32_t calculate_max_buffers(CAEN&) noexcept;
 
 /// End Mathematical functions
 //
