@@ -727,9 +727,10 @@ class CAENDigitizerInterface {
 
                     // We create the analysis object with all the info, but
                     // this does not do the analysis!
-                    _spe_analysis.reset(new SPEAnalysis<SimplifiedSiPMFunction>(
+                    _spe_analysis = std::make_unique<
+                        SPEAnalysis<SimplifiedSiPMFunction>>(
                         prepulse_end_region_u,
-                        window, _coords));
+                        window, _coords);
 
                     acq_pulses = 0;
                     init_done = true;
@@ -908,7 +909,7 @@ class CAENDigitizerInterface {
             break;
             case VBRState::ResetAll:
                 _indicator_sender(IndicatorNames::VBD_IN_MEMORY, false);
-                _vbe_analysis.reset(new GainVBDEstimation());
+                _vbe_analysis = std::make_unique<GainVBDEstimation>();
             case VBRState::Reset:
                 close(_pulse_file);
                 init_done = false;
