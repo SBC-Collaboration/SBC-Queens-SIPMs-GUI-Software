@@ -109,7 +109,7 @@ struct CAENInterfaceData {
 
     std::string SiPMVoltageSysPort = "";
     int SiPMID = 0;
-    int CellNumber = 0;
+    int CellNumber = 1;
     float LatestTemperature = -1.f;
     bool SiPMVoltageSysChange = false;
     bool SiPMVoltageSysSupplyEN = false;
@@ -145,7 +145,8 @@ class CAENDigitizerInterface {
     uint64_t TriggeredWaveforms = 0;
 
     // tmp stuff
-    double _reset_timer = 30000.0;
+    double _wait_time = 900000.0;
+    double _reset_timer = 0;
     uint16_t* _data;
     size_t _length;
     std::vector<double> _x_values, _y_values;
@@ -872,6 +873,7 @@ class CAENDigitizerInterface {
             {
                 if (_vbe_analysis->size() >= 3) {
                     double t = get_current_time_epoch() / 1000.0;
+                    _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
                     auto values = _vbe_analysis->calculate();
 
                     if (values.BreakdownVoltageError != 0.0) {
@@ -879,7 +881,7 @@ class CAENDigitizerInterface {
                             values.BreakdownVoltage);
                         _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
                             values.BreakdownVoltageError);
-                        _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
+                        _indicator_sender(IndicatorNames::VBD_IN_MEMORY, true);
 
                         _saveinfo_file->Add(
                                     SaveFileInfo(t, "breakdown_voltage : " +
@@ -897,13 +899,15 @@ class CAENDigitizerInterface {
                                     SaveFileInfo(t, "dgain_dV_std : " +
                                 std::to_string(values.RateError)));
                     }
+
+                    _indicator_sender(IndicatorNames::CALCULATING_VBD, false);
                 }
 
                 _doe.VBDData.State = VBRState::Idle;
             }
             break;
             case VBRState::ResetAll:
-                _indicator_sender(IndicatorNames::CALCULATING_VBD, false);
+                _indicator_sender(IndicatorNames::VBD_IN_MEMORY, false);
                 _vbe_analysis.reset(new GainVBDEstimation());
             case VBRState::Reset:
                 close(_pulse_file);
@@ -912,6 +916,7 @@ class CAENDigitizerInterface {
                 acq_pulses = 0;
                 _doe.VBDData.State = VBRState::Idle;
                 _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, false);
+
             break;
             case VBRState::Idle:
             default:
@@ -1187,9 +1192,6 @@ class CAENDigitizerInterface {
                     _indicator_sender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
                     _indicator_sender(IndicatorNames::PICO_CURRENT, time, curr);
                     _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
-                } else {
-                    _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
-                        false);
                 }
             }
 
@@ -1216,8 +1218,7 @@ class CAENDigitizerInterface {
             case CAENInterfaceStates::RunMode:
                 // This is to allow some time between voltage changes so it
                 // settles before a measurement is done.
-                if (_reset_timer > 0) {
-                    _reset_timer -= get_current_time_epoch();
+                if ((get_current_time_epoch() - _reset_timer) < _wait_time) {
                     _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
                         false);
                 } else {
@@ -1233,9 +1234,15 @@ class CAENDigitizerInterface {
                     -> std::optional<SiPMVoltageMeasure> {
                         send_msg(port, "++addr 22\n", "");
 
+                        // The wait time to let the user know the voltage
+                        // has stabilized is 90s or 3 mins
+                        _wait_time = 90000.0;
                         if (_doe.SiPMVoltageSysSupplyEN) {
                             send_msg(port, ":sour:volt:stat ON\n", "");
                             spdlog::warn("Turning on voltage supply.");
+                            // However, when the voltage starts from OFF
+                            // We should multiply it by 3.
+                            _wait_time *= 3;
                         } else {
                             send_msg(port, ":sour:volt:stat OFF\n", "");
                             spdlog::warn("Turning off voltage supply.");
@@ -1250,7 +1257,13 @@ class CAENDigitizerInterface {
 
                         // Setting a delay when other functionalities can start
                         // working as normal
-                        _reset_timer = 30000.0; // ms
+                        _reset_timer = get_current_time_epoch(); // ms
+
+                        // Let's also reset this indicator which helps
+                        // minimize confusion in the GUI
+                        _indicator_sender(IndicatorNames::DONE_DATA_TAKING,
+                            false);
+
 
                         return {};
                     });

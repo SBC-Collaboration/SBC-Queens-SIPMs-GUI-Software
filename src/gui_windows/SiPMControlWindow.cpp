@@ -6,6 +6,7 @@
 // C++ 3rd party includes
 // my includes
 #include "sbcqueens-gui/hardware_helpers/Calibration.hpp"
+#include <imgui.h>
 
 namespace SBCQueens {
 
@@ -123,7 +124,7 @@ bool SiPMControlWindow::operator()() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
         ImVec4(.0f, 8.f, .8f, 1.0f));
-    CAENControlFac.Button("Start Breakdown Voltage (VBD) Mode",
+    CAENControlFac.Button("Calculate 1SPE gain",
         [=](CAENInterfaceData& old) {
             if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
                 old.CurrentState == CAENInterfaceStates::RunMode ||
@@ -133,8 +134,8 @@ bool SiPMControlWindow::operator()() {
                     old.LatestTemperature = tgui_state.PIDTempValues.SetPoint;
                     old.VBDData.State = VBRState::Init;
                 } else {
-                    spdlog::warn("VBD mode cannot start without enabling the "
-                        "power supply.");
+                    spdlog::warn("Gain calculation cannot start without "
+                        "enabling the power supply.");
                 }
             }
             return true;
@@ -209,6 +210,13 @@ bool SiPMControlWindow::operator()() {
         ImGui::SetTooltip("Resets the internal buffer for the breakdown buffer "
             "calculations");
     }
+    ImGui::SameLine();
+    indicatorReceiver.booleanIndicator(IndicatorNames::VBD_IN_MEMORY,
+        "VBD in memory?",
+        tmp,
+        [=](const double& newVal) -> bool {
+                return newVal < 0;
+    });
 
     //  end VBD mode controls
     ImGui::Separator();
