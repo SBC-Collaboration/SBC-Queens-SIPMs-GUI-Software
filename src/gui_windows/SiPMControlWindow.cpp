@@ -90,14 +90,15 @@ bool SiPMControlWindow::operator()() {
     CAENControlFac.InputFloat("SiPM Voltage", cgui_state.SiPMVoltageSysVoltage,
         0.01f, 60.00f, "%2.2f V",
         ImGui::IsItemDeactivated, [=](CAENInterfaceData& old) {
-            if (cgui_state.SiPMVoltageSysVoltage >= 60.0f) {
-                old.SiPMVoltageSysVoltage = 60.0f;
-                cgui_state.SiPMVoltageSysVoltage = 60.0f;
+
+            // Ignore the input under BVMode or RunMode
+            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode ||
+                old.CurrentState == CAENInterfaceStates::RunMode) {
+                return true;
             }
 
-            // A change in voltage while in VBD mode should trip a reset
-            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
-                old.VBDData.State = VBRState::Reset;
+            if (cgui_state.SiPMVoltageSysVoltage >= 60.0f) {
+                old.SiPMVoltageSysVoltage = 60.0f;
             }
 
             old.SiPMVoltageSysVoltage = cgui_state.SiPMVoltageSysVoltage;
@@ -124,15 +125,13 @@ bool SiPMControlWindow::operator()() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
         ImVec4(.0f, 8.f, .8f, 1.0f));
-    CAENControlFac.Button("Calculate 1SPE gain",
+    CAENControlFac.Button("Calculate VBD",
         [=](CAENInterfaceData& old) {
-            if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-                old.CurrentState == CAENInterfaceStates::RunMode ||
-                old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+            if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode) {
                 old.CurrentState = CAENInterfaceStates::BreakdownVoltageMode;
+
                 if (old.SiPMVoltageSysSupplyEN) {
                     old.LatestTemperature = tgui_state.PIDTempValues.SetPoint;
-                    old.VBDData.State = VBRState::Init;
                 } else {
                     spdlog::warn("Gain calculation cannot start without "
                         "enabling the power supply.");
@@ -147,6 +146,14 @@ bool SiPMControlWindow::operator()() {
             "nuisance parameters, for example: rise and fall times."
             "Then it grabs another sample to calculate the gain");
     }
+    ImGui::SameLine();
+    CAENControlFac.Button("Cancel VBD mode",
+        [=](CAENInterfaceData& old) {
+            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+                old.CancelMeasurements = true;
+            }
+            return true;
+    });
 
     indicatorReceiver.booleanIndicator(IndicatorNames::ANALYSIS_ONGOING,
         "Processing...",
@@ -159,7 +166,7 @@ bool SiPMControlWindow::operator()() {
     }
 
     indicatorReceiver.booleanIndicator(IndicatorNames::FULL_ANALYSIS_DONE,
-        "Done?",
+        "All Analysis Done?",
         tmp,
         [=](const double& newVal) -> bool {
                 return newVal > 0;
@@ -168,24 +175,8 @@ bool SiPMControlWindow::operator()() {
         ImGui::SetTooltip("Shows the calculations finished.");
     }
 
-    CAENControlFac.Button("Calculate VBD",
-        [](CAENInterfaceData& old) {
-            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
-                if(old.VBDData.State == VBRState::Idle) {
-                    old.VBDData.State = VBRState::CalculateBreakdownVoltage;
-                }
-            }
-            return true;
-    });
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Given enough data points (3 or more) "
-            "in the G vs V plot the user can calculate the gain by pressing "
-            "this button.");
-    }
-
-    ImGui::SameLine();
     indicatorReceiver.booleanIndicator(IndicatorNames::CALCULATING_VBD,
-        "Done?",
+        "Calculating VBD Done?",
         tmp,
         [=](const double& newVal) -> bool {
                 return newVal < 0;
@@ -195,22 +186,6 @@ bool SiPMControlWindow::operator()() {
             "have finalized.");
     }
 
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.0f, 0.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        ImVec4(0.8f, .1f, .1f, 1.0f));
-    CAENControlFac.Button("Reset VBD",
-        [](CAENInterfaceData& old) {
-            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
-                old.VBDData.State = VBRState::ResetAll;
-            }
-            return true;
-    });
-    ImGui::PopStyleColor(2);
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Resets the internal buffer for the breakdown buffer "
-            "calculations");
-    }
-    ImGui::SameLine();
     indicatorReceiver.booleanIndicator(IndicatorNames::VBD_IN_MEMORY,
         "VBD in memory?",
         tmp,
@@ -231,6 +206,14 @@ bool SiPMControlWindow::operator()() {
             old.CurrentState = CAENInterfaceStates::RunMode;
         }
         return true;
+    });
+    ImGui::SameLine();
+    CAENControlFac.Button("Cancel data taking",
+        [=](CAENInterfaceData& old) {
+            if (old.CurrentState == CAENInterfaceStates::RunMode) {
+                old.CancelMeasurements = true;
+            }
+            return true;
     });
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Starts a data taking routine which ends until "

@@ -10,7 +10,7 @@
 
 // my includes
 #include "sbcqueens-gui/imgui_helpers.hpp"
-#include "sbcqueens-gui/hardware_helpers/CAENDigitizerInterface.hpp"
+#include "sbcqueens-gui/hardware_helpers/CAENInterfaceData.hpp"
 #include "sbcqueens-gui/hardware_helpers/TeensyControllerInterface.hpp"
 #include "sbcqueens-gui/indicators.hpp"
 
