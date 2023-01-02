@@ -71,6 +71,8 @@ class CAENDigitizerInterface {
     uint64_t SavedWaveforms = 0;
     uint64_t TriggeredWaveforms = 0;
 
+    bool _vbd_created = false;
+
     // tmp stuff
     double _wait_time = 900000.0;
     double _reset_timer = 0;
@@ -129,7 +131,7 @@ class CAENDigitizerInterface {
             std::bind(&CAENDigitizerInterface::oscilloscope, this));
 
         breakdownVoltageMode_state = std::make_shared<CAENInterfaceState>(
-            std::chrono::milliseconds(200),
+            std::chrono::milliseconds(50),
             std::bind(&CAENDigitizerInterface::breakdown_voltage_mode, this));
 
         runMode_state = std::make_shared<CAENInterfaceState>(
@@ -186,7 +188,7 @@ class CAENDigitizerInterface {
                     "Initializing...");
 
                 // Setup GPIB interface
-                // send_msg_slow(port, "++rst");
+                // send_msg_slow("++rst");
                 send_msg_slow("++eos 0");
                 send_msg_slow("++addr 10");
                 send_msg_slow("++auto 0");
@@ -196,7 +198,7 @@ class CAENDigitizerInterface {
                 // These parameters are constant for now
                 // but later they can become a parameter or the voltage
                 // system can be optional at all
-                // send_msg_slow("*rst");
+                send_msg_slow("*rst");
                 send_msg_slow(":init:cont on");
                 send_msg_slow(":volt:dc:nplc 10");
                 send_msg_slow(":volt:dc:rang:auto 0");
@@ -209,7 +211,7 @@ class CAENDigitizerInterface {
 
                 // Keithley 6487
                 send_msg_slow("++addr 22");
-                // send_msg_slow("*rst");
+                send_msg_slow("*rst");
                 send_msg_slow(":form:elem read");
 
                 // Volt supply side
@@ -531,23 +533,27 @@ class CAENDigitizerInterface {
     // is done. Serves more for the user to know
     // how things are changing.
     bool breakdown_voltage_mode() {
-        static bool create_once = true;
-        if (create_once) {
+        if (not vbr_routine) {
             vbr_routine = std::make_unique<BreakDownRoutine>(
-                std::move(_caen_port),
-                _doe, _run_name, _saveinfo_file);
-            create_once = false;
+                std::move(_caen_port), _doe, _run_name, _saveinfo_file);
         }
 
         vbr_routine->update();
+
+        if(vbr_routine->hasVoltageChanged()) {
+            _doe.SiPMVoltageSysVoltage = vbr_routine->getCurrentVoltage();
+            _doe.SiPMVoltageSysChange = true;
+        }
 
         // GUI related stuff
         TriggeredWaveforms = vbr_routine->getLatestNumEvents();
         SavedWaveforms = vbr_routine->getTotalAcquiredEvents();
         _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
 
-        if(vbr_routine->getCurrentState() == BreakDownRoutineState::Finished) {
-            switch_state(CAENInterfaceStates::RunMode);
+        switch (vbr_routine->getCurrentState()) {
+        case BreakDownRoutineState::Finished:
+        {
+            switch_state(CAENInterfaceStates::OscilloscopeMode);
 
             auto values = vbr_routine->getBreakdownVoltage();
             _latest_breakdown_voltage = values;
@@ -564,20 +570,17 @@ class CAENDigitizerInterface {
             // Clean resources and get the port back
             _caen_port = vbr_routine->retrieveCAEN();
             vbr_routine.reset();
-        } else if (vbr_routine->getCurrentState()
-                == BreakDownRoutineState::Analysis) {
+            break;
+        }
+        case BreakDownRoutineState::Analysis:
+        case BreakDownRoutineState::CalculateBreakdownVoltage:
+        {
             auto pars = vbr_routine->getAnalysisLatestValues();
 
-            if(vbr_routine->isVoltageChanged()) {
+            if (vbr_routine->hasNewGainMeasurement())
+            {
                 _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
-                    _doe.LatestMeasure.Volt,
-                    pars.SPEParameters(1));
-
-                // Set this to true to let the software that controls
-                // the power supply know it needs to change
-                _doe.SiPMVoltageSysChange = true;
-                // To this voltage
-                _doe.SiPMVoltageSysVoltage = vbr_routine->getCurrentVoltage();
+                    _doe.LatestMeasure.Volt, pars.SPEParameters(1));
             }
 
             _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
@@ -601,9 +604,13 @@ class CAENDigitizerInterface {
             _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, false);
             _indicator_sender(IndicatorNames::ANALYSIS_ONGOING, true);
         }
+        break;
+        // default:
+        // break;
+        }
 
-        // This needs a cancel button
-        if (_doe.CancelMeasurements) {
+        // Cancel button routine
+        if (_doe.CancelMeasurements && vbr_routine) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
             _caen_port = vbr_routine->retrieveCAEN();
@@ -888,6 +895,7 @@ class CAENDigitizerInterface {
         switch (_doe.CurrentState) {
             case CAENInterfaceStates::OscilloscopeMode:
             case CAENInterfaceStates::RunMode:
+            case CAENInterfaceStates::BreakdownVoltageMode:
                 if (_doe.SiPMVoltageSysChange) {
                     _sipm_volt_sys.get([&](serial_ptr& port)
                     -> std::optional<SiPMVoltageMeasure> {
@@ -899,12 +907,18 @@ class CAENDigitizerInterface {
                         if (_doe.SiPMVoltageSysSupplyEN) {
                             send_msg(port, ":sour:volt:stat ON\n", "");
                             spdlog::warn("Turning on voltage supply.");
-                            // However, when the voltage starts from OFF
-                            // We should multiply it by 3.
-                            _wait_time *= 3;
+
                         } else {
                             send_msg(port, ":sour:volt:stat OFF\n", "");
                             spdlog::warn("Turning off voltage supply.");
+                        }
+
+                        auto dV = std::abs(_doe.LatestMeasure.Volt
+                            - _doe.SiPMVoltageSysVoltage);
+                        if (dV >= 10.0) {
+                            // However, when the voltage swing is higher than
+                            // 10V, it should be multiplied it by 2.5.
+                            _wait_time *= 2.5;
                         }
 
                         send_msg(port, ":sour:volt "
@@ -914,15 +928,13 @@ class CAENDigitizerInterface {
                         spdlog::info("Changing output voltage to {0}",
                             _doe.SiPMVoltageSysVoltage);
 
-                        // Setting a delay when other functionalities can start
-                        // working as normal
+                        // Resetting the timer.
                         _reset_timer = get_current_time_epoch(); // ms
 
                         // Let's also reset this indicator which helps
                         // minimize confusion in the GUI
                         _indicator_sender(IndicatorNames::DONE_DATA_TAKING,
                             false);
-
 
                         return {};
                     });
@@ -931,12 +943,10 @@ class CAENDigitizerInterface {
                     _doe.SiPMVoltageSysChange = false;
                 }
 
-            case CAENInterfaceStates::BreakdownVoltageMode:
                 // This is to allow some time between voltage changes so it
                 // settles before a measurement is done.
                 if ((get_current_time_epoch() - _reset_timer) < _wait_time) {
                     _doe.isVoltageStabilized = false;
-
                 } else {
                     _doe.isVoltageStabilized = true;
                 }
@@ -947,7 +957,6 @@ class CAENDigitizerInterface {
                 get_voltage();
                 save_voltages();
             break;
-
 
             case CAENInterfaceStates::Standby:
             case CAENInterfaceStates::AttemptConnection:

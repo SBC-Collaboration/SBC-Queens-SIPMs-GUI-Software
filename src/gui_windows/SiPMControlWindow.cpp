@@ -142,8 +142,8 @@ bool SiPMControlWindow::operator()() {
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Starts the logic to attempt a VBD calculation."
-            "Estimates the SPE parameters: A1pe, and pulse "
-            "nuisance parameters, for example: rise and fall times."
+            "It disables the ability to change the voltage. "
+            "If it fails, it will retry. Cancel by pressing Cancel VBD mode"
             "Then it grabs another sample to calculate the gain");
     }
     ImGui::SameLine();
@@ -154,6 +154,9 @@ bool SiPMControlWindow::operator()() {
             }
             return true;
     });
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Cancels any ongoing VBD calculation.");
+    }
 
     indicatorReceiver.booleanIndicator(IndicatorNames::ANALYSIS_ONGOING,
         "Processing...",

@@ -15,6 +15,8 @@ namespace SBCQueens {
 
 bool BreakDownRoutine::update() {
     _new_events = _process_events();
+    _is_voltage_changed = false;
+    _is_new_gain_measurement = false;
 
     switch (_current_state) {
     case BreakDownRoutineState::Init:
@@ -55,27 +57,13 @@ bool BreakDownRoutine::_idle() {
 }
 
 bool BreakDownRoutine::_init() {
+    // We start at the first voltage
+    _reset_voltage();
+
     // Memory allocations and prepare the resources for whenever
     // the user presses the next button, and prepares the file
     // File preparation
-    std::ostringstream out;
-    out.precision(3);
-    out << _doe.LatestTemperature << "degC_";
-    out << _doe.SiPMVoltageSysVoltage << "V";
-    _file_name = _doe.RunDir
-        + "/" + _run_name
-        + "/" + std::to_string(_doe.SiPMID) + "_"
-        + std::to_string(_doe.CellNumber) + "cell_"
-        + out.str()
-        + "_spe_estimation.bin";
-
-    open(_pulse_file,
-        _file_name,
-        // sbc_init_file is a function that saves the header
-        // of the sbc data format as a function of record length
-        // and number of channels
-        sbc_init_file,
-        _caen_port);
+    _open_sipm_file();
 
     // Save into the log when the data saving started
     double t = get_current_time_epoch() / 1000.0;
@@ -107,6 +95,7 @@ bool BreakDownRoutine::_init() {
 
     // _coords is the guesses for the analysis
     // 0 being the t0 guess
+    _coords = arma::mat(5, 1, arma::fill::zeros);
     _coords(0, 0) = prepulse_end_region + 1;
     // 1 is the gain guess
     _coords(1, 0) = 35e3;
@@ -139,32 +128,27 @@ bool BreakDownRoutine::_init() {
 
     _acq_pulses = 0;
 
-    // Front end preparation
-    _current_state = BreakDownRoutineState::Analysis;
-
-    // We start at the first voltage
-    _current_voltage = GainVoltages.cbegin();
-
     async_save(_saveinfo_file, [](const SaveFileInfo& val){
         return std::to_string(val.Time) + "," + val.FileName
             + "\n";
     });
 
-    // No voltage change here at all.
-    _is_voltage_changed = false;
+    _current_state = BreakDownRoutineState::Analysis;
+    _vbe_analysis = std::make_unique<GainVBDEstimation>();
 
     return true;
 }
 
 bool BreakDownRoutine::_analysis() {
     // Do not take data if temp or voltage is not stable
-    if (not _doe.isVoltageStabilized && not _doe.isTemperatureStabilized) {
+    if (not _doe.isVoltageStabilized || not _doe.isTemperatureStabilized) {
         return true;
     }
 
     // This case can stall if no data is coming in, maybe
     // add a timeout later.
     if (!_new_events) {
+        spdlog::warn("No new events in the buffer during analysis");
         return true;
     }
 
@@ -207,7 +191,7 @@ bool BreakDownRoutine::_analysis() {
         _acq_pulses++;
     }
 
-    spdlog::debug("Acquired {0} pulses so far.", _acq_pulses);
+    spdlog::info("Acquired {0} pulses so far.", _acq_pulses);
 
     save(_pulse_file, sbc_save_func, _caen_port);
     if (_acq_pulses >= _doe.VBDData.SPEEstimationTotalPulses) {
@@ -233,6 +217,12 @@ bool BreakDownRoutine::_analysis() {
                 _spe_analysis_out.SPEParametersErrors(1),
                 _doe.LatestMeasure.Volt);
 
+            spdlog::info("Calculated gain of {0} [arb.] with error {1} "
+                "at measurement {2}V",
+                _spe_analysis_out.SPEParameters(1),
+                _spe_analysis_out.SPEParametersErrors(1),
+                _doe.LatestMeasure.Volt);
+
             t = get_current_time_epoch() / 1000.0;
             for (arma::uword i = 0; i < _spe_analysis_out.SPEParameters.n_elem; i++) {
                 _saveinfo_file->Add(
@@ -244,9 +234,22 @@ bool BreakDownRoutine::_analysis() {
                 std::to_string(_spe_analysis_out.SPEParametersErrors(i))));
             }
 
-            // go to the next voltage and repeat.
+            // go to the next voltage.
             ++_current_voltage;
-            _is_voltage_changed = true;
+            _is_new_gain_measurement = true;
+
+            // Close and open the next file
+            close(_pulse_file);
+
+            // If done with all the voltages, time to move on!
+            if (_current_voltage == GainVoltages.cend()) {
+                spdlog::info("Finished taking gain measurements.");
+                _current_state = BreakDownRoutineState::CalculateBreakdownVoltage;
+            } else {
+                _is_voltage_changed = true;
+                // This should open the next file.
+                _open_sipm_file();
+            }
         }
 
         _acq_pulses = 0;
@@ -256,13 +259,6 @@ bool BreakDownRoutine::_analysis() {
                 + val.FileName + "\n";
         });
 
-        // If done with all the voltages, time to move on!
-        if (_current_voltage == GainVoltages.cend()) {
-            spdlog::info("Finished taking gain measurements.");
-            _current_state = BreakDownRoutineState::CalculateBreakdownVoltage;
-        }
-    } else {
-        _is_voltage_changed = false;
     }
 
     return true;
@@ -270,13 +266,15 @@ bool BreakDownRoutine::_analysis() {
 
 bool BreakDownRoutine::_calculate_breakdown_voltage() {
     if (_vbe_analysis->size() < 3) {
-        return true;
+        spdlog::error("There are less than three gain-voltage pairs in the "
+            "buffer, what went wrong?");
     }
 
     double t = get_current_time_epoch() / 1000.0;
     auto values = _vbe_analysis->calculate();
 
-    if (values.BreakdownVoltageError != 0.0) {
+    if (values.BreakdownVoltage > 0.0) {
+        _vbe_analysis_out = values;
         _saveinfo_file->Add(
                     SaveFileInfo(t, "breakdown_voltage : " +
                 std::to_string(values.BreakdownVoltage)));
@@ -293,37 +291,35 @@ bool BreakDownRoutine::_calculate_breakdown_voltage() {
                     SaveFileInfo(t, "dgain_dV_std : " +
                 std::to_string(values.RateError)));
 
+        async_save(_saveinfo_file, [](const SaveFileInfo& val) {
+            return std::to_string(val.Time) + ","
+                + val.FileName + "\n";
+        });
+
         _current_state = BreakDownRoutineState::Finished;
         return false;
     } else {
         spdlog::error("Breakdown voltage calculation failed. Restarting.");
-        _current_state = BreakDownRoutineState::Analysis;
-        _current_voltage = GainVoltages.cbegin();
-        _acq_pulses = 0;
+        _soft_reset();
         return true;
     }
-
-    // No voltage change here at all.
-    _is_voltage_changed = false;
 }
 
 bool BreakDownRoutine::_finished() {
-    _is_voltage_changed = false;
     return true;
 }
 
 bool BreakDownRoutine::_soft_reset() {
-    _is_voltage_changed = true;
+    _current_state = BreakDownRoutineState::Analysis;
     _acq_pulses = 0;
-    _current_voltage = GainVoltages.cbegin();
+    _reset_voltage();
     return true;
 }
 
 bool BreakDownRoutine::_hard_reset() {
-    _current_state = BreakDownRoutineState::Init;
-    _vbe_analysis = std::make_unique<GainVBDEstimation>();
     close(_pulse_file);
     _soft_reset();
+    _current_state = BreakDownRoutineState::Init;
     return true;
 }
 

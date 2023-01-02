@@ -3,10 +3,14 @@
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
+#include <chrono>
+
 // C++ 3rd party includes
 #include <imgui.h>
+
 // my includes
 #include "sbcqueens-gui/implot_helpers.hpp"
+#include "sbcqueens-gui/timing_events.hpp"
 
 namespace SBCQueens {
 
@@ -22,10 +26,10 @@ bool IndicatorWindow::operator()() {
         IndicatorNames::SAVED_WAVEFORMS, "Saved SiPM Pulses", 200);
     ImGui::SameLine(300); ImGui::Text("[waveforms]");
 
-    bool tmp;
+    bool done_data_taking;
     _indicator_receiver.booleanIndicator(
         IndicatorNames::DONE_DATA_TAKING, "Done data taking?",
-        tmp, [=](const double& newVal) -> bool {
+        done_data_taking, [=](const double& newVal) -> bool {
             return newVal > 0;
         }, 200);
     //
@@ -47,9 +51,47 @@ bool IndicatorWindow::operator()() {
             return newVal > 0;
         }, 200);
 
+    static double tmp_err = 1e9;
+    const double kTEMPERRTHRES = 10e-3;
+    static bool last_is_temp_stab = false, is_temp_stab = false;
+    static bool did_change = false;
+    last_is_temp_stab = is_temp_stab;
     _indicator_receiver.indicator(IndicatorNames::PID_TEMP_ERROR,
-        "Temp Error", 200);
+        "Temp Error", tmp_err, 200);
     ImGui::SameLine(300); ImGui::Text("[K]");
+
+    //
+    auto off_color = static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f));
+    auto on_color = static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, 0.6f));
+
+    is_temp_stab = std::abs(tmp_err) <= kTEMPERRTHRES;
+    // did_change = (last_is_temp_stab != is_temp_stab) || did_change;
+
+    auto current_color = is_temp_stab ? on_color : off_color;
+    ImGui::Text("%s", "Is Temperature stabilized"); ImGui::SameLine(200);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, current_color);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, current_color);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, current_color);
+
+    ImGui::Button("##tmpStab", ImVec2(15, 15));
+
+    ImGui::PopStyleColor(3);
+
+    static auto update_temp_nb = make_total_timed_event(
+            std::chrono::milliseconds(1000),
+            // Lambda hacking to allow the class function to be pass to
+            // make_total_timed_event. Is there any other way?
+            [&]() {
+            _cq.try_enqueue(
+                [=](CAENInterfaceData& oldState) {
+                oldState.isTemperatureStabilized = is_temp_stab;
+                return true;
+            });
+        });
+
+    update_temp_nb();
+    //
 
     _indicator_receiver.indicator(IndicatorNames::LATEST_RTD1_TEMP,
         "RTD1 Temp", 200);

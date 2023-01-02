@@ -56,8 +56,9 @@ bool send_msg(serial_ptr& port,
 template<typename T>
 std::optional<T> retrieve_msg(serial_ptr& port) noexcept {
     if (port) {
+        std::string msg;
         try {
-            std::string msg = port->readline(512);
+            msg = port->readline(512);
             if constexpr ( std::is_same_v<T, int>) {
                 return std::make_optional(std::stoi(msg));
             } else if constexpr ( std::is_same_v<T, int32_t > ) {
@@ -82,9 +83,10 @@ std::optional<T> retrieve_msg(serial_ptr& port) noexcept {
         } catch(serial::PortNotOpenedException& e) {
             spdlog::error("Port not opened: {0}", e.what());
         } catch (std::invalid_argument& e) {
-            spdlog::error("Invalid argument error: {0}", e.what());
+            spdlog::error("Invalid argument error: {0} with message {1}", e.what(),
+                msg);
         } catch (...) {
-            spdlog::error("Unknown error in retrieve_msg");
+            spdlog::error("Unknown error in retrieve_msg with message {0}", msg);
         }
     }
 

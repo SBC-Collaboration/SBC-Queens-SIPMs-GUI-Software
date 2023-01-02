@@ -66,10 +66,10 @@ namespace SBCQueens {
 					// Values higher than 32767 do not make sense as this is a 16 bit PID
 					// To give headroom for when calculating the output, we use 16384
 					// or 2^14
-					float cmp = kp*pid_comm_err;
-					if (cmp > 16384.0f) {
+					float cmp_tmp = kp*pid_comm_err;
+					if (cmp_tmp > 16384.0f) {
 						pid_comm_err = 16384.0f;
-					} else if (cmp < -16384.0f) {
+					} else if (cmp_tmp < -16384.0f) {
 						pid_comm_err = -16384.0f;
 					}
 				}
@@ -124,10 +124,10 @@ namespace SBCQueens {
 					// Values higher than 32767 do not make sense as this is a 16 bit PID
 					// To give headroom for when calculating the output, we use 16384
 					// or 2^14
-					float cmp = kp*pid_comm_err;
-					if (cmp > 16384.0f) {
+					float cmp_tmp = kp*pid_comm_err;
+					if (cmp_tmp > 16384.0f) {
 						pid_comm_err = 16384.0f;
-					} else if (cmp < -16384.0f) {
+					} else if (cmp_tmp < -16384.0f) {
 						pid_comm_err = -16384.0f;
 					}
 				}

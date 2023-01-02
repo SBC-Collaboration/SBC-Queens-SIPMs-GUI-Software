@@ -47,6 +47,7 @@ enum class IndicatorNames {
     // CAEN Indicators
     // Boolean
     CURRENT_STABILIZED,
+    TEMPERATURE_STABILIZED,
     ANALYSIS_ONGOING,
     FULL_ANALYSIS_DONE,
     PROCESSING_REDUCED_WF,
