@@ -55,6 +55,26 @@ struct CAENDigitizerModelConstants {
 
     std::vector<double> VoltageRanges;
 
+    CAENDigitizerModelConstants() {}
+    CAENDigitizerModelConstants(const uint32_t& res,
+        const double& acqRate, const uint32_t& memPerCh, const uint8_t& numChs,
+        const uint8_t& numGrps, const uint8_t& numChsPerGrp,
+        const uint32_t maxNumBuffs, const float& nloctorl,
+        std::initializer_list<double> voltRanges) :
+        ADCResolution{res},
+        AcquisitionRate{acqRate},
+        MemoryPerChannel{memPerCh},
+        NumChannels{numChs},
+        NumberOfGroups{numGrps},
+        NumChannelsPerGroup{numChsPerGrp},
+        MaxNumBuffers{maxNumBuffs},
+        NLOCToRecordLength{nloctorl},
+        VoltageRanges{voltRanges}
+        {}
+
+    CAENDigitizerModelConstants(const CAENDigitizerModelConstants&) = default;
+    CAENDigitizerModelConstants&
+        operator=(const CAENDigitizerModelConstants&) = default;
 };
 
 // This is here so we can transform string to enums

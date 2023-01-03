@@ -8,6 +8,7 @@
 #include <string>
 // C++ 3rd party includes
 // my includes
+#include "sbcqueens-gui/timing_events.hpp"
 #include "sbcqueens-gui/caen_helper.hpp"
 #include "sbcqueens-gui/file_helpers.hpp"
 
@@ -121,6 +122,22 @@ class BreakdownRoutine {
             // and number of channels
             sbc_init_file,
             _caen_port);
+
+        double t = get_current_time_epoch() / 1000.0;
+        _saveinfo_file->Add(SaveFileInfo(t, _file_name));
+    }
+
+    // Closes the pulse file, and write to the logfile when it was closed.
+    void _close_sipm_file() noexcept {
+        if (not _pulse_file) {
+            return;
+        }
+
+        // Close and open the next file
+        close(_pulse_file);
+
+        double t = get_current_time_epoch() / 1000.0;
+        _saveinfo_file->Add(SaveFileInfo(t, _file_name));
     }
 
     // Resets the voltage and set the hasVoltageChanged() to true.
@@ -152,7 +169,7 @@ class BreakdownRoutine {
         _run_name{runName},
         _current_voltage{GainVoltages.cbegin()}
     {
-        if (not port) {
+        if (not _caen_port) {
             throw "BreakdownRoutine cannot be created with an empty CAEN "
             "resource";
         }
@@ -162,6 +179,8 @@ class BreakdownRoutine {
             return std::make_shared<caenEvent>(_caen_port->Handle);
         });
     }
+
+    ~BreakdownRoutine() { }
 
     // Updates the state machine.
     bool update() noexcept;
@@ -207,6 +226,10 @@ class BreakdownRoutine {
     // Returns the breakdown voltage If none, it equals to 0.
     GainVBDFitParameters getBreakdownVoltage() noexcept {
         return _vbe_analysis_out;
+    }
+
+    auto getLatestEvents() noexcept {
+        return _processing_evts;
     }
 
     // Retrieves the CAEN resource. If not retrieved, this class will

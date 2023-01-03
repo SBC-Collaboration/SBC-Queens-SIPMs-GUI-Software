@@ -8,6 +8,7 @@
 #include <string>
 // C++ 3rd party includes
 // my includes
+#include "sbcqueens-gui/timing_events.hpp"
 #include "sbcqueens-gui/caen_helper.hpp"
 #include "sbcqueens-gui/file_helpers.hpp"
 
@@ -17,7 +18,7 @@
 
 namespace SBCQueens {
 
-class AcquistionRoutine {
+class AcquisitionRoutine {
     // CAEN Digitizer resource
     CAEN _caen_port;
     // Information about the current state of the SiPM/CAEN software
@@ -43,12 +44,14 @@ class AcquistionRoutine {
     bool _has_voltage_changed = false;
     // Flag to indicate if there is a new gain measurement
     bool _has_new_gain_measurement = false;
+    // Flag to indicate if the routine has finished
+    bool _has_finished = false;
 
     // Buffer of the latest 1024 (max allowed) Events from the CAEN digitizer
     std::array<CAENEvent, 1024> _processing_evts;
 
     // Latest breakdown voltage routine values
-    GainVBDFitParameters _vbe_analysis_in;
+    const GainVBDFitParameters _vbe_analysis_in;
 
     // Retrieves events from the CAEN digitizer, and extracts them to
     // _processing_evts
@@ -72,7 +75,7 @@ class AcquistionRoutine {
     // Opens the SiPM pulse file given the current temperature, voltage,
     // SiPM ID, and cell.
     // The output file is named
-    // "{SIPMID}_{SIPMCELL}cell_{TEMP}degC_{VOLT}V_spe_estimation.bin"
+    // "{SIPMID}_{SIPMCELL}cell_{TEMP}degC_{OVER-VOLTAGE}OV_databin"
     void _open_sipm_file() noexcept {
         std::ostringstream out;
         out.precision(3);
@@ -92,6 +95,27 @@ class AcquistionRoutine {
             // and number of channels
             sbc_init_file,
             _caen_port);
+
+        double t = get_current_time_epoch() / 1000.0;
+        _saveinfo_file->Add(SaveFileInfo(t, _file_name));
+    }
+
+    // Closes the pulse file, and write to the logfile when it was closed.
+    void _close_sipm_file() noexcept {
+        if (not _pulse_file) {
+            return;
+        }
+        // Close and open the next file
+        close(_pulse_file);
+
+        double t = get_current_time_epoch() / 1000.0;
+        _saveinfo_file->Add(SaveFileInfo(t, _file_name));
+    }
+
+    // Resets the voltage and set the hasVoltageChanged() to true.
+    void _reset_voltage() noexcept {
+        _current_overvoltage = OverVoltages.cbegin();
+        _has_voltage_changed = true;
     }
 
  public:
@@ -100,9 +124,9 @@ class AcquistionRoutine {
         2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
 
         // Takes ownership of the port and shared the saveinfo data
-    AcquistionRoutine(CAEN port, CAENInterfaceData& doe,
+    AcquisitionRoutine(CAEN port, CAENInterfaceData& doe,
         const std::string& runName, LogFile svInfoFile,
-        GainVBDFitParameters& vbe) :
+        const GainVBDFitParameters& vbe) :
         _caen_port{std::move(port)},
         _doe{doe},
         _saveinfo_file{svInfoFile},
@@ -110,8 +134,8 @@ class AcquistionRoutine {
         _current_overvoltage{OverVoltages.cbegin()},
         _vbe_analysis_in{vbe}
     {
-        if (not port) {
-            throw "BreakdownRoutine cannot be created with an empty CAEN "
+        if (not _caen_port) {
+            throw "AcquistionRoutine cannot be created with an empty CAEN "
             "resource";
         }
 
@@ -142,7 +166,15 @@ class AcquistionRoutine {
 
     // Returns the routine current voltage.
     auto getCurrentVoltage() noexcept {
-        return *_current_overvoltage;
+        return *_current_overvoltage + _vbe_analysis_in.BreakdownVoltage;
+    }
+
+    auto hasFinished() noexcept {
+        return _has_finished;
+    }
+
+    auto getLatestEvents() noexcept {
+        return _processing_evts;
     }
 
     // Retrieves the CAEN resource. If not retrieved, this class will

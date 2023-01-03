@@ -8,7 +8,6 @@
 #include <spdlog/spdlog.h>
 
 // my includes
-#include "sbcqueens-gui/timing_events.hpp"
 #include "sbcqueens-gui/armadillo_helpers.hpp"
 
 namespace SBCQueens {
@@ -63,10 +62,6 @@ bool BreakdownRoutine::_init() noexcept {
     // First, we open the file corresponding to the first voltage.
     _open_sipm_file();
 
-    // Save into the log when the data saving started
-    double t = get_current_time_epoch() / 1000.0;
-    _saveinfo_file->Add(SaveFileInfo(t, _file_name));
-
     // It will hold this many pulses so let's allocate what we need
     _spe_estimation_pulse_buffer.resize(_doe.VBDData.SPEEstimationTotalPulses,
         _doe.GlobalConfig.RecordLength);
@@ -87,7 +82,7 @@ bool BreakdownRoutine::_init() noexcept {
         0 : static_cast<uint32_t>(prepulse_end_region);
 
     // We log the expected t0
-    t = get_current_time_epoch() / 1000.0;
+    auto t = get_current_time_epoch() / 1000.0;
     _saveinfo_file->Add(SaveFileInfo(t, "expected_t0 : "
         + std::to_string(prepulse_end_region_u + 1)));
 
@@ -158,16 +153,19 @@ bool BreakdownRoutine::_analysis() noexcept {
             continue;
         }
 
+        auto current_event = _processing_evts[k];
+        auto prev_event = _processing_evts[k-1];
+
         // If the next even time is smaller than the previous
         // it means the trigger tag overflowed. We ignore it
         // because I do not feel like making the math right now
-        if (_processing_evts[k]->Info.TriggerTimeTag <
-            _processing_evts[k - 1]->Info.TriggerTimeTag) {
+        if (current_event->Info.TriggerTimeTag <
+            prev_event->Info.TriggerTimeTag) {
             continue;
         }
 
-        auto dtsp = _processing_evts[k]->Info.TriggerTimeTag
-            - _processing_evts[k - 1]->Info.TriggerTimeTag;
+        auto dtsp = current_event->Info.TriggerTimeTag
+            - prev_event->Info.TriggerTimeTag;
 
         // 1 tsp = 8 ns as per CAEN documentation
         // dtsp * 8ns = time difference in ns
@@ -177,14 +175,11 @@ bool BreakdownRoutine::_analysis() noexcept {
             continue;
         }
 
-        if (_pulse_file) {
-            _pulse_file->Add(_processing_evts[k]);
-        }
 
-        arma::mat wave = caen_event_to_armadillo(
-            _processing_evts[k], 1);
-        _spe_estimation_pulse_buffer.row(_acq_pulses)
-            = wave;
+        _pulse_file->Add(current_event);
+
+        arma::mat wave = caen_event_to_armadillo(current_event, 1);
+        _spe_estimation_pulse_buffer.row(_acq_pulses) = wave;
 
         _acq_pulses++;
     }
@@ -193,10 +188,9 @@ bool BreakdownRoutine::_analysis() noexcept {
 
     save(_pulse_file, sbc_save_func, _caen_port);
     if (_acq_pulses >= _doe.VBDData.SPEEstimationTotalPulses) {
-
-        // This one is to note when the data taking ended
-        double t = get_current_time_epoch() / 1000.0;
-        _saveinfo_file->Add(SaveFileInfo(t, _file_name));
+        // We close the file here because this is the exact moment acquisition
+        // stopped. In case of an error, we reopen.
+        _close_sipm_file();
 
         spdlog::info("Finished taking data! Moving to analysis of voltage "
             "{0}", *_current_voltage);
@@ -221,23 +215,18 @@ bool BreakdownRoutine::_analysis() noexcept {
                 _spe_analysis_out.SPEParametersErrors(1),
                 _doe.LatestMeasure.Volt);
 
-            t = get_current_time_epoch() / 1000.0;
+            auto t = get_current_time_epoch() / 1000.0;
             for (arma::uword i = 0; i < _spe_analysis_out.SPEParameters.n_elem; i++) {
-                _saveinfo_file->Add(
-                    SaveFileInfo(t,
-                std::to_string(_spe_analysis_out.SPEParameters(i))));
+                _saveinfo_file->Add(SaveFileInfo(t,
+                    std::to_string(_spe_analysis_out.SPEParameters(i))));
 
-                _saveinfo_file->Add(
-                    SaveFileInfo(t,
-                std::to_string(_spe_analysis_out.SPEParametersErrors(i))));
+                _saveinfo_file->Add(SaveFileInfo(t,
+                    std::to_string(_spe_analysis_out.SPEParametersErrors(i))));
             }
 
             // go to the next voltage.
             ++_current_voltage;
             _has_new_gain_measurement = true;
-
-            // Close and open the next file
-            close(_pulse_file);
 
             // If done with all the voltages, time to move on!
             if (_current_voltage == GainVoltages.cend()) {
@@ -248,6 +237,9 @@ bool BreakdownRoutine::_analysis() noexcept {
                 // This should open the next file.
                 _open_sipm_file();
             }
+        } else {
+            // This means the measurement failed, so we reopen the file.
+            _open_sipm_file();
         }
 
         _acq_pulses = 0;
@@ -315,7 +307,7 @@ bool BreakdownRoutine::_soft_reset() noexcept {
 }
 
 bool BreakdownRoutine::_hard_reset() noexcept {
-    close(_pulse_file);
+    _close_sipm_file();
     _soft_reset();
     _current_state = BreakdownRoutineState::Init;
     return true;
