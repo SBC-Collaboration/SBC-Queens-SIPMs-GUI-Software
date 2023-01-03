@@ -1,5 +1,5 @@
-#ifndef BREAKDOWNROUTINE_H
-#define BREAKDOWNROUTINE_H
+#ifndef ACQUISTIONROUTINE_H
+#define ACQUISTIONROUTINE_H
 #pragma once
 
 // C STD includes
@@ -13,26 +13,11 @@
 
 #include "sbcqueens-gui/hardware_helpers/CAENInterfaceData.hpp"
 
-#include "sipmanalysis/PulseFunctions.hpp"
-#include "sipmanalysis/SPEAnalysis.hpp"
 #include "sipmanalysis/GainVBDEstimation.hpp"
-#include "sipmanalysis/StabilityTools.hpp"
 
 namespace SBCQueens {
 
-enum class BreakdownRoutineState {
-    Unusued = 0,
-    Idle,
-    Init,
-    Analysis,
-    CalculateBreakdownVoltage,
-    SoftReset,
-    HardReset,
-    Finished
-};
-
-// Does not manage voltage resources.
-class BreakdownRoutine {
+class AcquistionRoutine {
     // CAEN Digitizer resource
     CAEN _caen_port;
     // Information about the current state of the SiPM/CAEN software
@@ -46,9 +31,6 @@ class BreakdownRoutine {
     // Variable to hold the current file name (and directory)
     std::string _file_name = "";
 
-    // Current State of the internal state-machine
-    BreakdownRoutineState _current_state = BreakdownRoutineState::Init;
-
     // Latest number of Events acquired from the CAEN digitizer
     uint32_t _latest_num_events = 0;
     // Total number of Events acquired from the CAEN digitizer
@@ -56,7 +38,7 @@ class BreakdownRoutine {
     // Flag to indicate if there are new Events from the CAEN digitizer
     bool _has_new_events = false;
     // Register to the current voltage being applied to the SiPM
-    const double* _current_voltage;
+    const double* _current_overvoltage;
     // Flag to indicate if the voltage has been changed
     bool _has_voltage_changed = false;
     // Flag to indicate if there is a new gain measurement
@@ -64,20 +46,9 @@ class BreakdownRoutine {
 
     // Buffer of the latest 1024 (max allowed) Events from the CAEN digitizer
     std::array<CAENEvent, 1024> _processing_evts;
-    arma::mat _coords;
-    // Buffer of the latest Events from the CAEN digitizer as a Armadillo mat
-    arma::mat _spe_estimation_pulse_buffer;
-    // Class that holds the routine to extract the gain (and other) parameters
-    // from data.
-    std::unique_ptr< SPEAnalysis<SimplifiedSiPMFunction> > _spe_analysis;
-    // Class that holds the routine to calculate the breakdown voltage from
-    // the gains calculated from the _spe_analysis.
-    std::unique_ptr< GainVBDEstimation > _vbe_analysis;
 
-    // Latest 1SPE values
-    SPEAnalysisParams<SimplifiedSiPMFunction> _spe_analysis_out;
     // Latest breakdown voltage routine values
-    GainVBDFitParameters _vbe_analysis_out;
+    GainVBDFitParameters _vbe_analysis_in;
 
     // Retrieves events from the CAEN digitizer, and extracts them to
     // _processing_evts
@@ -106,13 +77,13 @@ class BreakdownRoutine {
         std::ostringstream out;
         out.precision(3);
         out << _doe.LatestTemperature << "degC_";
-        out << *_current_voltage << "V";
+        out << *_current_overvoltage << "OV";
         _file_name = _doe.RunDir
             + "/" + _run_name
             + "/" + std::to_string(_doe.SiPMID) + "_"
             + std::to_string(_doe.CellNumber) + "cell_"
             + out.str()
-            + "_spe_estimation.bin";
+            + "_data.bin";
 
         open(_pulse_file,
             _file_name,
@@ -123,34 +94,21 @@ class BreakdownRoutine {
             _caen_port);
     }
 
-    // Resets the voltage and set the hasVoltageChanged() to true.
-    void _reset_voltage() noexcept {
-        _current_voltage = GainVoltages.cbegin();
-        _has_voltage_changed = true;
-    }
-
-    bool _idle() noexcept;
-    bool _init() noexcept;
-    bool _analysis() noexcept;
-    bool _calculate_breakdown_voltage() noexcept;
-    bool _finished() noexcept;
-    bool _soft_reset() noexcept;
-    bool _hard_reset() noexcept;
-
  public:
-    // These are SiPM and temperature dependent but for now,
-    // we are aiming at VUV4 from -20degC to -40degC
-    const static inline std::array<double, 3> GainVoltages = {
-        52.0, 53.0, 54.0 };
 
-    // Takes ownership of the port and shared the saveinfo data
-    BreakdownRoutine(CAEN port, CAENInterfaceData& doe,
-        const std::string& runName, LogFile svInfoFile) :
+    const static inline std::array<double, 7> OverVoltages = {
+        2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
+
+        // Takes ownership of the port and shared the saveinfo data
+    AcquistionRoutine(CAEN port, CAENInterfaceData& doe,
+        const std::string& runName, LogFile svInfoFile,
+        GainVBDFitParameters& vbe) :
         _caen_port{std::move(port)},
         _doe{doe},
         _saveinfo_file{svInfoFile},
         _run_name{runName},
-        _current_voltage{GainVoltages.cbegin()}
+        _current_overvoltage{OverVoltages.cbegin()},
+        _vbe_analysis_in{vbe}
     {
         if (not port) {
             throw "BreakdownRoutine cannot be created with an empty CAEN "
@@ -163,13 +121,8 @@ class BreakdownRoutine {
         });
     }
 
-    // Updates the state machine.
+    // Updates the acquisition
     bool update() noexcept;
-
-    // Gets the latest internal state
-    BreakdownRoutineState getCurrentState() noexcept {
-        return _current_state;
-    }
 
     // Latest number of Events acquired from the CAEN digitizer
     auto getLatestNumEvents() noexcept {
@@ -189,24 +142,7 @@ class BreakdownRoutine {
 
     // Returns the routine current voltage.
     auto getCurrentVoltage() noexcept {
-        return *_current_voltage;
-    }
-
-    // Returns a copy to the internal flag used to indicate if there is a
-    // new gain measurement
-    auto hasNewGainMeasurement() noexcept {
-        return _has_new_gain_measurement;
-    }
-
-    // Returns the latest 1SPE parameters. If none, most of the internal
-    // data values will be 0.
-    SPEAnalysisParams<SimplifiedSiPMFunction> getAnalysisLatestValues() noexcept {
-        return _spe_analysis_out;
-    }
-
-    // Returns the breakdown voltage If none, it equals to 0.
-    GainVBDFitParameters getBreakdownVoltage() noexcept {
-        return _vbe_analysis_out;
+        return *_current_overvoltage;
     }
 
     // Retrieves the CAEN resource. If not retrieved, this class will
@@ -216,11 +152,8 @@ class BreakdownRoutine {
     }
 
     // Resets the internal state and resets the routine.
-    void reset() noexcept {
-        _hard_reset();
-    }
+    void reset() noexcept;
 };
-
 
 }  // namespace SBCQueens
 

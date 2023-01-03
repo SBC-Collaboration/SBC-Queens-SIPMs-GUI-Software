@@ -13,56 +13,54 @@
 
 namespace SBCQueens {
 
-bool BreakDownRoutine::update() {
-    _new_events = _process_events();
-    _is_voltage_changed = false;
-    _is_new_gain_measurement = false;
+bool BreakdownRoutine::update() noexcept {
+    _has_new_events = _process_events();
+    _has_voltage_changed = false;
+    _has_new_gain_measurement = false;
 
     switch (_current_state) {
-    case BreakDownRoutineState::Init:
+    case BreakdownRoutineState::Init:
         return _init();
     break;
 
-    case BreakDownRoutineState::Analysis:
+    case BreakdownRoutineState::Analysis:
         return _analysis();
     break;
 
-    case BreakDownRoutineState::CalculateBreakdownVoltage:
+    case BreakdownRoutineState::CalculateBreakdownVoltage:
         return _calculate_breakdown_voltage();
     break;
 
-    case BreakDownRoutineState::Finished:
+    case BreakdownRoutineState::Finished:
         return _finished();
     break;
 
-    case BreakDownRoutineState::HardReset:
+    case BreakdownRoutineState::HardReset:
         return _hard_reset();
     break;
 
-    case BreakDownRoutineState::SoftReset:
+    case BreakdownRoutineState::SoftReset:
         return _soft_reset();
     break;
 
     // These do nothing for now.
-    case BreakDownRoutineState::Idle:
-    case BreakDownRoutineState::Unusued:
+    case BreakdownRoutineState::Idle:
+    case BreakdownRoutineState::Unusued:
     default:
          return true;
     }
 }
 
 
-bool BreakDownRoutine::_idle() {
+bool BreakdownRoutine::_idle() noexcept {
     return true;
 }
 
-bool BreakDownRoutine::_init() {
-    // We start at the first voltage
+bool BreakdownRoutine::_init() noexcept {
+    // We start at the first voltage, so we reset it.
     _reset_voltage();
 
-    // Memory allocations and prepare the resources for whenever
-    // the user presses the next button, and prepares the file
-    // File preparation
+    // First, we open the file corresponding to the first voltage.
     _open_sipm_file();
 
     // Save into the log when the data saving started
@@ -133,13 +131,13 @@ bool BreakDownRoutine::_init() {
             + "\n";
     });
 
-    _current_state = BreakDownRoutineState::Analysis;
+    _current_state = BreakdownRoutineState::Analysis;
     _vbe_analysis = std::make_unique<GainVBDEstimation>();
 
     return true;
 }
 
-bool BreakDownRoutine::_analysis() {
+bool BreakdownRoutine::_analysis() noexcept {
     // Do not take data if temp or voltage is not stable
     if (not _doe.isVoltageStabilized || not _doe.isTemperatureStabilized) {
         return true;
@@ -147,7 +145,7 @@ bool BreakDownRoutine::_analysis() {
 
     // This case can stall if no data is coming in, maybe
     // add a timeout later.
-    if (!_new_events) {
+    if (!_has_new_events) {
         spdlog::warn("No new events in the buffer during analysis");
         return true;
     }
@@ -236,7 +234,7 @@ bool BreakDownRoutine::_analysis() {
 
             // go to the next voltage.
             ++_current_voltage;
-            _is_new_gain_measurement = true;
+            _has_new_gain_measurement = true;
 
             // Close and open the next file
             close(_pulse_file);
@@ -244,9 +242,9 @@ bool BreakDownRoutine::_analysis() {
             // If done with all the voltages, time to move on!
             if (_current_voltage == GainVoltages.cend()) {
                 spdlog::info("Finished taking gain measurements.");
-                _current_state = BreakDownRoutineState::CalculateBreakdownVoltage;
+                _current_state = BreakdownRoutineState::CalculateBreakdownVoltage;
             } else {
-                _is_voltage_changed = true;
+                _has_voltage_changed = true;
                 // This should open the next file.
                 _open_sipm_file();
             }
@@ -264,7 +262,7 @@ bool BreakDownRoutine::_analysis() {
     return true;
 }
 
-bool BreakDownRoutine::_calculate_breakdown_voltage() {
+bool BreakdownRoutine::_calculate_breakdown_voltage() noexcept {
     if (_vbe_analysis->size() < 3) {
         spdlog::error("There are less than three gain-voltage pairs in the "
             "buffer, what went wrong?");
@@ -296,7 +294,7 @@ bool BreakDownRoutine::_calculate_breakdown_voltage() {
                 + val.FileName + "\n";
         });
 
-        _current_state = BreakDownRoutineState::Finished;
+        _current_state = BreakdownRoutineState::Finished;
         return false;
     } else {
         spdlog::error("Breakdown voltage calculation failed. Restarting.");
@@ -305,21 +303,21 @@ bool BreakDownRoutine::_calculate_breakdown_voltage() {
     }
 }
 
-bool BreakDownRoutine::_finished() {
+bool BreakdownRoutine::_finished() noexcept {
     return true;
 }
 
-bool BreakDownRoutine::_soft_reset() {
-    _current_state = BreakDownRoutineState::Analysis;
+bool BreakdownRoutine::_soft_reset() noexcept {
+    _current_state = BreakdownRoutineState::Analysis;
     _acq_pulses = 0;
     _reset_voltage();
     return true;
 }
 
-bool BreakDownRoutine::_hard_reset() {
+bool BreakdownRoutine::_hard_reset() noexcept {
     close(_pulse_file);
     _soft_reset();
-    _current_state = BreakDownRoutineState::Init;
+    _current_state = BreakdownRoutineState::Init;
     return true;
 }
 

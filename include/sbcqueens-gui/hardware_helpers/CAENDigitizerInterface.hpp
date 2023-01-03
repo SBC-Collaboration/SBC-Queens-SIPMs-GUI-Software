@@ -42,7 +42,7 @@
 #include "sbcqueens-gui/hardware_helpers/ClientController.hpp"
 #include "sbcqueens-gui/hardware_helpers/Calibration.hpp"
 
-#include "sbcqueens-gui/sipm_helpers/BreakDownRoutine.hpp"
+#include "sbcqueens-gui/sipm_helpers/BreakdownRoutine.hpp"
 
 #include "sipmanalysis/PulseFunctions.hpp"
 #include "sipmanalysis/SPEAnalysis.hpp"
@@ -84,7 +84,7 @@ class CAENDigitizerInterface {
     CAENEvent _processing_evts[1024];
 
     // Analysis
-    std::unique_ptr<BreakDownRoutine> vbr_routine;
+    std::unique_ptr<BreakdownRoutine> _vbd_routine;
     GainVBDFitParameters _latest_breakdown_voltage;
 
     // As long as we make the Func template argument a std::fuction
@@ -533,29 +533,29 @@ class CAENDigitizerInterface {
     // is done. Serves more for the user to know
     // how things are changing.
     bool breakdown_voltage_mode() {
-        if (not vbr_routine) {
-            vbr_routine = std::make_unique<BreakDownRoutine>(
+        if (not _vbd_routine) {
+            _vbd_routine = std::make_unique<BreakdownRoutine>(
                 std::move(_caen_port), _doe, _run_name, _saveinfo_file);
         }
 
-        vbr_routine->update();
+        _vbd_routine->update();
 
-        if(vbr_routine->hasVoltageChanged()) {
-            _doe.SiPMVoltageSysVoltage = vbr_routine->getCurrentVoltage();
+        if(_vbd_routine->hasVoltageChanged()) {
+            _doe.SiPMVoltageSysVoltage = _vbd_routine->getCurrentVoltage();
             _doe.SiPMVoltageSysChange = true;
         }
 
         // GUI related stuff
-        TriggeredWaveforms = vbr_routine->getLatestNumEvents();
-        SavedWaveforms = vbr_routine->getTotalAcquiredEvents();
+        TriggeredWaveforms = _vbd_routine->getLatestNumEvents();
+        SavedWaveforms = _vbd_routine->getTotalAcquiredEvents();
         _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
 
-        switch (vbr_routine->getCurrentState()) {
-        case BreakDownRoutineState::Finished:
+        switch (_vbd_routine->getCurrentState()) {
+        case BreakdownRoutineState::Finished:
         {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            auto values = vbr_routine->getBreakdownVoltage();
+            auto values = _vbd_routine->getBreakdownVoltage();
             _latest_breakdown_voltage = values;
 
             _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
@@ -568,16 +568,16 @@ class CAENDigitizerInterface {
             _indicator_sender(IndicatorNames::ANALYSIS_ONGOING, false);
 
             // Clean resources and get the port back
-            _caen_port = vbr_routine->retrieveCAEN();
-            vbr_routine.reset();
+            _caen_port = _vbd_routine->retrieveCAEN();
+            _vbd_routine.reset();
             break;
         }
-        case BreakDownRoutineState::Analysis:
-        case BreakDownRoutineState::CalculateBreakdownVoltage:
+        case BreakdownRoutineState::Analysis:
+        case BreakdownRoutineState::CalculateBreakdownVoltage:
         {
-            auto pars = vbr_routine->getAnalysisLatestValues();
+            auto pars = _vbd_routine->getAnalysisLatestValues();
 
-            if (vbr_routine->hasNewGainMeasurement())
+            if (_vbd_routine->hasNewGainMeasurement())
             {
                 _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
                     _doe.LatestMeasure.Volt, pars.SPEParameters(1));
@@ -610,11 +610,11 @@ class CAENDigitizerInterface {
         }
 
         // Cancel button routine
-        if (_doe.CancelMeasurements && vbr_routine) {
+        if (_doe.CancelMeasurements && _vbd_routine) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            _caen_port = vbr_routine->retrieveCAEN();
-            vbr_routine.reset();
+            _caen_port = _vbd_routine->retrieveCAEN();
+            _vbd_routine.reset();
             _doe.CancelMeasurements = false;
         }
 
