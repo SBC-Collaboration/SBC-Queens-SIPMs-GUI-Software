@@ -61,7 +61,6 @@ class CAENDigitizerInterface {
 
     // Files
     std::string _run_name =  "";
-    DataFile<CAENEvent> _pulse_file;
     DataFile<SiPMVoltageMeasure> _voltages_file;
     LogFile _saveinfo_file;
 
@@ -82,14 +81,14 @@ class CAENDigitizerInterface {
     uint16_t* _data;
     size_t _length;
     std::vector<double> _x_values, _y_values;
-    CAENEvent _osc_event, _adj_osc_event;
+    CAENEvent _osc_event;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
     std::array<CAENEvent, 1024> _processing_evts;
 
     // Analysis
-    std::unique_ptr<BreakdownRoutine> _vbd_routine;
+    std::unique_ptr<BreakdownRoutine> _vbd_routine = nullptr;
     GainVBDFitParameters _latest_breakdown_voltage;
-    std::unique_ptr<AcquisitionRoutine> _acq_routine;
+    std::unique_ptr<AcquisitionRoutine> _acq_routine = nullptr;
 
     // As long as we make the Func template argument a std::fuction
     // we can then use pointer magic to initialize them
@@ -193,6 +192,8 @@ class CAENDigitizerInterface {
 
                 // Setup GPIB interface
                 // send_msg_slow("++rst");
+                // This should be not run if we are in debug mode.
+            #ifdef NDEBUG
                 send_msg_slow("++eos 0");
                 send_msg_slow("++addr 10");
                 send_msg_slow("++auto 0");
@@ -249,6 +250,7 @@ class CAENDigitizerInterface {
 
                 send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1100));
                 send_msg_slow(":init");
+            #endif
 
                 return true;
             },
@@ -415,10 +417,10 @@ class CAENDigitizerInterface {
         // _sipm_volt_sys.get([=](serial_ptr& port) -> std::optional<double> {
         //     return {};
         // });
-        std::generate(_processing_evts.begin(), _processing_evts.end(),
-        [&](){
-            return std::make_shared<caenEvent>(_caen_port->Handle);
-        });
+        // std::generate(_processing_evts.begin(), _processing_evts.end(),
+        // [&](){
+        //     return std::make_shared<caenEvent>(_caen_port->Handle);
+        // });
 
         // Allocate memory for events
         _osc_event = std::make_shared<caenEvent>(_caen_port->Handle);
@@ -527,7 +529,7 @@ class CAENDigitizerInterface {
     bool breakdown_voltage_mode() {
         if (not _vbd_routine) {
             _vbd_routine = std::make_unique<BreakdownRoutine>(
-                std::move(_caen_port), _doe, _run_name, _saveinfo_file);
+                _caen_port, _doe, _run_name, _saveinfo_file);
         }
 
         _vbd_routine->update();
@@ -548,68 +550,72 @@ class CAENDigitizerInterface {
         switch (_vbd_routine->getCurrentState()) {
         case BreakdownRoutineState::Finished:
         {
-            switch_state(CAENInterfaceStates::RunMode);
+            switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            auto values = _vbd_routine->getBreakdownVoltage();
-            _latest_breakdown_voltage = values;
-
-            _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
-            _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
-                values.BreakdownVoltage);
-            _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
-                values.BreakdownVoltageError);
-            _indicator_sender(IndicatorNames::VBD_IN_MEMORY, true);
             _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, true);
             _indicator_sender(IndicatorNames::ANALYSIS_ONGOING, false);
 
             // Clean resources and get the port back
-            _caen_port = _vbd_routine->retrieveCAEN();
-            _vbd_routine.reset();
+            // _caen_port = _vbd_routine->retrieveCAEN();
+            _vbd_routine = nullptr;
             break;
         }
         case BreakdownRoutineState::Analysis:
+            _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
         case BreakdownRoutineState::CalculateBreakdownVoltage:
         {
-            auto pars = _vbd_routine->getAnalysisLatestValues();
-
             if (_vbd_routine->hasNewGainMeasurement())
             {
+                auto pars = _vbd_routine->getAnalysisLatestValues();
                 _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
                     _doe.LatestMeasure.Volt, pars.SPEParameters(1));
-            }
-
-            _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
+                _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
                 pars.SPEParameters(1));
 
-            _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
-                pars.SPEEfficiency);
-            _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
-                pars.IntegralThreshold);
+                _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
+                    pars.SPEEfficiency);
+                _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
+                    pars.IntegralThreshold);
 
-            _indicator_sender(IndicatorNames::OFFSET,
-                pars.SPEParameters(2));
+                _indicator_sender(IndicatorNames::OFFSET,
+                    pars.SPEParameters(2));
 
-            _indicator_sender(IndicatorNames::RISE_TIME,
-                pars.SPEParameters(3));
+                _indicator_sender(IndicatorNames::RISE_TIME,
+                    pars.SPEParameters(3));
 
-            _indicator_sender(IndicatorNames::FALL_TIME,
-                pars.SPEParameters(4));
+                _indicator_sender(IndicatorNames::FALL_TIME,
+                    pars.SPEParameters(4));
+            }
 
             // Let the front-end know that the analysis is ongoing
             _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, false);
             _indicator_sender(IndicatorNames::ANALYSIS_ONGOING, true);
         }
         break;
-        // default:
-        // break;
+        case BreakdownRoutineState::Acquisition:
+            if (_vbd_routine->hasNewBreakdownVoltage()) {
+               auto values = _vbd_routine->getBreakdownVoltage();
+
+                _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
+                    values.BreakdownVoltage);
+                _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
+                    values.BreakdownVoltageError);
+
+                _indicator_sender(IndicatorNames::VBD_IN_MEMORY, true);
+                _indicator_sender(IndicatorNames::CALCULATING_VBD, false);
+            }
+
+            break;
+        default:
+        break;
         }
 
         // Cancel button routine
         if (_doe.CancelMeasurements && _vbd_routine) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            _caen_port = _vbd_routine->retrieveCAEN();
-            _vbd_routine.reset();
+            // _caen_port = _vbd_routine->retrieveCAEN();
+            _vbd_routine = nullptr;
             _doe.CancelMeasurements = false;
         }
 
@@ -621,7 +627,7 @@ class CAENDigitizerInterface {
         if (not _acq_routine) {
             _indicator_sender(IndicatorNames::DONE_DATA_TAKING, false);
             _acq_routine = std::make_unique<AcquisitionRoutine> (
-                std::move(_caen_port), _doe, _run_name, _saveinfo_file,
+                _caen_port, _doe, _run_name, _saveinfo_file,
                 _latest_breakdown_voltage);
         }
 
@@ -644,8 +650,8 @@ class CAENDigitizerInterface {
         if (_acq_routine->hasFinished()) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            _caen_port = _acq_routine->retrieveCAEN();
-            _acq_routine.reset();
+            // _caen_port = _acq_routine->retrieveCAEN();
+            _acq_routine = nullptr;
 
             _indicator_sender(IndicatorNames::DONE_DATA_TAKING, true);
         }
@@ -654,8 +660,8 @@ class CAENDigitizerInterface {
         if (_doe.CancelMeasurements && _acq_routine) {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            _caen_port = _acq_routine->retrieveCAEN();
-            _acq_routine.reset();
+            // _caen_port = _acq_routine->retrieveCAEN();
+            _acq_routine = nullptr;
             _doe.CancelMeasurements = false;
         }
 
@@ -826,7 +832,12 @@ class CAENDigitizerInterface {
 
                         // The wait time to let the user know the voltage
                         // has stabilized is 90s or 3 mins
+                    #ifdef NDEBUG
                         _wait_time = 90000.0;
+                    #else
+                        // Debug mode reduces to 30secs. We do not have time!
+                        _wait_time = 30000.0;
+                    #endif
                         if (_doe.SiPMVoltageSysSupplyEN) {
                             send_msg(port, ":sour:volt:stat ON\n", "");
                             spdlog::warn("Turning on voltage supply.");

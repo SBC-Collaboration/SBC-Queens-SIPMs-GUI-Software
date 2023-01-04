@@ -53,9 +53,9 @@ struct CAENDigitizerModelConstants {
 
     float NLOCToRecordLength = 1;
 
-    std::vector<double> VoltageRanges;
+    std::vector<double> VoltageRanges = {};
 
-    CAENDigitizerModelConstants() {}
+    // CAENDigitizerModelConstants() {}
     CAENDigitizerModelConstants(const uint32_t& res,
         const double& acqRate, const uint32_t& memPerCh, const uint8_t& numChs,
         const uint8_t& numGrps, const uint8_t& numChsPerGrp,
@@ -72,22 +72,22 @@ struct CAENDigitizerModelConstants {
         VoltageRanges{voltRanges}
         {}
 
-    CAENDigitizerModelConstants(const CAENDigitizerModelConstants&) = default;
-    CAENDigitizerModelConstants&
-        operator=(const CAENDigitizerModelConstants&) = default;
+    // CAENDigitizerModelConstants(const CAENDigitizerModelConstants&) = default;
+    // CAENDigitizerModelConstants&
+    //     operator=(const CAENDigitizerModelConstants&) = default;
 };
 
 // This is here so we can transform string to enums
-const std::unordered_map<std::string, CAENDigitizerModel>
-    CAENDigitizerModels_map {
+const static inline std::unordered_map<std::string, CAENDigitizerModel>
+    CAENDigitizerModelsMap {
         {"DT5730B", CAENDigitizerModel::DT5730B},
         {"DT5740D", CAENDigitizerModel::DT5740D}
 };
 
 // These links all the enums with their constants or properties that
 // are fixed per digitizer
-const std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
-    CAENDigitizerModelsConstants_map {
+const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
+    CAENDigitizerModelsConstantsMap {
         {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants {
             14,  // ADCResolution
             500e6,  //  AcquisitionRate
@@ -100,15 +100,15 @@ const std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
             {0.5, 2.0}  // VoltageRanges
         }},
         {CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants {
-             12,  // ADCResolution
-             62.5e6,  //  AcquisitionRate
-             static_cast<uint32_t>(192e3),  // MemoryPerChannel
-             32,  // NumChannels
-             4,  // NumChannels
-             8,  // NumberOfGroups
-             1024,  // MaxNumBuffers
-             1.5f,  // NLOCToRecordLength
-             {2.0, 10.0}  // VoltageRanges
+            12,  // ADCResolution
+            62.5e6,  //  AcquisitionRate
+            static_cast<uint32_t>(192e3),  // MemoryPerChannel
+            32,  // NumChannels
+            4,  // NumChannels
+            8,  // NumberOfGroups
+            1024,  // MaxNumBuffers
+            1.5f,  // NLOCToRecordLength
+            {2.0, 10.0}  // VoltageRanges
         }}
     // This is a C++20 higher feature so lets keep everything 17 compliant
     // CAENDigitizerModelsConstants_map {
@@ -253,20 +253,20 @@ struct caenEvent {
         CAEN_DGTZ_FreeEvent(_handle, reinterpret_cast<void**>(&Data) );
     }
 
-    // This copies event other into this
-    caenEvent(const caenEvent& other) {
-        this->_handle = other._handle;
-        this->DataPtr = other.DataPtr;
-        CAEN_DGTZ_AllocateEvent(other._handle,
-            reinterpret_cast<void**>(&this->Data));
-        // *A = *B copies the data
-        *this->Data = *other.Data;
-        this->Info = other.Info;
-    }
+    // // This copies event other into this
+    // caenEvent(const caenEvent& other) {
+    //     this->_handle = other._handle;
+    //     this->DataPtr = other.DataPtr;
+    //     CAEN_DGTZ_AllocateEvent(other._handle,
+    //         reinterpret_cast<void**>(&this->Data));
+    //     // *A = *B copies the data
+    //     *this->Data = *other.Data;
+    //     this->Info = other.Info;
+    // }
 
-    caenEvent operator=(const caenEvent& other) {
-        return caenEvent(other);
-    }
+    // caenEvent operator=(const caenEvent& other) {
+    //     return caenEvent(other);
+    // }
 
  private:
     int _handle;
@@ -284,7 +284,7 @@ struct caen {
         Model(model),
         ConnectionType(ct), LinkNum(ln), ConetNode(cn),
         VMEBaseAddress(addr), Handle(h), LatestError(err),
-        ModelConstants(CAENDigitizerModelsConstants_map.at(model)) {
+        ModelConstants(CAENDigitizerModelsConstantsMap.at(model)) {
     }
 
     ~caen() {

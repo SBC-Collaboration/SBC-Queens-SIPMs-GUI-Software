@@ -7,7 +7,7 @@ bool CAENTabs::operator()() {
         ImGui::PushItemWidth(120);
 
         CAENControlFac.ComboBox("Model", cgui_state.Model,
-            CAENDigitizerModels_map, [](){ return false; },
+            CAENDigitizerModelsMap, [](){ return false; },
             [](){ return true; });
 
         ImGui::InputScalar("Max Events Per Read", ImGuiDataType_U32,

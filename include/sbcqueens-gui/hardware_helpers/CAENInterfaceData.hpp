@@ -31,8 +31,8 @@ enum class CAENInterfaceStates {
 };
 
 struct BreakdownVoltageConfigData {
-    uint32_t SPEEstimationTotalPulses = 10000;
-    uint32_t DataPulses = 1000000;
+    uint32_t SPEEstimationTotalPulses = 20000;
+    uint32_t DataPulses = 200000;
 };
 
 struct CAENInterfaceData {

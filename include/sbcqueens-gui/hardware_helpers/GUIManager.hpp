@@ -319,7 +319,7 @@ class GUIManager {
             if (ImGui::BeginTabItem("SiPM Waveforms")) {
                 const size_t kCHperGroup = 8;
                 const auto& model_constants
-                    = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
+                    = CAENDigitizerModelsConstantsMap.at(cgui_state.Model);
                 // const auto numgroups = model_constants.NumberOfGroups > 0 ?
                 //     model_constants.NumberOfGroups : 1;
                 // const int numchpergroup = model_constants.NumChannels / numgroups;

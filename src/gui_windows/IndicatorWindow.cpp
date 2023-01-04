@@ -54,7 +54,6 @@ bool IndicatorWindow::operator()() {
     static double tmp_err = 1e9;
     const double kTEMPERRTHRES = 10e-3;
     static bool last_is_temp_stab = false, is_temp_stab = false;
-    static bool did_change = false;
     last_is_temp_stab = is_temp_stab;
     _indicator_receiver.indicator(IndicatorNames::PID_TEMP_ERROR,
         "Temp Error", tmp_err, 200);

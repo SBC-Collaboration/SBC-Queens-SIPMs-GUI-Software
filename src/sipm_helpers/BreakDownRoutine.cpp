@@ -9,13 +9,17 @@
 
 // my includes
 #include "sbcqueens-gui/armadillo_helpers.hpp"
+#include "sbcqueens-gui/caen_helper.hpp"
 
 namespace SBCQueens {
 
 bool BreakdownRoutine::update() noexcept {
     _has_new_events = _process_events();
+
+    // Reset Flags
     _has_voltage_changed = false;
     _has_new_gain_measurement = false;
+    _has_new_breakdown_voltage = false;
 
     switch (_current_state) {
     case BreakdownRoutineState::Init:
@@ -42,9 +46,11 @@ bool BreakdownRoutine::update() noexcept {
         return _soft_reset();
     break;
 
+    case BreakdownRoutineState::Acquisition:
+        return _acquistion();
+    break;
+
     // These do nothing for now.
-    case BreakdownRoutineState::Idle:
-    case BreakdownRoutineState::Unusued:
     default:
          return true;
     }
@@ -145,44 +151,11 @@ bool BreakdownRoutine::_analysis() noexcept {
         return true;
     }
 
-    // k = 1, we always throw the first event
-    for (uint32_t k = 1; k < _latest_num_events; k++) {
-
-        // If we already have enough events, do not grab more
-        if (_acq_pulses >= _doe.VBDData.SPEEstimationTotalPulses) {
-            continue;
-        }
-
-        auto current_event = _processing_evts[k];
-        auto prev_event = _processing_evts[k-1];
-
-        // If the next even time is smaller than the previous
-        // it means the trigger tag overflowed. We ignore it
-        // because I do not feel like making the math right now
-        if (current_event->Info.TriggerTimeTag <
-            prev_event->Info.TriggerTimeTag) {
-            continue;
-        }
-
-        auto dtsp = current_event->Info.TriggerTimeTag
-            - prev_event->Info.TriggerTimeTag;
-
-        // 1 tsp = 8 ns as per CAEN documentation
-        // dtsp * 8ns = time difference in ns
-        // In other words, do not add events with a time
-        // difference between the last pulse of 1000ns
-        if (dtsp*8 < 10000) {
-            continue;
-        }
-
-
-        _pulse_file->Add(current_event);
-
-        arma::mat wave = caen_event_to_armadillo(current_event, 1);
-        _spe_estimation_pulse_buffer.row(_acq_pulses) = wave;
-
-        _acq_pulses++;
-    }
+    filter_data(_doe.VBDData.SPEEstimationTotalPulses,
+        [&](CAENEvent& evt) {
+            arma::mat wave = caen_event_to_armadillo(evt, 1);
+            _spe_estimation_pulse_buffer.row(_acq_pulses) = wave;
+        });
 
     spdlog::info("Acquired {0} pulses so far.", _acq_pulses);
 
@@ -193,13 +166,13 @@ bool BreakdownRoutine::_analysis() noexcept {
         _close_sipm_file();
 
         spdlog::info("Finished taking data! Moving to analysis of voltage "
-            "{0}", *_current_voltage);
+            "{0}", _current_voltage);
         // This is the line of code that runs the analysis!
         _spe_analysis_out = _spe_analysis->FullAnalysis(
             _spe_estimation_pulse_buffer,
             _doe.GroupConfigs[0].TriggerThreshold, 1.0);
 
-        spdlog::info("Finished analysis of voltage {0}", *_current_voltage);
+        spdlog::info("Finished analysis of voltage {0}", _current_voltage);
 
         // Sometimes the analysis can fail and this is
         // reflected in SPEEfficiency being 0.
@@ -224,15 +197,19 @@ bool BreakdownRoutine::_analysis() noexcept {
                     std::to_string(_spe_analysis_out.SPEParametersErrors(i))));
             }
 
+
+
             // go to the next voltage.
-            ++_current_voltage;
+            _current_voltage_index++;
             _has_new_gain_measurement = true;
 
             // If done with all the voltages, time to move on!
-            if (_current_voltage == GainVoltages.cend()) {
+            if (_current_voltage_index >= GainVoltages.size()) {
                 spdlog::info("Finished taking gain measurements.");
+                _spe_analysis = nullptr;
                 _current_state = BreakdownRoutineState::CalculateBreakdownVoltage;
             } else {
+                _current_voltage = GainVoltages[_current_voltage_index];
                 _has_voltage_changed = true;
                 // This should open the next file.
                 _open_sipm_file();
@@ -286,13 +263,25 @@ bool BreakdownRoutine::_calculate_breakdown_voltage() noexcept {
                 + val.FileName + "\n";
         });
 
-        _current_state = BreakdownRoutineState::Finished;
-        return false;
+        _current_state = BreakdownRoutineState::Acquisition;
+        _has_new_breakdown_voltage = true;
+
+        _current_voltage_index = 0;
+        _current_voltage = OverVoltages[_current_voltage_index];
+
+        _has_voltage_changed = true;
+
+        _open_sipm_file();
+
+        spdlog::info("Moving to acquisition starting at {0} OV",
+            _current_voltage);
     } else {
         spdlog::error("Breakdown voltage calculation failed. Restarting.");
         _soft_reset();
-        return true;
     }
+
+    _vbe_analysis = nullptr;
+    return true;
 }
 
 bool BreakdownRoutine::_finished() noexcept {
@@ -300,7 +289,7 @@ bool BreakdownRoutine::_finished() noexcept {
 }
 
 bool BreakdownRoutine::_soft_reset() noexcept {
-    _current_state = BreakdownRoutineState::Analysis;
+    _current_state = BreakdownRoutineState::Init;
     _acq_pulses = 0;
     _reset_voltage();
     return true;
@@ -309,8 +298,45 @@ bool BreakdownRoutine::_soft_reset() noexcept {
 bool BreakdownRoutine::_hard_reset() noexcept {
     _close_sipm_file();
     _soft_reset();
-    _current_state = BreakdownRoutineState::Init;
     return true;
+}
+
+bool BreakdownRoutine::_acquistion() noexcept {
+    if (not _has_new_events) {
+        return true;
+    }
+
+    // Do not take data if temp or voltage is not stable.
+    // Data taking is still taking in the background to make sure the buffer
+    // is clear once these are stabilized
+    if (not _doe.isVoltageStabilized || not _doe.isTemperatureStabilized) {
+        spdlog::warn("Something is not stable");
+        return true;
+    }
+
+    filter_data(_doe.VBDData.DataPulses, [](CAENEvent&){});
+
+    spdlog::info("Acquired {0} pulses so far.", _acq_pulses);
+    save(_pulse_file, sbc_save_func, _caen_port);
+
+    if (_acq_pulses >= _doe.VBDData.DataPulses) {
+        // Reset
+        _acq_pulses = 0;
+        // Go to the next voltage.
+        _current_voltage_index++;
+
+        _close_sipm_file();
+        _open_sipm_file();
+
+        // If done with all the voltages, time to move on!
+        if (_current_voltage < OverVoltages.size()) {
+            _current_voltage = OverVoltages[_current_voltage_index];
+            spdlog::info("Moving to {0} OV.", _current_voltage);
+            _has_voltage_changed = true;
+        } else {
+            _current_state = BreakdownRoutineState::Finished;
+        }
+    }
 }
 
 }  // namespace SBCQueens

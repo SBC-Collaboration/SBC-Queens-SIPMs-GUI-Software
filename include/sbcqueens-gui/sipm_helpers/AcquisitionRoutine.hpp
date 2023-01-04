@@ -20,7 +20,7 @@ namespace SBCQueens {
 
 class AcquisitionRoutine {
     // CAEN Digitizer resource
-    CAEN _caen_port;
+    CAEN& _caen_port;
     // Information about the current state of the SiPM/CAEN software
     const CAENInterfaceData& _doe;
     // Manager of the digitizer pulse file
@@ -42,8 +42,6 @@ class AcquisitionRoutine {
     const double* _current_overvoltage;
     // Flag to indicate if the voltage has been changed
     bool _has_voltage_changed = false;
-    // Flag to indicate if there is a new gain measurement
-    bool _has_new_gain_measurement = false;
     // Flag to indicate if the routine has finished
     bool _has_finished = false;
 
@@ -124,10 +122,10 @@ class AcquisitionRoutine {
         2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
 
         // Takes ownership of the port and shared the saveinfo data
-    AcquisitionRoutine(CAEN port, CAENInterfaceData& doe,
+    AcquisitionRoutine(CAEN& port, CAENInterfaceData& doe,
         const std::string& runName, LogFile svInfoFile,
         const GainVBDFitParameters& vbe) :
-        _caen_port{std::move(port)},
+        _caen_port{port},
         _doe{doe},
         _saveinfo_file{svInfoFile},
         _run_name{runName},
@@ -139,14 +137,23 @@ class AcquisitionRoutine {
             "resource";
         }
 
+        if (not _saveinfo_file) {
+            throw "AcquistionRoutine cannot be created with an empty file "
+            "resource";
+        }
+
         std::generate(_processing_evts.begin(), _processing_evts.end(),
         [&](){
             return std::make_shared<caenEvent>(_caen_port->Handle);
         });
     }
 
+    ~AcquisitionRoutine() {
+        _close_sipm_file();
+    }
+
     // Updates the acquisition
-    bool update() noexcept;
+    bool update();
 
     // Latest number of Events acquired from the CAEN digitizer
     auto getLatestNumEvents() noexcept {
@@ -179,12 +186,12 @@ class AcquisitionRoutine {
 
     // Retrieves the CAEN resource. If not retrieved, this class will
     // free the resources when out of scope.
-    CAEN retrieveCAEN() noexcept {
-        return std::move(_caen_port);
-    }
+    // CAEN retrieveCAEN() noexcept {
+    //     return std::move(_caen_port);
+    // }
 
     // Resets the internal state and resets the routine.
-    void reset() noexcept;
+    // void reset() noexcept;
 };
 
 }  // namespace SBCQueens

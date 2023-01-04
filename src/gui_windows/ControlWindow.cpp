@@ -65,7 +65,7 @@ void ControlWindow::init(const toml::table& tb) {
     	{{"USB", CAENConnectionType::USB, },
         {"A4818", CAENConnectionType::A4818}};
     cgui_state.Model
-        = CAENDigitizerModels_map.at(CAEN_conf["Model"].value_or("DT5730B"));
+        = CAENDigitizerModelsMap.at(CAEN_conf["Model"].value_or("DT5730B"));
     cgui_state.PortNum
         = CAEN_conf["Port"].value_or(0u);
     cgui_state.ConnectionType

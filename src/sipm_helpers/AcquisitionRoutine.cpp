@@ -2,14 +2,14 @@
 
 namespace SBCQueens {
 
-bool AcquisitionRoutine::update() noexcept {
+bool AcquisitionRoutine::update() {
 	if (_has_finished) {
 		return false;
 	}
 
     _has_new_events = _process_events();
+    // Reset Flags
     _has_voltage_changed = false;
-    _has_new_gain_measurement = false;
 
     if (not _has_new_events) {
     	return false;
@@ -80,10 +80,10 @@ bool AcquisitionRoutine::update() noexcept {
     }
 }
 
-void AcquisitionRoutine::reset() noexcept {
-	_close_sipm_file();
-	_has_finished = false;
-	_reset_voltage();
-}
+// void AcquisitionRoutine::reset() noexcept {
+// 	_close_sipm_file();
+// 	_has_finished = false;
+// 	_reset_voltage();
+// }
 
 }  // namespace SBCQueens
