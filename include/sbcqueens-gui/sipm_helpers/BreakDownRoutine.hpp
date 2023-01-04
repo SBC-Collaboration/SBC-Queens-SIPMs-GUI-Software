@@ -86,7 +86,7 @@ class BreakdownRoutine {
 
     // Retrieves events from the CAEN digitizer, and extracts them to
     // _processing_evts
-    auto _process_events() noexcept {
+    bool _process_events() noexcept {
         bool is_new_data = retrieve_data_until_n_events(_caen_port,
             _caen_port->GlobalConfig.MaxEventsPerRead);
 
@@ -175,19 +175,16 @@ class BreakdownRoutine {
                 continue;
             }
 
-            auto current_event = _processing_evts[k];
-            auto prev_event = _processing_evts[k-1];
-
             // If the next even time is smaller than the previous
             // it means the trigger tag overflowed. We ignore it
             // because I do not feel like making the math right now
-            if (current_event->Info.TriggerTimeTag <
-                prev_event->Info.TriggerTimeTag) {
+            if (_processing_evts[k]->Info.TriggerTimeTag <
+                 _processing_evts[k-1]->Info.TriggerTimeTag) {
                 continue;
             }
 
-            auto dtsp = current_event->Info.TriggerTimeTag
-                - prev_event->Info.TriggerTimeTag;
+            auto dtsp = _processing_evts[k]->Info.TriggerTimeTag
+                -  _processing_evts[k-1]->Info.TriggerTimeTag;
 
             // 1 tsp = 8 ns as per CAEN documentation
             // dtsp * 8ns = time difference in ns
@@ -199,7 +196,7 @@ class BreakdownRoutine {
 
             _pulse_file->Add(_processing_evts[k]);
 
-            f(current_event);
+            f(_processing_evts[k]);
 
             _acq_pulses++;
         }

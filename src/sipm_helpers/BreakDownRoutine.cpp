@@ -146,7 +146,7 @@ bool BreakdownRoutine::_analysis() noexcept {
 
     // This case can stall if no data is coming in, maybe
     // add a timeout later.
-    if (!_has_new_events) {
+    if (not _has_new_events) {
         spdlog::warn("No new events in the buffer during analysis");
         return true;
     }
