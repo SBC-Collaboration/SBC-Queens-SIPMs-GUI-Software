@@ -40,7 +40,6 @@ function(set_project_warnings project_name)
   )
 
   set(CLANG_WARNINGS
-      -O3
       -Wall
       -Wextra  # reasonable and standard
       -Wshadow # warn the user if a variable declaration shadows one from a

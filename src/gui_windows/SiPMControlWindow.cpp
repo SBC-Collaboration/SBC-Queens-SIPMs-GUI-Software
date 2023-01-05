@@ -33,8 +33,7 @@ bool SiPMControlWindow::operator()() {
         ImVec4(204.f / 255.f, 170.f / 255.f, 0.0f, 1.0f));
     CAENControlFac.Button("Reset CAEN", [&](CAENInterfaceData& old){
         if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-            old.CurrentState == CAENInterfaceStates::RunMode ||
-            old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+            old.CurrentState == CAENInterfaceStates::MeasurementRoutineMode) {
             // Setting it to AttemptConnection will force it to reset
             old = cgui_state;
             old.SiPMVoltageSysChange = false;
@@ -80,6 +79,15 @@ bool SiPMControlWindow::operator()() {
         ImGui::IsItemEdited, [=](CAENInterfaceData& old) {
             old.SiPMVoltageSysSupplyEN = cgui_state.SiPMVoltageSysSupplyEN;
             old.SiPMVoltageSysChange = true;
+
+            // When enabling we also send the current voltage shown
+            // in the indicator to make sure the user sees the voltage
+            // he expects.
+            if (cgui_state.SiPMVoltageSysVoltage >= 60.0f) {
+                old.SiPMVoltageSysVoltage = 60.0f;
+            }
+
+            old.SiPMVoltageSysVoltage = cgui_state.SiPMVoltageSysVoltage;
             return true;
         });
     if (ImGui::IsItemHovered()) {
@@ -92,8 +100,8 @@ bool SiPMControlWindow::operator()() {
         ImGui::IsItemDeactivated, [=](CAENInterfaceData& old) {
 
             // Ignore the input under BVMode or RunMode
-            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode ||
-                old.CurrentState == CAENInterfaceStates::RunMode) {
+            if (old.CurrentState
+                == CAENInterfaceStates::MeasurementRoutineMode) {
                 return true;
             }
 
@@ -125,10 +133,10 @@ bool SiPMControlWindow::operator()() {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
         ImVec4(.0f, 8.f, .8f, 1.0f));
-    CAENControlFac.Button("Calculate VBD",
+    CAENControlFac.Button("Run measurement Routine",
         [=](CAENInterfaceData& old) {
             if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode) {
-                old.CurrentState = CAENInterfaceStates::BreakdownVoltageMode;
+                old.CurrentState = CAENInterfaceStates::MeasurementRoutineMode;
 
                 if (old.SiPMVoltageSysSupplyEN) {
                     old.LatestTemperature = tgui_state.PIDTempValues.SetPoint;
@@ -141,87 +149,89 @@ bool SiPMControlWindow::operator()() {
     });
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Starts the logic to attempt a VBD calculation."
+        ImGui::SetTooltip("Starts the logic to attempt a VBD calculation, and"
+            "then takes the pulse data. \n\n"
             "It disables the ability to change the voltage. "
-            "If it fails, it will retry. Cancel by pressing Cancel VBD mode"
-            "Then it grabs another sample to calculate the gain");
+            "If it fails, it will retry. Cancel by pressing Cancel routine.");
     }
     ImGui::SameLine();
-    CAENControlFac.Button("Cancel VBD mode",
+
+    ImGui::PushStyleColor(ImGuiCol_Button,
+        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f)));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, 0.7f)));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, 0.8f)));
+    CAENControlFac.Button("Cancel routine",
         [=](CAENInterfaceData& old) {
-            if (old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+            if (old.CurrentState == CAENInterfaceStates::MeasurementRoutineMode) {
                 old.CancelMeasurements = true;
             }
             return true;
     });
+    ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Cancels any ongoing VBD calculation.");
+        ImGui::SetTooltip("Cancels any ongoing measurement routine.");
     }
 
-    indicatorReceiver.booleanIndicator(IndicatorNames::ANALYSIS_ONGOING,
-        "Processing...",
+    indicatorReceiver.booleanIndicator(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
+        "Calculating breakdown voltage",
         tmp,
         [=](const double& newVal) -> bool {
                 return newVal > 0;
     });
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Shows the calculations are ongoing");
+        ImGui::SetTooltip("Shows if the measurements for the breakdown voltage "
+            "are ongoing");
     }
 
-    indicatorReceiver.booleanIndicator(IndicatorNames::FULL_ANALYSIS_DONE,
-        "All Analysis Done?",
+    indicatorReceiver.booleanIndicator(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
+        "Acquiring pulse data",
         tmp,
         [=](const double& newVal) -> bool {
                 return newVal > 0;
     });
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Shows the calculations finished.");
+        ImGui::SetTooltip("Shows if the measurements are ongoing.");
     }
 
-    indicatorReceiver.booleanIndicator(IndicatorNames::CALCULATING_VBD,
-        "Calculating VBD Done?",
+    indicatorReceiver.booleanIndicator(IndicatorNames::FINISHED_ROUTINE,
+        "Finished with Cell?",
         tmp,
         [=](const double& newVal) -> bool {
-                return newVal < 0;
+                return newVal > 0;
     });
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Shows if the breakdown voltage calculations "
-            "have finalized.");
+        ImGui::SetTooltip("Shows if the routine is done.");
     }
 
-    indicatorReceiver.booleanIndicator(IndicatorNames::VBD_IN_MEMORY,
-        "VBD in memory?",
-        tmp,
-        [=](const double& newVal) -> bool {
-                return newVal < 0;
-    });
 
     //  end VBD mode controls
     ImGui::Separator();
     //  Data taking controls
-    CAENControlFac.Button(
-        "Start SiPM Data Taking",
-        [=](CAENInterfaceData& old) {
-        // Only change state if its in a work related
-        // state, i.e oscilloscope mode
-        if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-            old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
-            old.CurrentState = CAENInterfaceStates::RunMode;
-        }
-        return true;
-    });
-    ImGui::SameLine();
-    CAENControlFac.Button("Cancel data taking",
-        [=](CAENInterfaceData& old) {
-            if (old.CurrentState == CAENInterfaceStates::RunMode) {
-                old.CancelMeasurements = true;
-            }
-            return true;
-    });
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Starts a data taking routine which ends until "
-            "the indicator 'Done data taking?' turns green.");
-    }
+    // CAENControlFac.Button(
+    //     "Start SiPM Data Taking",
+    //     [=](CAENInterfaceData& old) {
+    //     // Only change state if its in a work related
+    //     // state, i.e oscilloscope mode
+    //     if (old.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
+    //         old.CurrentState == CAENInterfaceStates::BreakdownVoltageMode) {
+    //         old.CurrentState = CAENInterfaceStates::RunMode;
+    //     }
+    //     return true;
+    // });
+    // ImGui::SameLine();
+    // CAENControlFac.Button("Cancel data taking",
+    //     [=](CAENInterfaceData& old) {
+    //         if (old.CurrentState == CAENInterfaceStates::RunMode) {
+    //             old.CancelMeasurements = true;
+    //         }
+    //         return true;
+    // });
+    // if (ImGui::IsItemHovered()) {
+    //     ImGui::SetTooltip("Starts a data taking routine which ends until "
+    //         "the indicator 'Done data taking?' turns green.");
+    // }
 
     // CAENControlFac.Button(
     //     "Stop SiPM Data Taking",

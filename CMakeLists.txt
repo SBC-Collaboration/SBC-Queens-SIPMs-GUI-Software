@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.11)
 include(cmake/CPM.cmake)
 
 project(SBCQueensGUIHelpers
-  VERSION 0.2.0
+  VERSION 0.3.0
   LANGUAGES C CXX)
 
 if(UNIX AND NOT APPLE)
@@ -47,7 +47,7 @@ endif (UNIX)
 
 
 add_compile_options(
-  "$<$<CONFIG:DEBUG>:-Og;-ggdb;>"
+  "$<$<CONFIG:DEBUG>:-O0;-ggdb;>"
   "$<$<CONFIG:RELEASE>:-O3;>"
 )
 
@@ -105,9 +105,9 @@ file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 add_library(${PROJECT_NAME} ${sources} ${headers})
 
 include(cmake/CompilerWarnings.cmake)
-set(CMAKE_CXX_STANDARD 17)
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
 set_project_warnings(${PROJECT_NAME})
 
 # if(MINGW)

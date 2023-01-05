@@ -24,8 +24,7 @@ enum class CAENInterfaceStates {
     Standby,
     AttemptConnection,
     OscilloscopeMode,
-    BreakdownVoltageMode,
-    RunMode,
+    MeasurementRoutineMode,
     Disconnected,
     Closing
 };

@@ -292,8 +292,7 @@ bool ControlWindow::operator()() {
                 [=](CAENInterfaceData& state) {
                     // Only change the state if any of these states
                     if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-                        state.CurrentState == CAENInterfaceStates::BreakdownVoltageMode ||
-                        state.CurrentState == CAENInterfaceStates::RunMode){
+                        state.CurrentState == CAENInterfaceStates::MeasurementRoutineMode) {
                             spdlog::info("Going to disconnect the CAEN digitizer");
                             state.CurrentState = CAENInterfaceStates::Disconnected;
                     }

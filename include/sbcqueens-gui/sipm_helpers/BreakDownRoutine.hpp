@@ -1,12 +1,14 @@
 #ifndef BREAKDOWNROUTINE_H
 #define BREAKDOWNROUTINE_H
 #include <cstddef>
+#include <stdexcept>
 #pragma once
 
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
 #include <string>
+#include <span>
 // C++ 3rd party includes
 // my includes
 #include "sbcqueens-gui/timing_events.hpp"
@@ -24,7 +26,7 @@ namespace SBCQueens {
 
 enum class BreakdownRoutineState {
     Init,
-    Analysis,
+    GainMeasurements,
     CalculateBreakdownVoltage,
     SoftReset,
     HardReset,
@@ -57,9 +59,7 @@ class BreakdownRoutine {
     // Flag to indicate if there are new Events from the CAEN digitizer
     bool _has_new_events = false;
     // Register to the current voltage being applied to the SiPM
-    double _current_voltage;
-    // Index of the current register
-    std::size_t _current_voltage_index;
+    const double* _current_voltage;
     // Flag to indicate if the voltage has been changed
     bool _has_voltage_changed = false;
     // Flag to indicate if there is a new gain measurement
@@ -112,7 +112,7 @@ class BreakdownRoutine {
         if (_current_state == BreakdownRoutineState::Acquisition) {
             out.precision(3);
             out << _doe.LatestTemperature << "degC_";
-            out << _current_voltage << "OV";
+            out << *_current_voltage << "OV";
             _file_name = _doe.RunDir
                 + "/" + _run_name
                 + "/" + std::to_string(_doe.SiPMID) + "_"
@@ -122,7 +122,7 @@ class BreakdownRoutine {
         } else {
             out.precision(3);
             out << _doe.LatestTemperature << "degC_";
-            out << _current_voltage << "V";
+            out << *_current_voltage << "V";
             _file_name = _doe.RunDir
                 + "/" + _run_name
                 + "/" + std::to_string(_doe.SiPMID) + "_"
@@ -158,11 +158,10 @@ class BreakdownRoutine {
 
     // Resets the voltage and set the hasVoltageChanged() to true.
     void _reset_voltage() noexcept {
-        _current_voltage_index = 0;
         if (_current_state == BreakdownRoutineState::Acquisition) {
-            _current_voltage = OverVoltages[0];
+            _current_voltage = OverVoltages.cbegin();
         } else {
-            _current_voltage = GainVoltages[0];
+            _current_voltage = GainVoltages.cbegin();
         }
         _has_voltage_changed = true;
     }
@@ -204,7 +203,7 @@ class BreakdownRoutine {
 
     bool _idle() noexcept;
     bool _init() noexcept;
-    bool _analysis() noexcept;
+    bool _gain_measurements() noexcept;
     bool _calculate_breakdown_voltage() noexcept;
     bool _finished() noexcept;
     bool _soft_reset() noexcept;
@@ -214,11 +213,11 @@ class BreakdownRoutine {
  public:
     // These are SiPM and temperature dependent but for now,
     // we are aiming at VUV4 from -20degC to -40degC
-    const static inline std::vector<double> GainVoltages = {
+    constexpr static std::array<double, 3> GainVoltages{
         52.0, 53.0, 54.0 };
 
-    const static inline std::vector<double> OverVoltages = {
-        4.0, 5.0, 6.0, 7.0, 8.0 };
+    constexpr static std::array<double, 7> OverVoltages{
+        2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
 
     // Takes ownership of the port and shared the saveinfo data
     BreakdownRoutine(CAEN& port, CAENInterfaceData& doe,
@@ -227,16 +226,16 @@ class BreakdownRoutine {
         _doe{doe},
         _saveinfo_file{svInfoFile},
         _run_name{runName},
-        _current_voltage{GainVoltages[0]}
+        _current_voltage{GainVoltages.cbegin()}
     {
         if (not _caen_port) {
-            throw "BreakdownRoutine cannot be created with an empty CAEN "
-            "resource";
+            throw std::invalid_argument("BreakdownRoutine cannot be created "
+            "with an empty CAEN resource");
         }
 
         if (not _saveinfo_file) {
-            throw "BreakdownRoutine cannot be created with an empty file "
-            "resource";
+            throw std::invalid_argument("BreakdownRoutine cannot be created "
+            "with an empty file resource");
         }
 
         std::generate(_processing_evts.begin(), _processing_evts.end(),
@@ -276,10 +275,10 @@ class BreakdownRoutine {
     // Returns the routine current voltage.
     double getCurrentVoltage() noexcept {
         if (_current_state == BreakdownRoutineState::Acquisition) {
-            return _current_voltage + _vbe_analysis_out.BreakdownVoltage;
+            return *_current_voltage + _vbe_analysis_out.BreakdownVoltage;
         }
 
-        return _current_voltage;
+        return *_current_voltage;
     }
 
     // Returns a copy to the internal flag used to indicate if there is a

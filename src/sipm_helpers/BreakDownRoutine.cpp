@@ -26,8 +26,8 @@ bool BreakdownRoutine::update() noexcept {
         return _init();
     break;
 
-    case BreakdownRoutineState::Analysis:
-        return _analysis();
+    case BreakdownRoutineState::GainMeasurements:
+        return _gain_measurements();
     break;
 
     case BreakdownRoutineState::CalculateBreakdownVoltage:
@@ -132,13 +132,13 @@ bool BreakdownRoutine::_init() noexcept {
             + "\n";
     });
 
-    _current_state = BreakdownRoutineState::Analysis;
+    _current_state = BreakdownRoutineState::GainMeasurements;
     _vbe_analysis = std::make_unique<GainVBDEstimation>();
 
     return true;
 }
 
-bool BreakdownRoutine::_analysis() noexcept {
+bool BreakdownRoutine::_gain_measurements() noexcept {
     // Do not take data if temp or voltage is not stable
     if (not _doe.isVoltageStabilized || not _doe.isTemperatureStabilized) {
         return true;
@@ -166,13 +166,13 @@ bool BreakdownRoutine::_analysis() noexcept {
         _close_sipm_file();
 
         spdlog::info("Finished taking data! Moving to analysis of voltage "
-            "{0}", _current_voltage);
+            "{0}", *_current_voltage);
         // This is the line of code that runs the analysis!
         _spe_analysis_out = _spe_analysis->FullAnalysis(
             _spe_estimation_pulse_buffer,
             _doe.GroupConfigs[0].TriggerThreshold, 1.0);
 
-        spdlog::info("Finished analysis of voltage {0}", _current_voltage);
+        spdlog::info("Finished analysis of voltage {0}", *_current_voltage);
 
         // Sometimes the analysis can fail and this is
         // reflected in SPEEfficiency being 0.
@@ -197,19 +197,16 @@ bool BreakdownRoutine::_analysis() noexcept {
                     std::to_string(_spe_analysis_out.SPEParametersErrors(i))));
             }
 
-
-
             // go to the next voltage.
-            _current_voltage_index++;
+            _current_voltage++;
             _has_new_gain_measurement = true;
 
             // If done with all the voltages, time to move on!
-            if (_current_voltage_index >= GainVoltages.size()) {
+            if (_current_voltage >= GainVoltages.cend()) {
                 spdlog::info("Finished taking gain measurements.");
                 _spe_analysis = nullptr;
                 _current_state = BreakdownRoutineState::CalculateBreakdownVoltage;
             } else {
-                _current_voltage = GainVoltages[_current_voltage_index];
                 _has_voltage_changed = true;
                 // This should open the next file.
                 _open_sipm_file();
@@ -266,15 +263,15 @@ bool BreakdownRoutine::_calculate_breakdown_voltage() noexcept {
         _current_state = BreakdownRoutineState::Acquisition;
         _has_new_breakdown_voltage = true;
 
-        _current_voltage_index = 0;
-        _current_voltage = OverVoltages[_current_voltage_index];
+        // Start at Overvoltages now
+        _current_voltage = OverVoltages.cbegin();
 
         _has_voltage_changed = true;
 
         _open_sipm_file();
 
         spdlog::info("Moving to acquisition starting at {0} OV",
-            _current_voltage);
+            *_current_voltage);
     } else {
         spdlog::error("Breakdown voltage calculation failed. Restarting.");
         _soft_reset();
@@ -303,6 +300,7 @@ bool BreakdownRoutine::_hard_reset() noexcept {
 
 bool BreakdownRoutine::_acquistion() noexcept {
     if (not _has_new_events) {
+        spdlog::warn("No new events");
         return true;
     }
 
@@ -310,7 +308,6 @@ bool BreakdownRoutine::_acquistion() noexcept {
     // Data taking is still taking in the background to make sure the buffer
     // is clear once these are stabilized
     if (not _doe.isVoltageStabilized || not _doe.isTemperatureStabilized) {
-        spdlog::warn("Something is not stable");
         return true;
     }
 
@@ -323,20 +320,21 @@ bool BreakdownRoutine::_acquistion() noexcept {
         // Reset
         _acq_pulses = 0;
         // Go to the next voltage.
-        _current_voltage_index++;
+        _current_voltage++;
 
         _close_sipm_file();
         _open_sipm_file();
 
         // If done with all the voltages, time to move on!
-        if (_current_voltage < OverVoltages.size()) {
-            _current_voltage = OverVoltages[_current_voltage_index];
-            spdlog::info("Moving to {0} OV.", _current_voltage);
+        if (_current_voltage < OverVoltages.cend()) {
+            spdlog::info("Moving to {0} OV.", *_current_voltage);
             _has_voltage_changed = true;
         } else {
             _current_state = BreakdownRoutineState::Finished;
         }
     }
+
+    return true;
 }
 
 }  // namespace SBCQueens

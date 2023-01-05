@@ -78,6 +78,8 @@ bool AcquisitionRoutine::update() {
         	_has_finished = true;
         }
     }
+
+    return true;
 }
 
 // void AcquisitionRoutine::reset() noexcept {

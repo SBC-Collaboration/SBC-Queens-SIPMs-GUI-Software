@@ -70,7 +70,7 @@ class CAENDigitizerInterface {
     CAEN _caen_port = nullptr;
     ClientController<serial_ptr, SiPMVoltageMeasure> _sipm_volt_sys;
 
-    uint64_t SavedWaveforms = 0;
+    uint32_t SavedWaveforms = 0;
     uint64_t TriggeredWaveforms = 0;
 
     bool _vbd_created = false;
@@ -108,8 +108,8 @@ class CAENDigitizerInterface {
     CAENInterfaceState_ptr standby_state;
     CAENInterfaceState_ptr attemptConnection_state;
     CAENInterfaceState_ptr oscilloscopeMode_state;
-    CAENInterfaceState_ptr breakdownVoltageMode_state;
-    CAENInterfaceState_ptr runMode_state;
+    CAENInterfaceState_ptr measurementRoutineMode_state;
+    // CAENInterfaceState_ptr runMode_state;
     CAENInterfaceState_ptr disconnected_state;
     CAENInterfaceState_ptr closing_state;
 
@@ -133,13 +133,13 @@ class CAENDigitizerInterface {
             std::chrono::milliseconds(150),
             std::bind(&CAENDigitizerInterface::oscilloscope, this));
 
-        breakdownVoltageMode_state = std::make_shared<CAENInterfaceState>(
+        measurementRoutineMode_state = std::make_shared<CAENInterfaceState>(
             std::chrono::milliseconds(50),
-            std::bind(&CAENDigitizerInterface::breakdown_voltage_mode, this));
+            std::bind(&CAENDigitizerInterface::measurement_routine_mode, this));
 
-        runMode_state = std::make_shared<CAENInterfaceState>(
-            std::chrono::milliseconds(50),
-            std::bind(&CAENDigitizerInterface::run_mode, this));
+        // runMode_state = std::make_shared<CAENInterfaceState>(
+        //     std::chrono::milliseconds(50),
+        //     std::bind(&CAENDigitizerInterface::run_mode, this));
 
         disconnected_state = std::make_shared<CAENInterfaceState>(
             std::chrono::milliseconds(1),
@@ -310,13 +310,13 @@ class CAENDigitizerInterface {
                 main_loop_state = oscilloscopeMode_state;
             break;
 
-            case CAENInterfaceStates::BreakdownVoltageMode:
-                main_loop_state = breakdownVoltageMode_state;
+            case CAENInterfaceStates::MeasurementRoutineMode:
+                main_loop_state = measurementRoutineMode_state;
             break;
 
-            case CAENInterfaceStates::RunMode:
-                main_loop_state = runMode_state;
-            break;
+            // case CAENInterfaceStates::RunMode:
+            //     main_loop_state = runMode_state;
+            // break;
 
             case CAENInterfaceStates::Disconnected:
                 main_loop_state = disconnected_state;
@@ -526,10 +526,17 @@ class CAENDigitizerInterface {
     // Does the SiPM pulse processing but no file saving
     // is done. Serves more for the user to know
     // how things are changing.
-    bool breakdown_voltage_mode() {
+    bool measurement_routine_mode() {
         if (not _vbd_routine) {
             _vbd_routine = std::make_unique<BreakdownRoutine>(
                 _caen_port, _doe, _run_name, _saveinfo_file);
+
+            // Reset all indicators for this section
+            _indicator_sender(IndicatorNames::FINISHED_ROUTINE, false);
+            _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
+                false);
+            _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
+                false);
         }
 
         _vbd_routine->update();
@@ -543,27 +550,27 @@ class CAENDigitizerInterface {
         rdm_extract_for_gui();
 
         // GUI related stuff
-        TriggeredWaveforms = _vbd_routine->getLatestNumEvents();
+        TriggeredWaveforms += static_cast<uint64_t>(
+            _vbd_routine->getLatestNumEvents());
         SavedWaveforms = _vbd_routine->getTotalAcquiredEvents();
         _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
 
         switch (_vbd_routine->getCurrentState()) {
         case BreakdownRoutineState::Finished:
-        {
             switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, true);
-            _indicator_sender(IndicatorNames::ANALYSIS_ONGOING, false);
+            _indicator_sender(IndicatorNames::FINISHED_ROUTINE, true);
 
+            // Set back to 52 just in case.
+            _doe.SiPMVoltageSysVoltage = *_vbd_routine->GainVoltages.cbegin();
+            _doe.SiPMVoltageSysChange = true;
             // Clean resources and get the port back
             // _caen_port = _vbd_routine->retrieveCAEN();
             _vbd_routine = nullptr;
             break;
-        }
-        case BreakdownRoutineState::Analysis:
-            _indicator_sender(IndicatorNames::CALCULATING_VBD, true);
+        case BreakdownRoutineState::GainMeasurements:
+            _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING, true);
         case BreakdownRoutineState::CalculateBreakdownVoltage:
-        {
             if (_vbd_routine->hasNewGainMeasurement())
             {
                 auto pars = _vbd_routine->getAnalysisLatestValues();
@@ -586,13 +593,9 @@ class CAENDigitizerInterface {
                 _indicator_sender(IndicatorNames::FALL_TIME,
                     pars.SPEParameters(4));
             }
-
-            // Let the front-end know that the analysis is ongoing
-            _indicator_sender(IndicatorNames::FULL_ANALYSIS_DONE, false);
-            _indicator_sender(IndicatorNames::ANALYSIS_ONGOING, true);
-        }
-        break;
+            break;
         case BreakdownRoutineState::Acquisition:
+            _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING, true);
             if (_vbd_routine->hasNewBreakdownVoltage()) {
                auto values = _vbd_routine->getBreakdownVoltage();
 
@@ -600,9 +603,6 @@ class CAENDigitizerInterface {
                     values.BreakdownVoltage);
                 _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
                     values.BreakdownVoltageError);
-
-                _indicator_sender(IndicatorNames::VBD_IN_MEMORY, true);
-                _indicator_sender(IndicatorNames::CALCULATING_VBD, false);
             }
 
             break;
@@ -623,51 +623,51 @@ class CAENDigitizerInterface {
         return true;
     }
 
-    bool run_mode() {
-        if (not _acq_routine) {
-            _indicator_sender(IndicatorNames::DONE_DATA_TAKING, false);
-            _acq_routine = std::make_unique<AcquisitionRoutine> (
-                _caen_port, _doe, _run_name, _saveinfo_file,
-                _latest_breakdown_voltage);
-        }
+    // bool run_mode() {
+    //     if (not _acq_routine) {
+    //         _indicator_sender(IndicatorNames::DONE_DATA_TAKING, false);
+    //         _acq_routine = std::make_unique<AcquisitionRoutine> (
+    //             _caen_port, _doe, _run_name, _saveinfo_file,
+    //             _latest_breakdown_voltage);
+    //     }
 
-        _acq_routine->update();
+    //     _acq_routine->update();
 
-        if(_acq_routine->hasVoltageChanged()) {
-            _doe.SiPMVoltageSysVoltage = _acq_routine->getCurrentVoltage();
-            _doe.SiPMVoltageSysChange = true;
-        }
+    //     if(_acq_routine->hasVoltageChanged()) {
+    //         _doe.SiPMVoltageSysVoltage = _acq_routine->getCurrentVoltage();
+    //         _doe.SiPMVoltageSysChange = true;
+    //     }
 
-        _processing_evts = _acq_routine->getLatestEvents();
-        rdm_extract_for_gui();
+    //     _processing_evts = _acq_routine->getLatestEvents();
+    //     rdm_extract_for_gui();
 
-        // GUI related stuff
-        TriggeredWaveforms = _acq_routine->getLatestNumEvents();
-        SavedWaveforms = _acq_routine->getTotalAcquiredEvents();
-        _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
+    //     // GUI related stuff
+    //     TriggeredWaveforms = _acq_routine->getLatestNumEvents();
+    //     SavedWaveforms = _acq_routine->getTotalAcquiredEvents();
+    //     _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
 
-        // It finished, we move back to OscilloscopeMode
-        if (_acq_routine->hasFinished()) {
-            switch_state(CAENInterfaceStates::OscilloscopeMode);
+    //     // It finished, we move back to OscilloscopeMode
+    //     if (_acq_routine->hasFinished()) {
+    //         switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            // _caen_port = _acq_routine->retrieveCAEN();
-            _acq_routine = nullptr;
+    //         // _caen_port = _acq_routine->retrieveCAEN();
+    //         _acq_routine = nullptr;
 
-            _indicator_sender(IndicatorNames::DONE_DATA_TAKING, true);
-        }
+    //         _indicator_sender(IndicatorNames::DONE_DATA_TAKING, true);
+    //     }
 
-        // Cancel button routine
-        if (_doe.CancelMeasurements && _acq_routine) {
-            switch_state(CAENInterfaceStates::OscilloscopeMode);
+    //     // Cancel button routine
+    //     if (_doe.CancelMeasurements && _acq_routine) {
+    //         switch_state(CAENInterfaceStates::OscilloscopeMode);
 
-            // _caen_port = _acq_routine->retrieveCAEN();
-            _acq_routine = nullptr;
-            _doe.CancelMeasurements = false;
-        }
+    //         // _caen_port = _acq_routine->retrieveCAEN();
+    //         _acq_routine = nullptr;
+    //         _doe.CancelMeasurements = false;
+    //     }
 
-        change_state();
-        return true;
-    }
+    //     change_state();
+    //     return true;
+    // }
 
     bool disconnected_mode() {
         spdlog::warn("Manually losing connection to the CAEN digitizer.");
@@ -823,8 +823,7 @@ class CAENDigitizerInterface {
 
         switch (_doe.CurrentState) {
             case CAENInterfaceStates::OscilloscopeMode:
-            case CAENInterfaceStates::RunMode:
-            case CAENInterfaceStates::BreakdownVoltageMode:
+            case CAENInterfaceStates::MeasurementRoutineMode:
                 if (_doe.SiPMVoltageSysChange) {
                     _sipm_volt_sys.get([&](serial_ptr& port)
                     -> std::optional<SiPMVoltageMeasure> {

@@ -48,10 +48,10 @@ enum class IndicatorNames {
     // Boolean
     CURRENT_STABILIZED,
     TEMPERATURE_STABILIZED,
-    ANALYSIS_ONGOING,
-    FULL_ANALYSIS_DONE,
-    PROCESSING_REDUCED_WF,
-    CALCULATING_VBD,
+
+    BREAKDOWN_ROUTINE_ONGOING,
+    MEASUREMENT_ROUTINE_ONGOING,
+    FINISHED_ROUTINE,
 
     // Numerical
     CAENBUFFEREVENTS,
@@ -70,7 +70,6 @@ enum class IndicatorNames {
 
     SAVED_WAVEFORMS,
     DONE_DATA_TAKING,
-    VBD_IN_MEMORY
 };
 
 using GeneralIndicatorQueue = IndicatorsQueue<IndicatorNames, double>;

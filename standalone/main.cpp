@@ -8,6 +8,9 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <readerwriterqueue.h>
 
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+
 // My includes
 // Only have 1 include at a time!
 #ifdef USE_VULKAN
@@ -25,17 +28,26 @@
 #include "sbcqueens-gui/hardware_helpers/GUIManager.hpp"
 
 int main() {
-    // try{
-    //     auto async_file = spdlog::rotating_logger_mt<spdlog::async_factory>(
-    //      "main logger", "log.txt", 1024 * 1024 * 5, 3
-    //  );
+    try{
+        spdlog::init_thread_pool(8192, 1);
+        auto stdout_sink
+            = std::make_shared<spdlog::sinks::stdout_color_sink_mt >();
+        auto rotating_sink
+            = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+                "log.txt", 1024*1024*10, 3);
+        std::vector<spdlog::sink_ptr> sinks {stdout_sink, rotating_sink};
+        auto logger = std::make_shared<spdlog::async_logger>("log",
+            sinks.begin(), sinks.end(), spdlog::thread_pool(),
+            spdlog::async_overflow_policy::block);
+        spdlog::register_logger(logger);
 
-    //  spdlog::set_default_logger(async_file);
-    // } catch(const spdlog::spdlog_ex& ex) {
-    //   std::cout << "Log initialization failed: " << ex.what() << std::endl;
-    // }
+    } catch(const spdlog::spdlog_ex& ex) {
+      std::cout << "Log initialization failed: " << ex.what() << std::endl;
+      throw "Log initialization failed";
+    }
 
-    spdlog::info("Starting software");
+    spdlog::info("Starting software by first initializing all the queues.");
+    //TODO(Hector): these should be changed to shared_ptrs
     SBCQueens::TeensyQueue teensyQueue;
     SBCQueens::CAENQueue caenQueue;
     SBCQueens::SlowDAQQueue otherQueue;
@@ -43,6 +55,7 @@ int main() {
     SBCQueens::MultiplePlotQueue mpQueue;
     SBCQueens::SiPMPlotQueue sipmQueue;
 
+    spdlog::info("Then the GUI.");
     // This is our GUI function which actually holds all of our buttons
     // labels, inputs, graphs and ect
     SBCQueens::GUIManager guiManager(
@@ -60,8 +73,6 @@ int main() {
         sipmQueue);
 
     spdlog::info("Creating wrapper. Using:");
-
-
 #ifdef USE_VULKAN
     spdlog::info("Using VULKAN + GLFW backend");
 #else
@@ -81,6 +92,7 @@ int main() {
     };
 
     // std::thread main_thread(gui_wrapper);
+    spdlog::info("Creating the teensy interface and CAEN interface.");
 
     // The lambdas we are passing are the functions
     // to read and write to the queue
@@ -109,7 +121,7 @@ int main() {
 
     std::thread other_thread(std::ref(otherc));
 
-    spdlog::info("Starting threads");
+    spdlog::info("Starting threads which holds everything.");
 
     tc_thread.detach();
     caen_thread.detach();
