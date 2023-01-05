@@ -213,11 +213,12 @@ class BreakdownRoutine {
  public:
     // These are SiPM and temperature dependent but for now,
     // we are aiming at VUV4 from -20degC to -40degC
-    constexpr static std::array<double, 3> GainVoltages{
-        52.0, 53.0, 54.0 };
+    constexpr static auto GainVoltages = std::to_array<double>({
+        52.0, 53.0, 54.0 });
 
-    constexpr static std::array<double, 7> OverVoltages{
-        2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
+    constexpr static auto OverVoltages = std::to_array<double>({
+        // 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
+        2.0, 4.0, 8.0 });
 
     // Takes ownership of the port and shared the saveinfo data
     BreakdownRoutine(CAEN& port, CAENInterfaceData& doe,

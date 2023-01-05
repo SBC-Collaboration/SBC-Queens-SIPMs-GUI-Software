@@ -83,6 +83,7 @@ class CAENDigitizerInterface {
     std::vector<double> _x_values, _y_values;
     CAENEvent _osc_event;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
+    uint32_t LatestAcquiredWaveforms;
     std::array<CAENEvent, 1024> _processing_evts;
 
     // Analysis
@@ -417,10 +418,10 @@ class CAENDigitizerInterface {
         // _sipm_volt_sys.get([=](serial_ptr& port) -> std::optional<double> {
         //     return {};
         // });
-        // std::generate(_processing_evts.begin(), _processing_evts.end(),
-        // [&](){
-        //     return std::make_shared<caenEvent>(_caen_port->Handle);
-        // });
+        std::generate(_processing_evts.begin(), _processing_evts.end(),
+        [&](){
+            return std::make_shared<caenEvent>(_caen_port->Handle);
+        });
 
         // Allocate memory for events
         _osc_event = std::make_shared<caenEvent>(_caen_port->Handle);
@@ -550,8 +551,8 @@ class CAENDigitizerInterface {
         rdm_extract_for_gui();
 
         // GUI related stuff
-        TriggeredWaveforms += static_cast<uint64_t>(
-            _vbd_routine->getLatestNumEvents());
+        LatestAcquiredWaveforms = _vbd_routine->getLatestNumEvents();
+        TriggeredWaveforms += static_cast<uint64_t>(LatestAcquiredWaveforms);
         SavedWaveforms = _vbd_routine->getTotalAcquiredEvents();
         _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
 
@@ -688,12 +689,12 @@ class CAENDigitizerInterface {
             std::chrono::milliseconds(200),
             [&]() {
                 // For the GUI
-                if (TriggeredWaveforms == 0) {
+                if (LatestAcquiredWaveforms == 0) {
                     return;
                 }
                 static std::default_random_engine generator;
                 std::uniform_int_distribution<uint64_t>
-                    distribution(0, TriggeredWaveforms);
+                    distribution(0, LatestAcquiredWaveforms);
                 uint64_t rdm_num = distribution(generator);
 
                 _osc_event = _processing_evts[rdm_num];
@@ -851,7 +852,7 @@ class CAENDigitizerInterface {
                         if (dV >= 10.0) {
                             // However, when the voltage swing is higher than
                             // 10V, it should be multiplied it by 2.5.
-                            _wait_time *= 1.0;
+                            _wait_time *= 2.0;
                         }
 
                         send_msg(port, ":sour:volt "

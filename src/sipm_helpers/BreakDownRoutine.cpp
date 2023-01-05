@@ -326,7 +326,7 @@ bool BreakdownRoutine::_acquistion() noexcept {
         _open_sipm_file();
 
         // If done with all the voltages, time to move on!
-        if (_current_voltage < OverVoltages.cend()) {
+        if (_current_voltage != OverVoltages.cend()) {
             spdlog::info("Moving to {0} OV.", *_current_voltage);
             _has_voltage_changed = true;
         } else {
