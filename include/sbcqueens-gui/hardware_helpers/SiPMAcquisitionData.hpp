@@ -5,11 +5,13 @@
 // C STD includes
 // C 3rd party includes
 // C++ std includes
-#include <functional>
 // C++ 3rd party includes
-#include <readerwriterqueue.h>
+
 // my includes
+#include "sbcqueens-gui/multithreading_helpers/Pipe.hpp"
+
 #include "sbcqueens-gui/caen_helper.hpp"
+#include "sbcqueens-gui/imgui_helpers.hpp"
 
 namespace SBCQueens {
 
@@ -19,7 +21,7 @@ struct SiPMVoltageMeasure {
     double Time;  // in unix timestamp
 };
 
-enum class CAENInterfaceStates {
+enum class SiPMAcquisitionStates {
     NullState = 0,
     Standby,
     AttemptConnection,
@@ -34,7 +36,20 @@ struct BreakdownVoltageConfigData {
     uint32_t DataPulses = 200000;
 };
 
-struct CAENInterfaceData {
+struct SiPMAcquisitionData;
+
+// Multi-threading items
+using SiPMAcquisitionDataPipeCallback = PipeCallback<SiPMAcquisitionData>;
+
+// It accepts any Queue with a FIFO style.
+template<template<typename, typename> class QueueType, typename Traits>
+class SiPMAcquisitionPipe : public Pipe<QueueType, SiPMAcquisitionData, Traits> {};
+
+template<class TPipe>
+class SiPMAcquisitionPipeEnd : public PipeEnd<TPipe> {};
+
+// CAEN Interface data that holds every non-volatile items.
+struct SiPMAcquisitionData {
     std::string RunDir = "";
 
     CAENConnectionType ConnectionType;
@@ -46,7 +61,7 @@ struct CAENInterfaceData {
     int PortNum = 0;
     uint32_t VMEAddress = 0;
 
-    CAENInterfaceStates CurrentState = CAENInterfaceStates::NullState;
+    SiPMAcquisitionStates CurrentState = SiPMAcquisitionStates::NullState;
 
     bool SoftwareTrigger = false;
     bool ResetCaen = false;
@@ -68,10 +83,15 @@ struct CAENInterfaceData {
 
     std::string SiPMName = "";
     BreakdownVoltageConfigData VBDData;
+
+    // This API required items.
+    bool Changed = false;
+    SiPMAcquisitionDataPipeCallback Callback;
 };
 
-using CAENQueueType = std::function < bool(CAENInterfaceData&) >;
-using CAENQueue = moodycamel::ReaderWriterQueue< CAENQueueType >;
+
+// Control and indicators
+using SiPMAcquisitionControl = Control;
 
 }  // namespace SBCQueens
 

@@ -1,5 +1,5 @@
-#ifndef TEENSYCONTROLLERINTERFACE_H
-#define TEENSYCONTROLLERINTERFACE_H
+#ifndef TEENSYCONTROLLERMANAGER_H
+#define TEENSYCONTROLLERMANAGER_H
 #pragma once
 
 /*
@@ -52,6 +52,8 @@ using json = nlohmann::json;
 // namespace sml = boost::sml;
 
 // my includes
+#include "sbcqueens-gui/multithreading_helpers/ThreadManager.hpp"
+
 #include "sbcqueens-gui/serial_helper.hpp"
 #include "sbcqueens-gui/imgui_helpers.hpp"
 #include "sbcqueens-gui/implot_helpers.hpp"
@@ -60,66 +62,9 @@ using json = nlohmann::json;
 #include "sbcqueens-gui/indicators.hpp"
 #include "sbcqueens-gui/armadillo_helpers.hpp"
 
+#include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
+
 namespace SBCQueens {
-
-enum class TeensyControllerStates {
-    NullState = 0,
-    Standby,
-    AttemptConnection,
-    Connected,
-    Disconnected,
-    Closing
-};
-
-enum class PIDState {
-    Standby,
-    Running
-};
-
-struct PIDConfig {
-    float SetPoint = 0.0;
-    float Kp = 0.0;
-    float Ti = 0.0;
-    float Td = 0.0;
-};
-
-// Sensors structs
-struct PeltierValues {
-    double Current;
-};
-
-struct Peltiers {
-    double time;
-    PeltierValues PID;
-};
-
-struct RTDs {
-    double time;
-    std::vector<double> RTDS;
-};
-
-struct RawRTDs {
-    double time;
-    std::vector<uint16_t> RTDREGS;
-    std::vector<double> Resistances;
-    std::vector<double> Temps;
-};
-
-struct PressureValues {
-    double Pressure;
-};
-
-struct Pressures {
-    double time;
-    PressureValues Vacuum;
-};
-
-
-struct TeensySystemPars {
-    uint32_t NumRtdBoards = 0;
-    uint32_t NumRtdsPerBoard = 0;
-    bool InRTDOnlyMode = false;
-};
 
 // The BMEs return their values as registers
 // as the calculations required to turn them into
@@ -222,123 +167,15 @@ void to_json(json& j, const BMEs& p);
 void from_json(const json& j, BMEs& p);
 
 
-// end Sensors structs
+template<typename Pipes>
+class TeensyControllerManager : public ThreadManager<Pipes> {
 
-enum class TeensyCommands {
-    CheckError,
-    GetError,
-    Reset,
-
-    SetPPIDUpdatePeriod,
-    SetPPIDRTD,
-    SetPPID,
-    SetPPIDTripPoint,
-    SetPPIDTempSetpoint,
-    SetPPIDTempKp,
-    SetPPIDTempTi,
-    SetPPIDTempTd,
-    ResetPPID,
-
-    SetRTDSamplingPeriod,
-    SetRTDMask,
-
-    SetPeltierRelay,
-
-    GetSystemParameters,
-    GetPeltiers,
-    GetRTDs,
-    GetRawRTDs,
-    GetPressures,
-    GetBMEs,
-
-    None = 0
-};
-
-// This map holds all the commands that the Teensy accepts, as str,
-// and maps them to an enum for easy access.
-const std::unordered_map<TeensyCommands, std::string> cTeensyCommands = {
-    /// General system commands
-    {TeensyCommands::CheckError,            "CHECKERR"},
-    {TeensyCommands::Reset,                 "RESET"},
-    /// !General system commands
-    ////
-    /// Hardware specific commands
-    {TeensyCommands::SetPPIDUpdatePeriod,   "SET_PPID_UP"},
-    {TeensyCommands::SetPPIDRTD,            "SET_PPID_RTD"},
-    {TeensyCommands::SetPPID,               "SET_PPID"},
-    {TeensyCommands::SetPPIDTripPoint,      "SET_PTRIPPOINT"},
-    {TeensyCommands::SetPPIDTempSetpoint,   "SET_PTEMP"},
-    {TeensyCommands::SetPPIDTempKp,         "SET_PTKP_PID"},
-    {TeensyCommands::SetPPIDTempTi,         "SET_PTTi_PID"},
-    {TeensyCommands::SetPPIDTempTd,         "SET_PTTd_PID"},
-    {TeensyCommands::ResetPPID,             "RESET_PPID"},
-
-    {TeensyCommands::SetRTDSamplingPeriod,  "SET_RTD_SP"},
-    {TeensyCommands::SetRTDMask,            "RTD_BANK_MASK"},
-
-    {TeensyCommands::SetPeltierRelay,       "SET_PELTIER_RELAY"},
-
-    //// Getters
-    {TeensyCommands::GetSystemParameters,   "GET_SYS_PARAMETERS"},
-    {TeensyCommands::GetError,              "GETERR"},
-    {TeensyCommands::GetPeltiers,           "GET_PELTIERS_CURRS"},
-    {TeensyCommands::GetRTDs,               "GET_RTDS"},
-    {TeensyCommands::GetRawRTDs,            "GET_RAW_RTDS"},
-    {TeensyCommands::GetPressures,          "GET_PRESSURES"},
-    {TeensyCommands::GetBMEs,               "GET_BMES"},
-    //// !Getters
-    /// !Hardware specific commands
-
-    {TeensyCommands::None, ""}
-};
-
-
-
-// It holds everything the outside world can modify or use.
-// So far, I do not like teensy_serial is here.
-struct TeensyControllerData {
-    std::string RunDir      = "";
-
-    std::string Port        = "COM4";
-
-    TeensyControllerStates CurrentState
-        = TeensyControllerStates::NullState;
-
-    TeensyCommands CommandToSend
-        = TeensyCommands::None;
-
-    TeensySystemPars SystemParameters;
-
-    uint32_t RTDSamplingPeriod = 100;
-    uint32_t RTDMask = 0xFFFF;
-
-    // Relay stuff
-    bool PeltierState       = false;
-
-    // PID Stuff
-    uint16_t PidRTD = 0;
-    uint32_t PeltierPidUpdatePeriod = 100;
-    bool PeltierPIDState    = false;
-
-    float PIDTempTripPoint = 5.0;
-    PIDConfig PIDTempValues;
-};
-
-using TeensyQueueType
-    = std::function < bool(TeensyControllerData&) >;
-
-// single consumer, single sender queue for Tasks of the type
-// bool(TeensyControllerState&) A.K.A TeensyQueueType
-using TeensyQueue
-    = moodycamel::ReaderWriterQueue< TeensyQueueType >;
-
-template<typename... Queues>
-class TeensyControllerInterface {
- private:
-    std::tuple<Queues&...> _queues;
     std::map<std::string, std::string> _crc_cmds;
 
-    TeensyControllerData _doe;
+    using TeensyPipe_type = typename Pipes::TeensyPipe_type;
+    TeensyPipe_type _teensy_pipe_end;
+    TeensyControllerData& _doe;
+
     IndicatorSender<IndicatorNames> _indicator_sender;
     IndicatorSender<uint16_t> _plot_sender;
 
@@ -353,15 +190,16 @@ class TeensyControllerInterface {
     serial_ptr _port;
 
  public:
-    explicit TeensyControllerInterface(Queues&... queues)
-        : _queues(std::forward_as_tuple(queues...)),
+    explicit TeensyControllerManager(const Pipes& pipes) :
+        ThreadManager<Pipes>{pipes},
+        _teensy_pipe_end{pipes.TeensyPipe}, _doe{_teensy_pipe_end.DOE}
         _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
         _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
 
     // No copying
-    TeensyControllerInterface(const TeensyControllerInterface&) = delete;
+    TeensyControllerManager(const TeensyControllerManager&) = delete;
 
-    ~TeensyControllerInterface() {}
+    ~TeensyControllerManager() {}
 
     // Loop goes like this:
     // Initializes -> waits for action from GUI to connect
@@ -935,5 +773,11 @@ class TeensyControllerInterface {
         return send_msg(_port, str_cmd);
     }
 };
+
+template<typename Pipes>
+TeensyControllerManager<Pipes> make_teensy_controller_manager(const Pipes& p) {
+    return TeensyControllerManager<Pipes>(p);
+}
+
 }  // namespace SBCQueens
 #endif

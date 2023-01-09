@@ -1,5 +1,5 @@
-#ifndef SLOWDAQINTERFACE_H
-#define SLOWDAQINTERFACE_H
+#ifndef SlowDAQManager_H
+#define SlowDAQManager_H
 #pragma once
 
 /*
@@ -20,59 +20,22 @@
 
 // C++ 3rd party includes
 // my includes
+#include "sbcqueens-gui/multithreading_helpers/ThreadManager.hpp"
+
 #include "sbcqueens-gui/serial_helper.hpp"
 #include "sbcqueens-gui/file_helpers.hpp"
 #include "sbcqueens-gui/timing_events.hpp"
 
 #include "sbcqueens-gui/indicators.hpp"
+#include "sbcqueens-gui/hardware_helpers/SlowDAQData.hpp"
 
 namespace SBCQueens {
 
-enum class PFEIFFERSingleGaugeSP {
-    SLOW = 2,   // 1 min
-    FAST = 1,   // 1s
-    FASTER = 0  // 100ms
-};
-
-struct PFEIFFERSingleGaugeData {
-    double time;
-    double Pressure;
-};
-
-enum class PFEIFFERSSGState {
-    NullState = 0,
-    Standby,
-    AttemptConnection,
-    Connected,
-    Disconnected,
-    Closing
-};
-
-struct SlowDAQData {
-    std::string RunDir      = "";
-    std::string RunName     = "";
-
-    std::string PFEIFFERPort = "";
-
-    PFEIFFERSSGState PFEIFFERState = PFEIFFERSSGState::NullState;
-    bool PFEIFFERSingleGaugeEnable = false;
-    PFEIFFERSingleGaugeSP PFEIFFERSingleGaugeUpdateSpeed
-        = PFEIFFERSingleGaugeSP::SLOW;
-};
-
-
-using SlowDAQDataType
-    = std::function < bool(SlowDAQData&) >;
-
-using SlowDAQQueue
-    = moodycamel::ReaderWriterQueue< SlowDAQDataType >;
-
-template<typename... Queues>
-class SlowDAQInterface {
-    std::tuple<Queues&...> _queues;
-
-    // Data of everything (doe)
-    SlowDAQData doe;
+template<typename Pipes>
+class SlowDAQManager : public ThreadManager<Pipes> {
+    using SlowDAQ_type = typename Pipes::SlowDAQ_type;
+    SlowDAQ_type _slowdaq_pipe_end;
+    SlowDAQData& _slowdaq_doe;
 
     DataFile<PFEIFFERSingleGaugeData> _pfeiffer_file;
 
@@ -84,13 +47,10 @@ class SlowDAQInterface {
     double _init_time;
 
  public:
-    explicit SlowDAQInterface(Queues&... queues) :
-        _queues(std::forward_as_tuple(queues...)),
+    explicit SlowDAQManager(const Pipes& p) :
+        ThreadManager<Pipes>{p},
+        _slowdaq_pipe_end{p.SlowDAQPipe}, _slowdaq_doe{_slowdaq_pipe_end.Doe},
         _plot_sender(std::get<GeneralIndicatorQueue&>(_queues)) { }
-
-    // No copying
-    SlowDAQInterface(const SlowDAQInterface&) = delete;
-
 
     void operator()() {
         spdlog::info("Initializing slow DAQ thread...");
@@ -306,6 +266,11 @@ class SlowDAQInterface {
         return res;
     }
 };
+
+template<typename Pipes>
+SlowDAQManager<Pipes> make_slow_daq(const Pipes& p) {
+    return SlowDAQManager<Pipes>(p);
+}
 
 }  // namespace SBCQueens
 #endif

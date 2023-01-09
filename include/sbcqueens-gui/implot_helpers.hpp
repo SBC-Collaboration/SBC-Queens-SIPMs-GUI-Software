@@ -58,7 +58,7 @@ struct IndicatorVector {
 
 template<typename T, typename DATA = double>
 using IndicatorsQueue
-    = moodycamel::ConcurrentQueue< IndicatorVector<T, DATA> >;
+    = std::shared_ptr<moodycamel::ConcurrentQueue< IndicatorVector<T, DATA> >>;
 
 struct PlotFlags {
     bool ClearOnNewData;
@@ -110,7 +110,8 @@ class Indicator {
     virtual ~Indicator() {}
 
     template<typename OFFDATA>
-    // Adds element newVal.x to show in this indicator. newVal.y is ignored
+    // Adds element newVal.x to show in this indicator.
+    // newVal.y is ignored
     void add(const IndicatorVector<T, OFFDATA>& newVal) {
         if (newVal.ID == ID) {
             std::ostringstream out;
@@ -345,18 +346,18 @@ class Plot : public Indicator<T> {
 // It will update all of the indicators values once information is sent
 template<typename T, typename DATA>
 class IndicatorReceiver  {
-    IndicatorsQueue<T, DATA>& _q;
+    IndicatorsQueue<T, DATA> _q;
     std::unordered_map<T, std::unique_ptr<Indicator<T>>> _indicators;
 
 public:
     using type = T;
     using data_type = DATA;
 
-    explicit IndicatorReceiver(IndicatorsQueue<T, DATA>& q) : _q(q) { }
-
+    explicit IndicatorReceiver(IndicatorsQueue<T, DATA> q) : _q(q) { }
 
     // No copying
     IndicatorReceiver(const IndicatorReceiver&) = delete;
+    IndicatorReceiver operator=(const IndicatorReceiver&) = delete;
 
     // This is meant to be run in the single consumer.
     // Updates all the plots arrays from the queue.

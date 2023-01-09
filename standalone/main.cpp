@@ -6,7 +6,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <spdlog/sinks/rotating_file_sink.h>
-#include <readerwriterqueue.h>
+#include <concurrentqueue.h>
 
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/rotating_file_sink.h"
@@ -22,10 +22,26 @@
 // my includes
 #include "sbcqueens-gui/imgui_helpers.hpp"
 
-#include "sbcqueens-gui/hardware_helpers/TeensyControllerInterface.hpp"
-#include "sbcqueens-gui/hardware_helpers/CAENDigitizerInterface.hpp"
-#include "sbcqueens-gui/hardware_helpers/SlowDAQInterface.hpp"
+#include "sbcqueens-gui/hardware_helpers/TeensyControllerManager.hpp"
+#include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionManager.hpp"
+#include "sbcqueens-gui/hardware_helpers/SlowDAQManager.hpp"
 #include "sbcqueens-gui/hardware_helpers/GUIManager.hpp"
+
+// PipeInterface -> The type of Pipe to use and size_t is an internal
+// memory requirement of the Pipe.
+template <template <typename, typename> class PipeInterface, typename Traits>
+struct Pipes {
+    using SiPMPipe_type = SBCQueens::SiPMAcquisitionPipe<PipeInterface, Traits>;
+    using TeensyPipe_type = SBCQueens::TeensyControllerPipe<PipeInterface, Traits>;
+    using SlowDAQ_type = SBCQueens::SlowDAQPipe<PipeInterface, Traits>;
+
+    SiPMPipe_type SiPMPipe;
+    TeensyPipe_type TeensyPipe;
+    SlowDAQ_type SlowDAQPipe;
+};
+
+using SiPMCharacterizationPipes = Pipes<moodycamel::ConcurrentQueue,
+    moodycamel::ConcurrentQueueDefaultTraits>;
 
 int main() {
     try{
@@ -46,92 +62,45 @@ int main() {
       throw "Log initialization failed";
     }
 
-    spdlog::info("Starting software by first initializing all the queues.");
-    //TODO(Hector): these should be changed to shared_ptrs
-    SBCQueens::TeensyQueue teensyQueue;
-    SBCQueens::CAENQueue caenQueue;
-    SBCQueens::SlowDAQQueue otherQueue;
-    SBCQueens::GeneralIndicatorQueue giQueue;
-    SBCQueens::MultiplePlotQueue mpQueue;
-    SBCQueens::SiPMPlotQueue sipmQueue;
+    auto logger = spdlog::get("log");
+    logger->info("Created logger. Let's go!");
 
-    spdlog::info("Then the GUI.");
-    // This is our GUI function which actually holds all of our buttons
-    // labels, inputs, graphs and ect
-    SBCQueens::GUIManager guiManager(
-        // From GUI -> Teensy
-        teensyQueue,
-        // From GUI -> CAEN
-        caenQueue,
-        // From GUI -> slow DAQ
-        otherQueue,
-        // From Anyone -> GUI
-        giQueue,
-        // From Anyone -> GUI, auxiliary queue for dynamic plots
-        mpQueue,
-        // From CAEN -> GUI, auxiliary queue for dynamic plots
-        sipmQueue);
-
-    spdlog::info("Creating wrapper. Using:");
-#ifdef USE_VULKAN
-    spdlog::info("Using VULKAN + GLFW backend");
-#else
-    spdlog::info("Usigng OpenGL + GLFW backend");
-#endif
+    SiPMCharacterizationPipes pipes;
+    std::vector<SBCQueens::ThreadManager<SiPMCharacterizationPipes>> _threads;
+    logger->info("Created pipes that communicate between threads.");
 
     // This function just holds the rendering framework we are using
     // all of them found under rendering_wrappers
     // We wrapping it under a lambda so we can pass it to a thread
     // because we do not care about its returning vallue
-    auto gui_wrapper = [&]() {
+    // This is our GUI function which actually holds all of our buttons
+    // labels, inputs, graphs and ect
+    logger->info("Creating GUIMangaer using wrapper: ");
 #ifdef USE_VULKAN
-        ImGUIWrappers::main_glfw_vulkan_wrapper(guiManager);
+    _threads.push_back(SBCQueens::make_gui_manager(pipes,
+        ImGUIWrappers::main_glfw_vulkan_wrapper));
+    logger->info("VULKAN + GLFW backend.");
 #else
-        ImGUIWrappers::main_glfw_open3gl_wrapper(guiManager);
+    _threads.push_back(SBCQueens::make_gui_manager(pipes,
+        ImGUIWrappers::main_glfw_open3gl_wrapper));
+    logger->info("OpenGL + GLFW backend.");
 #endif
-    };
 
-    // std::thread main_thread(gui_wrapper);
-    spdlog::info("Creating the teensy interface and CAEN interface.");
-
+    logger->info("Creating Teensy Controller Manager.");
+    _threads.push_back(SBCQueens::make_teensy_controller_manager(pipes));
+    logger->info("Creating SiPM Controller Manager.");
+    _threads.push_back(SBCQueens::make_sipmacuiqisition_manager(pipes));
+    logger->info("Creating Slow DAQ Controller Manager.");
+    _threads.push_back(SBCQueens::make_slow_daq(pipes));
     // The lambdas we are passing are the functions
     // to read and write to the queue
-    SBCQueens::TeensyControllerInterface tc(
-        // GUI -> Teensy
-        teensyQueue,
-        // From Anyone -> GUI
-        giQueue,
+    logger->info("Starting all manager threads.");
+    for(const auto& _thread : _threads) {
+        std::thread t(std::move(_thread));
+        t.detach();
+    }
 
-        mpQueue);
-
-    std::thread tc_thread(std::ref(tc));
-
-    SBCQueens::CAENDigitizerInterface caenc(
-        giQueue,
-        caenQueue,
-        mpQueue,
-        sipmQueue);
-
-    std::thread caen_thread(std::ref(caenc));
-
-    SBCQueens::SlowDAQInterface otherc(
-        giQueue,
-        otherQueue,
-        mpQueue);
-
-    std::thread other_thread(std::ref(otherc));
-
-    spdlog::info("Starting threads which holds everything.");
-
-    tc_thread.detach();
-    caen_thread.detach();
-    other_thread.detach();
-    gui_wrapper();
-
-    // while(!tc_thread.joinable());
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-
-    spdlog::info("Closing ! ! !");
+    logger->info("Closing spawning thread. See you on the other side!");
 
     return 0;
 }

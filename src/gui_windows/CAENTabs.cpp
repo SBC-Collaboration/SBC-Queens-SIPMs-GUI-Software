@@ -18,13 +18,13 @@ bool CAENTabs::operator()() {
         ImGui::InputScalar("Post-Trigger buffer %", ImGuiDataType_U32,
             &cgui_state.GlobalConfig.PostTriggerPorcentage);
 
-        ImGui::Checkbox("Overlapping Rejection",
-            &cgui_state.GlobalConfig.TriggerOverlappingEn);
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("If checked, overlapping rejection "
-                "is disabled which leads to a non-constant record length. "
-                "HIGHLY UNSTABLE FEATURE, DO NOT ENABLE.");
-        }
+        // ImGui::Checkbox("Overlapping Rejection",
+        //     &cgui_state.GlobalConfig.TriggerOverlappingEn);
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("If checked, overlapping rejection "
+        //         "is disabled which leads to a non-constant record length. "
+        //         "HIGHLY UNSTABLE FEATURE, DO NOT ENABLE.");
+        // }
 
         ImGui::Checkbox("TRG-IN as Gate",
             &cgui_state.GlobalConfig.EXTasGate);

@@ -11,14 +11,7 @@
 namespace SBCQueens {
 
 void SiPMControlWindow::init(const toml::table& tb) {
-    _config_table = tb;
-    auto other_conf = _config_table["Other"];
 
-    cgui_state.SiPMVoltageSysSupplyEN = false;
-    cgui_state.SiPMVoltageSysPort
-        = other_conf["SiPMVoltageSystem"]["Port"].value_or("COM6");
-    cgui_state.SiPMVoltageSysVoltage
-        = other_conf["SiPMVoltageSystem"]["InitVoltage"].value_or(0.0);
 }
 
 bool SiPMControlWindow::operator()() {

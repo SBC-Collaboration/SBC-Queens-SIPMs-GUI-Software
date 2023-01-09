@@ -16,8 +16,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <iostream>
-#include <tuple>
 #include <functional>
 
 // C++ 3rd party includes
@@ -25,81 +23,95 @@
 #include <toml.hpp>
 
 // My includes
-#include "sbcqueens-gui/hardware_helpers/TeensyControllerInterface.hpp"
-#include "sbcqueens-gui/hardware_helpers/CAENDigitizerInterface.hpp"
-#include "sbcqueens-gui/hardware_helpers/SlowDAQInterface.hpp"
+#include "sbcqueens-gui/multithreading_helpers/ThreadManager.hpp"
+
+#include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
+#include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"
+#include "sbcqueens-gui/hardware_helpers/SlowDAQData.hpp"
 
 #include "sbcqueens-gui/caen_helper.hpp"
 #include "sbcqueens-gui/imgui_helpers.hpp"
 #include "sbcqueens-gui/implot_helpers.hpp"
 #include "sbcqueens-gui/indicators.hpp"
 
+#include "sbcqueens-gui/gui_windows/Window.hpp"
+#include "sbcqueens-gui/gui_windows/ControlList.hpp"
 #include "sbcqueens-gui/gui_windows/IndicatorWindow.hpp"
 #include "sbcqueens-gui/gui_windows/ControlWindow.hpp"
 #include "sbcqueens-gui/gui_windows/SiPMControlWindow.hpp"
 
 namespace SBCQueens {
 
-template<typename... QueueFuncs>
-class GUIManager {
- private:
-    std::tuple<QueueFuncs&...> _queues;
+template<typename Pipes, typename DrawFunc>
+class GUIManager : public ThreadManager<Pipes> {
+    // To get the pipe interface used in the pipes.
+    DrawFunc _draw_func;
 
     IndicatorReceiver<IndicatorNames> GeneralIndicatorReceiver;
     IndicatorReceiver<uint16_t> MultiPlotReceiver;
     IndicatorReceiver<uint8_t> SiPMPlotReceiver;
 
-    // Teensy Controls
-    ControlLink<TeensyQueue> TeensyControlFac;
-    TeensyControllerData tgui_state;
-
     // CAEN Controls
-    ControlLink<CAENQueue> CAENControlFac;
-    CAENInterfaceData cgui_state;
+    using SiPMPipe_type = typename Pipes::SiPMPipe_type;
+    SiPMPipe_type _sipm_pipe_end;
+    SiPMAcquisitionData& _sipm_doe;
 
-    // Other controls
-    ControlLink<SlowDAQQueue> SlowDAQControlFac;
-    SlowDAQData sdaq_state;
+    // Teensy Pipe
+    using TeensyPipe_type = typename Pipes::TeensyPipe_type;
+    TeensyPipe_type _teensy_pipe_end;
+    TeensyControllerData& _teensy_doe;
+
+    // Slow DAQ pipe
+    using SlowDAQ_type = typename Pipes::SlowDAQ_type;
+    SlowDAQ_type _slowdaq_pipe_end;
+    SlowDAQData& _slowdaq_doe;
+
+    std::vector<Window<Pipes>> _windows;
 
     std::string i_run_dir;
     std::string i_run_name;
 
-    toml::table config_file;
     std::vector<std::string> rtd_names;
     std::vector<std::string> sipm_names;
 
-    IndicatorWindow indicatorWindow;
-    ControlWindow controlWindow;
-    SiPMControlWindow sipmControlWindow;
-
  public:
-    explicit GUIManager(QueueFuncs&... queues) :
-        _queues(std::forward_as_tuple(queues...)),
-        GeneralIndicatorReceiver(std::get<GeneralIndicatorQueue&>(_queues)),
-        MultiPlotReceiver   (std::get<MultiplePlotQueue&>(_queues)),
-        SiPMPlotReceiver    (std::get<SiPMPlotQueue&>(_queues)),
-        TeensyControlFac    (std::get<TeensyQueue&>(_queues)),
-        CAENControlFac  (std::get<CAENQueue&>(_queues)),
-        SlowDAQControlFac   (std::get<SlowDAQQueue&>(_queues)),
-        indicatorWindow     (GeneralIndicatorReceiver,
-            std::get<CAENQueue&>(_queues),
-            tgui_state, sdaq_state),
-        controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state,
-            SlowDAQControlFac, sdaq_state),
-        sipmControlWindow(CAENControlFac, cgui_state, GeneralIndicatorReceiver,
-            tgui_state)
+    GUIManager(const Pipes& p, DrawFunc&& draw_func) :
+        ThreadManager<Pipes>(p), _draw_func{draw_func},
+        // All of these are to have a local and faster access to them
+        // inside this class.
+        _sipm_pipe_end{p.SiPMPipe}, _sipm_doe{_sipm_pipe_end.Doe},
+        _teensy_pipe_end{p.TeensyPipe}, _teensy_doe{_teensy_pipe_end.Doe},
+        _slowdaq_pipe_end{p.SlowDAQPipe}, _slowdaq_doe{_slowdaq_pipe_end.Doe}
+
+        // _queues(std::forward_as_tuple(queues...)),
+        // GeneralIndicatorReceiver(std::get<GeneralIndicatorQueue>(_queues)),
+        // MultiPlotReceiver   (std::get<MultiplePlotQueue>(_queues)),
+        // SiPMPlotReceiver    (std::get<SiPMPlotQueue>(_queues)),
+        // TeensyControlFac    (std::get<TeensyQueue>(_queues)),
+        // CAENControlFac  (std::get<CAENQueue>(_queues)),
+        // SlowDAQControlFac   (std::get<SlowDAQQueue>(_queues)),
+        // indicatorWindow     (GeneralIndicatorReceiver,
+        //     std::get<CAENQueue>(_queues),
+        //     _teensy_doe, sdaq_state),
+        // controlWindow(TeensyControlFac, _teensy_doe, CAENControlFac, _sipm_doe,
+        //     SlowDAQControlFac, sdaq_state),
+        // sipmControlWindow(CAENControlFac, _sipm_doe, GeneralIndicatorReceiver,
+        //     _teensy_doe)
         {
+
+
+        _windows.push_back(make_indicator_window(p));
+        _windows.push_back(make_sipm_control_window(p));
+        _windows.push_back(make_control_window(p));
+
         // When config_file goes out of scope, everything
         // including the daughters get cleared
-        config_file = toml::parse_file("gui_setup.toml");
+        auto config_file = toml::parse_file("gui_setup.toml");
+        for(auto& window: _windows) {
+            window.init(config_file);
+        }
+
         auto t_conf = config_file["Teensy"];
-        // auto CAEN_conf = config_file["CAEN"];
-        // auto file_conf = config_file["File"];
-
-        indicatorWindow.Init(config_file);
-        controlWindow.init(config_file);
-        sipmControlWindow.init(config_file);
-
         if (toml::array* arr = t_conf["RTDNames"].as_array()) {
             for (toml::node& elem : *arr) {
                 rtd_names.emplace_back(elem.value_or(""));
@@ -111,16 +123,23 @@ class GUIManager {
                 sipm_names.emplace_back(elem.value_or(""));
             }
         }
-
-
     }
 
-    // No copying
     GUIManager(const GUIManager&) = delete;
+    GUIManager(GUIManager&&) = delete;
+    GUIManager(GUIManager&) = delete;
 
     ~GUIManager() { }
 
     void operator()() {
+        // _draw_func must have a recurring draw function
+        // and a close function.
+        _draw_func(&GUIManager<Pipes, DrawFunc>::_draw,
+            &GUIManager<Pipes, DrawFunc>::closing);
+    }
+
+ private:
+    void _draw() {
         static bool trg_once = true;
         if (trg_once) {
             ImPlot::StyleColorsDark();
@@ -128,8 +147,9 @@ class GUIManager {
             trg_once = false;
         }
 
-        controlWindow();
-        sipmControlWindow();
+        for(auto& window : _windows) {
+            window();
+        }
 
         //// Plots
         ImGui::Begin("Other Plots");
@@ -156,7 +176,7 @@ class GUIManager {
         }
 
         if (ImGui::BeginTabBar("Other Plots")) {
-            // if (!tgui_state.SystemParameters.InRTDOnlyMode) {
+            // if (!_teensy_doe.SystemParameters.InRTDOnlyMode) {
             //     if (ImGui::BeginTabItem("Local BME")) {
             //         if (ImPlot::BeginPlot("Local BME", ImVec2(-1, 0))) {
             //             // We setup the axis
@@ -222,17 +242,17 @@ class GUIManager {
         ImGui::Begin("Teensy-PID Plots");
 
         if (ImGui::Button("Clear")) {
-            for (uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
-                for (uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
+            for (uint16_t i = 0; i < _teensy_doe.SystemParameters.NumRtdBoards; i++) {
+                for (uint16_t j = 0; j < _teensy_doe.SystemParameters.NumRtdsPerBoard; j++) {
                     uint16_t k = static_cast<uint16_t>(
-                        i*tgui_state.SystemParameters.NumRtdsPerBoard +j);
+                        i*_teensy_doe.SystemParameters.NumRtdsPerBoard +j);
 
                     MultiPlotReceiver.ClearPlot(k);
                 }
             }
         }
 
-        if (!tgui_state.SystemParameters.InRTDOnlyMode) {
+        if (!_teensy_doe.SystemParameters.InRTDOnlyMode) {
             if (ImPlot::BeginPlot("PIDs", ImVec2(-1, 0))) {
                 ImPlot::SetupAxes("time [s]", "Current [A]",
                     g_axis_flags, g_axis_flags);
@@ -255,10 +275,10 @@ class GUIManager {
             ImPlot::SetupAxes("time [s]", "Temperature [K]",
                 g_axis_flags, g_axis_flags);
 
-            for (uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
-                for (uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
+            for (uint16_t i = 0; i < _teensy_doe.SystemParameters.NumRtdBoards; i++) {
+                for (uint16_t j = 0; j < _teensy_doe.SystemParameters.NumRtdsPerBoard; j++) {
                     uint16_t k = static_cast<uint16_t>(
-                        i*tgui_state.SystemParameters.NumRtdsPerBoard +j);
+                        i*_teensy_doe.SystemParameters.NumRtdsPerBoard +j);
 
                     if (k < rtd_names.size()) {
                         MultiPlotReceiver.plot(k, rtd_names[k]);
@@ -291,10 +311,10 @@ class GUIManager {
                     + rect.Y.Max) + rect.Y.Min,
                 rect.Y.Max, ImGuiCond_Always);
 
-            for (uint16_t i = 0; i < tgui_state.SystemParameters.NumRtdBoards; i++) {
-                for (uint16_t j = 0; j < tgui_state.SystemParameters.NumRtdsPerBoard; j++) {
+            for (uint16_t i = 0; i < _teensy_doe.SystemParameters.NumRtdBoards; i++) {
+                for (uint16_t j = 0; j < _teensy_doe.SystemParameters.NumRtdsPerBoard; j++) {
                     uint16_t k = static_cast<uint16_t>(
-                        i*tgui_state.SystemParameters.NumRtdsPerBoard +j);
+                        i*_teensy_doe.SystemParameters.NumRtdsPerBoard +j);
 
                     if (k < rtd_names.size()) {
                         MultiPlotReceiver.plot(k, rtd_names[k]);
@@ -319,7 +339,7 @@ class GUIManager {
             if (ImGui::BeginTabItem("SiPM Waveforms")) {
                 const size_t kCHperGroup = 8;
                 const auto& model_constants
-                    = CAENDigitizerModelsConstantsMap.at(cgui_state.Model);
+                    = CAENDigitizerModelsConstantsMap.at(_sipm_doe.Model);
                 // const auto numgroups = model_constants.NumberOfGroups > 0 ?
                 //     model_constants.NumberOfGroups : 1;
                 // const int numchpergroup = model_constants.NumChannels / numgroups;
@@ -329,7 +349,7 @@ class GUIManager {
                     ImPlotFlags_NoTitle)) {
                     ImPlot::SetupAxes("time [ns]", "Counts", g_axis_flags,
                         g_axis_flags);
-                    for (const auto& gp : cgui_state.GroupConfigs) {
+                    for (const auto& gp : _sipm_doe.GroupConfigs) {
                         // We need the number of groups each model has
 
                         // If groups is higher than 0, then it has groups
@@ -411,10 +431,6 @@ class GUIManager {
         }
 
         ImGui::End();
-        /// !SiPM Plots
-        //// !Plots
-
-        indicatorWindow();
     }
 
     // closing is called when the GUI is manually closed.
@@ -443,6 +459,11 @@ class GUIManager {
         });
     }
 };
+
+template<typename Pipes, typename DrawFunc>
+GUIManager<Pipes, DrawFunc> make_gui_manager(const Pipes& p, DrawFunc&& df) {
+    return GUIManager<Pipes, DrawFunc>(p, std::forward<DrawFunc>(df));
+}
 
 }  // namespace SBCQueens
 #endif
