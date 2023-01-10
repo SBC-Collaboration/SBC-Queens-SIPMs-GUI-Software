@@ -23,11 +23,10 @@ namespace SBCQueens {
 #ifndef NEW_RTD_BOARD
     const uint8_t RTD_ONE_CS        = 24u;
     const uint8_t RTD_TWO_CS        = 25u;
-    const uint8_t RTD_THREE_CS      = 26u;
+    const uint8_t RTD_THREE_CS      = 28u;
 #endif
 
-    const uint8_t BME_CS            = 7u;
-    const uint8_t BOX_BME_CS        = 8u;
+    const uint8_t BME_CS            = 0u;
 
     const uint8_t PELTIER_EN_PIN    = 17u;
 
@@ -36,7 +35,6 @@ namespace SBCQueens {
     const uint8_t VACUUM_PIN = 9u; //23
 
     ///
-
     extern BME280_t LOCAL_BME280;
 
     extern PeltierDriver PELTIER_DRIVER;

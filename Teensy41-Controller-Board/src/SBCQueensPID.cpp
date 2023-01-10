@@ -67,10 +67,10 @@ namespace SBCQueens {
 					// To give headroom for when calculating the output, we use 16384
 					// or 2^14
 					float cmp = kp*pid_comm_err;
-					if (cmp > 16384.0f) {
-						pid_comm_err = 16384.0f;
-					} else if (cmp < -16384.0f) {
-						pid_comm_err = -16384.0f;
+					if (cmp > 49152.0f) {
+						pid_comm_err = 49152.0f / kp;
+					} else if (cmp < -49152.0f) {
+						pid_comm_err = -49152.0f / kp;
 					}
 				}
 
@@ -125,10 +125,10 @@ namespace SBCQueens {
 					// To give headroom for when calculating the output, we use 16384
 					// or 2^14
 					float cmp = kp*pid_comm_err;
-					if (cmp > 16384.0f) {
-						pid_comm_err = 16384.0f;
-					} else if (cmp < -16384.0f) {
-						pid_comm_err = -16384.0f;
+					if (cmp > 49152.0f) {
+						pid_comm_err = 49152.0f / kp;
+					} else if (cmp < -49152.0f) {
+						pid_comm_err = -49152.0f / kp;
 					}
 				}
 

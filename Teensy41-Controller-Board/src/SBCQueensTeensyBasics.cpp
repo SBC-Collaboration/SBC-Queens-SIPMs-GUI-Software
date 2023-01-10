@@ -13,6 +13,7 @@ namespace SBCQueens {
     TimerHandle_t take_pressures_meas_h         = NULL;
 
     SemaphoreHandle_t  SPI_mutex = NULL;
+    SemaphoreHandle_t  SPI1_mutex = NULL;
     SemaphoreHandle_t  Wire1_mutex  = NULL;
     SemaphoreHandle_t  Wire2_mutex = NULL;
     SemaphoreHandle_t  registers_mutex =  NULL;
@@ -20,6 +21,7 @@ namespace SBCQueens {
     void init_teensy_controller_mutexes() {
         // Init space for all the mutexes (? is this how you pluralize it)
         SPI_mutex = xSemaphoreCreateBinary();
+        SPI1_mutex = xSemaphoreCreateBinary();
         Wire1_mutex = xSemaphoreCreateBinary();
         Wire2_mutex = xSemaphoreCreateBinary();
         registers_mutex = xSemaphoreCreateBinary();
@@ -49,6 +51,23 @@ namespace SBCQueens {
         SPI.endTransaction();
         // Returns the mutex
         xSemaphoreGive(SPI_mutex);
+    }
+
+    //// SPI Communcation handlers
+    // An SPI communication starts by asserting the CS pin LOW
+    void start_spi1(const uint8_t& cs_pin, const uint8_t& mode) {
+        // Wait until the mutex is available and return it
+        while (xSemaphoreTake(SPI1_mutex, 0));
+        SPI1.beginTransaction(SPISettings(1000000, arduino::MSBFIRST, mode));
+        digitalWrite(cs_pin, arduino::LOW);
+    }
+
+    // The SPI communcation ends by asserting CS pin HIGH
+    void end_spi1(const uint8_t& pin) {
+        digitalWrite(pin, arduino::HIGH);
+        SPI1.endTransaction();
+        // Returns the mutex
+        xSemaphoreGive(SPI1_mutex);
     }
     //// !SPI Communcation handlers
     /////

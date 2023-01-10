@@ -42,8 +42,10 @@ namespace SBCQueens {
     //// SPI Communcation handlers
     // Starts the SPI communication and takes the SPI comm mutex
     void start_spi(const uint8_t& cs_pin, const uint8_t& mode = SPI_MODE1);
+    void start_spi1(const uint8_t& cs_pin, const uint8_t& mode = SPI_MODE1);
     // Ends the SPI communication and gives the SPI comm mutex
     void end_spi(const uint8_t& pin);
+    void end_spi1(const uint8_t& pin);
     //// !SPI Communcation handlers
     /////
     //// Wire Communcation handlers

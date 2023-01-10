@@ -148,9 +148,6 @@ namespace SBCQueens {
 
 		pinMode(        BME_CS,             arduino::OUTPUT);
 		digitalWrite(   BME_CS,             arduino::HIGH);
-
-		pinMode(        BOX_BME_CS,         arduino::OUTPUT);
-		digitalWrite(   BOX_BME_CS,         arduino::HIGH);
 #endif
 		/// !Pin Initializations
 	}

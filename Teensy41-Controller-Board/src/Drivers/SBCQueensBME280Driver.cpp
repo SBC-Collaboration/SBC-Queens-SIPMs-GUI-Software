@@ -7,37 +7,37 @@ namespace SBCQueens {
     void bme280_init(BME280_t& controller) {
         
         // First, soft reset
-        start_spi(controller.CS_PIN, SPI_MODE0);
+        start_spi1(controller.CS_PIN, SPI_MODE0);
             SPI.transfer( cast ( BME280_ADDR::w_RESET_ADDR) );
             SPI.transfer(0xB6);
-        end_spi(controller.CS_PIN);
+        end_spi1(controller.CS_PIN);
         
         // wait a bit
         delay(10);
 
         // Then, set in sleep mode, everything off
-        start_spi(controller.CS_PIN, SPI_MODE0);
+        start_spi1(controller.CS_PIN, SPI_MODE0);
             SPI.transfer( cast ( BME280_ADDR::w_CTRL_MEAS_ADDR ) );
             SPI.transfer( cast ( BME_CONTROL_VALS::TEMP_OFF_PRESS_OFF_SLEEP) );
-        end_spi(controller.CS_PIN);
+        end_spi1(controller.CS_PIN);
 
         // Then, we modify control measure for temp and pressure
-        start_spi(controller.CS_PIN, SPI_MODE0);
+        start_spi1(controller.CS_PIN, SPI_MODE0);
             SPI.transfer(cast(BME280_ADDR::w_CONFIG_ADDR));
             SPI.transfer(cast(controller.ConfValue));
-        end_spi(controller.CS_PIN);
+        end_spi1(controller.CS_PIN);
 
         // Next, set humidify configuration measurements
-        start_spi(controller.CS_PIN, SPI_MODE0);
+        start_spi1(controller.CS_PIN, SPI_MODE0);
             SPI.transfer(cast(BME280_ADDR::w_CTRL_HUM_ADDR));
             SPI.transfer(cast(controller.HumConfValue));
-        end_spi(controller.CS_PIN);
+        end_spi1(controller.CS_PIN);
 
         // Finally, the control bits for pressure and temp
-        start_spi(controller.CS_PIN, SPI_MODE0);
+        start_spi1(controller.CS_PIN, SPI_MODE0);
             SPI.transfer(cast(BME280_ADDR::w_CTRL_MEAS_ADDR));
             SPI.transfer(cast(controller.ControlValue));
-        end_spi(controller.CS_PIN);
+        end_spi1(controller.CS_PIN);
 
     }
 
@@ -51,7 +51,7 @@ namespace SBCQueens {
         int32_t bme_pressure_register = 0;
         int32_t bme_hum_register = 0;
         // Returns 19:12 of the temp meas
-        start_spi(controller.CS_PIN, SPI_MODE0);
+        start_spi1(controller.CS_PIN, SPI_MODE0);
             // Start addr = 0xFA
             SPI.transfer(cast(BME280_ADDR::r_MEAS_ADDR));
 
@@ -73,7 +73,7 @@ namespace SBCQueens {
             bme_hum_register = SPI.transfer(0xFF) << 8; // Returns 15:8 of the hum meas
             bme_hum_register |= SPI.transfer(0xFF); // LSB bits of the hum meas
             /// !Humidity measurement
-        end_spi(controller.CS_PIN);
+        end_spi1(controller.CS_PIN);
 
         take_reg_mux();
             controller.REGISTERS.LAST_TEMP_REG = bme_temp_register;
