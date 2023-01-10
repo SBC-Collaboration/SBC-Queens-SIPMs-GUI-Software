@@ -81,7 +81,9 @@ class GUIManager {
         TeensyControlFac    (std::get<TeensyQueue&>(_queues)),
         CAENControlFac  (std::get<CAENQueue&>(_queues)),
         SlowDAQControlFac   (std::get<SlowDAQQueue&>(_queues)),
-        indicatorWindow     (GeneralIndicatorReceiver, tgui_state, sdaq_state),
+        indicatorWindow     (GeneralIndicatorReceiver,
+            std::get<CAENQueue&>(_queues),
+            tgui_state, sdaq_state),
         controlWindow(TeensyControlFac, tgui_state, CAENControlFac, cgui_state,
             SlowDAQControlFac, sdaq_state),
         sipmControlWindow(CAENControlFac, cgui_state, GeneralIndicatorReceiver,
@@ -317,7 +319,7 @@ class GUIManager {
             if (ImGui::BeginTabItem("SiPM Waveforms")) {
                 const size_t kCHperGroup = 8;
                 const auto& model_constants
-                    = CAENDigitizerModelsConstants_map.at(cgui_state.Model);
+                    = CAENDigitizerModelsConstantsMap.at(cgui_state.Model);
                 // const auto numgroups = model_constants.NumberOfGroups > 0 ?
                 //     model_constants.NumberOfGroups : 1;
                 // const int numchpergroup = model_constants.NumChannels / numgroups;

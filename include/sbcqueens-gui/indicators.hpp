@@ -47,10 +47,11 @@ enum class IndicatorNames {
     // CAEN Indicators
     // Boolean
     CURRENT_STABILIZED,
-    ANALYSIS_ONGOING,
-    FULL_ANALYSIS_DONE,
-    PROCESSING_REDUCED_WF,
-    CALCULATING_VBD,
+    TEMPERATURE_STABILIZED,
+
+    BREAKDOWN_ROUTINE_ONGOING,
+    MEASUREMENT_ROUTINE_ONGOING,
+    FINISHED_ROUTINE,
 
     // Numerical
     CAENBUFFEREVENTS,
@@ -69,7 +70,6 @@ enum class IndicatorNames {
 
     SAVED_WAVEFORMS,
     DONE_DATA_TAKING,
-    VBD_IN_MEMORY
 };
 
 using GeneralIndicatorQueue = IndicatorsQueue<IndicatorNames, double>;

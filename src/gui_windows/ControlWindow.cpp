@@ -65,7 +65,7 @@ void ControlWindow::init(const toml::table& tb) {
     	{{"USB", CAENConnectionType::USB, },
         {"A4818", CAENConnectionType::A4818}};
     cgui_state.Model
-        = CAENDigitizerModels_map.at(CAEN_conf["Model"].value_or("DT5730B"));
+        = CAENDigitizerModelsMap.at(CAEN_conf["Model"].value_or("DT5730B"));
     cgui_state.PortNum
         = CAEN_conf["Port"].value_or(0u);
     cgui_state.ConnectionType
@@ -292,8 +292,7 @@ bool ControlWindow::operator()() {
                 [=](CAENInterfaceData& state) {
                     // Only change the state if any of these states
                     if(state.CurrentState == CAENInterfaceStates::OscilloscopeMode ||
-                        state.CurrentState == CAENInterfaceStates::BreakdownVoltageMode ||
-                        state.CurrentState == CAENInterfaceStates::RunMode){
+                        state.CurrentState == CAENInterfaceStates::MeasurementRoutineMode) {
                             spdlog::info("Going to disconnect the CAEN digitizer");
                             state.CurrentState = CAENInterfaceStates::Disconnected;
                     }

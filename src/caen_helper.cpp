@@ -88,7 +88,7 @@ CAENError disconnect(CAEN& res) noexcept {
     // Before disconnecting, stop acquisition, and clear data
     // (clear data should only be called after the acquisition has been
     // stopped)
-    // Resources are freed when the pointer is released
+    // Resources are freed when the pointer is reset
     int errCode = CAEN_DGTZ_SWStopAcquisition(handle);
 
     errCode |= CAEN_DGTZ_FreeReadoutBuffer(&res->Data.Buffer);
@@ -104,7 +104,7 @@ CAENError disconnect(CAEN& res) noexcept {
         };
     }
 
-    res.release();
+    res.reset();
     return CAENError();
 }
 
@@ -676,16 +676,16 @@ void extract_event(CAEN& res, const uint32_t& i, CAENEvent& evt) noexcept {
         evt = std::make_shared<caenEvent>(handle);
     }
 
-        CAEN_DGTZ_GetEventInfo(handle,
-            res->Data.Buffer,
-            res->Data.DataSize,
-            i,
-            &evt->Info,
-            &evt->DataPtr);
+    CAEN_DGTZ_GetEventInfo(handle,
+        res->Data.Buffer,
+        res->Data.DataSize,
+        i,
+        &evt->Info,
+        &evt->DataPtr);
 
-        CAEN_DGTZ_DecodeEvent(handle,
-            evt->DataPtr,
-            reinterpret_cast<void**>(&evt->Data));
+    CAEN_DGTZ_DecodeEvent(handle,
+        evt->DataPtr,
+        reinterpret_cast<void**>(&evt->Data));
 }
 
 void clear_data(CAEN& res) noexcept {
