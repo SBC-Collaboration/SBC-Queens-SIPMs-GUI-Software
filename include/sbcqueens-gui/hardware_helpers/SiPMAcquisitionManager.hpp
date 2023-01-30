@@ -58,12 +58,12 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // To get the pipe interface used in the pipes.
     using SiPMPipe_type = typename Pipes::SiPMPipe_type;
     // Software related items
-    SiPMPipe_type _sipm_pipe_end;
+    SiPMAcquisitionPipeEnd<SiPMPipe_type> _sipm_pipe_end;
     // A reference to the DOE thats inside _caen_pipe_end
     SiPMAcquisitionData& _doe;
 
-    IndicatorSender<IndicatorNames> _indicator_sender;
-    IndicatorSender<uint8_t> _plot_sender;
+    // IndicatorSender<IndicatorNames> _indicator_sender;
+    // IndicatorSender<uint8_t> _plot_sender;
 
     // Files
     std::string _run_name =  "";
@@ -122,7 +122,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
  public:
     explicit SiPMAcquisitionManager(const Pipes& pipes) :
         ThreadManager<Pipes>(pipes),
-        _sipm_pipe_end{pipes.CAENPipe}, _doe{_sipm_pipe_end.Doe},
+        _sipm_pipe_end{pipes.SiPMPipe}, _doe{_sipm_pipe_end.Doe},
         _sipm_volt_sys("Keithley 2000/6487") {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
@@ -286,7 +286,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         last_waveforms = TriggeredWaveforms;
         last_time = current_time;
-        _indicator_sender(IndicatorNames::TRIGGERRATE, dWaveforms / dt);
+        // _indicator_sender(IndicatorNames::TRIGGERRATE, dWaveforms / dt);
     }
 
     // Local error checking. Checks if there was an error and prints it
@@ -341,14 +341,14 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // GUI -> CAEN
         SiPMAcquisitionData task;
 
-        // If the queue does not return a valid function, this call will
+        // If the queue does not return a valid callback, this call will
         // do nothing and should return true always.
         // The tasks are essentially any GUI driven modification, example
         // setting the PID setpoints or constants
         // or an user driven reset
         if (_sipm_pipe_end.Pipe->try_dequeue(task)) {
             if (not task.Callback(_doe)) {
-                spdlog::warn("Something went wrong with a command!");
+                spdlog::warn("Something went wrong with a command at the SiPM Manager");
             } else {
                 switch_state(_doe.CurrentState);
                 return true;
@@ -486,7 +486,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // Similar to an oscilloscope
     bool oscilloscope() {
         auto events = get_events_in_buffer(_caen_port);
-        _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
+        // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
 
         retrieve_data(_caen_port);
 
@@ -532,12 +532,12 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             _vbd_routine = std::make_unique<BreakdownRoutine>(
                 _caen_port, _doe, _run_name, _saveinfo_file);
 
-            // Reset all indicators for this section
-            _indicator_sender(IndicatorNames::FINISHED_ROUTINE, false);
-            _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
-                false);
-            _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
-                false);
+            // // Reset all indicators for this section
+            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, false);
+            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
+            //     false);
+            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
+                // false);
         }
 
         _vbd_routine->update();
@@ -554,13 +554,13 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         TriggeredWaveforms += static_cast<uint64_t>(
             _vbd_routine->getLatestNumEvents());
         SavedWaveforms = _vbd_routine->getTotalAcquiredEvents();
-        _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
+        // _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
 
         switch (_vbd_routine->getCurrentState()) {
         case BreakdownRoutineState::Finished:
             switch_state(SiPMAcquisitionStates::OscilloscopeMode);
 
-            _indicator_sender(IndicatorNames::FINISHED_ROUTINE, true);
+            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, true);
 
             // Set back to 52 just in case.
             _doe.SiPMVoltageSysVoltage = *_vbd_routine->GainVoltages.cbegin();
@@ -570,40 +570,40 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             _vbd_routine = nullptr;
             break;
         case BreakdownRoutineState::GainMeasurements:
-            _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING, true);
+            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING, true);
         case BreakdownRoutineState::CalculateBreakdownVoltage:
             if (_vbd_routine->hasNewGainMeasurement())
             {
                 auto pars = _vbd_routine->getAnalysisLatestValues();
-                _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
-                    _doe.LatestMeasure.Volt, pars.SPEParameters(1));
-                _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
-                pars.SPEParameters(1));
+                // _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
+                //     _doe.LatestMeasure.Volt, pars.SPEParameters(1));
+                // _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
+                // pars.SPEParameters(1));
 
-                _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
-                    pars.SPEEfficiency);
-                _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
-                    pars.IntegralThreshold);
+                // _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
+                //     pars.SPEEfficiency);
+                // _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
+                //     pars.IntegralThreshold);
 
-                _indicator_sender(IndicatorNames::OFFSET,
-                    pars.SPEParameters(2));
+                // _indicator_sender(IndicatorNames::OFFSET,
+                //     pars.SPEParameters(2));
 
-                _indicator_sender(IndicatorNames::RISE_TIME,
-                    pars.SPEParameters(3));
+                // _indicator_sender(IndicatorNames::RISE_TIME,
+                //     pars.SPEParameters(3));
 
-                _indicator_sender(IndicatorNames::FALL_TIME,
-                    pars.SPEParameters(4));
+                // _indicator_sender(IndicatorNames::FALL_TIME,
+                //     pars.SPEParameters(4));
             }
             break;
         case BreakdownRoutineState::Acquisition:
-            _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING, true);
+            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING, true);
             if (_vbd_routine->hasNewBreakdownVoltage()) {
                auto values = _vbd_routine->getBreakdownVoltage();
 
-                _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
-                    values.BreakdownVoltage);
-                _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
-                    values.BreakdownVoltageError);
+                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
+                //     values.BreakdownVoltage);
+                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
+                //     values.BreakdownVoltageError);
             }
 
             break;
@@ -729,9 +729,9 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                 _y_values[i] = static_cast<double>(buf[i]);
             }
 
-            _plot_sender(static_cast<uint8_t>(j),
-                _x_values,
-                _y_values);
+            // _plot_sender(static_cast<uint8_t>(j),
+            //     _x_values,
+            //     _y_values);
         }
     }
 
@@ -798,10 +798,10 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                     _doe.LatestMeasure.Time = time;
                     _doe.LatestMeasure.Current = curr;
                     _voltages_file->Add(_doe.LatestMeasure);
-                    _indicator_sender(IndicatorNames::DMM_VOLTAGE, time, volt);
-                    _indicator_sender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
-                    _indicator_sender(IndicatorNames::PICO_CURRENT, time, curr);
-                    _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
+                    // _indicator_sender(IndicatorNames::DMM_VOLTAGE, time, volt);
+                    // _indicator_sender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
+                    // _indicator_sender(IndicatorNames::PICO_CURRENT, time, curr);
+                    // _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
                 }
             }
 
@@ -867,8 +867,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
                         // Let's also reset this indicator which helps
                         // minimize confusion in the GUI
-                        _indicator_sender(IndicatorNames::DONE_DATA_TAKING,
-                            false);
+                        // _indicator_sender(IndicatorNames::DONE_DATA_TAKING,
+                        //     false);
 
                         return {};
                     });
@@ -885,8 +885,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                     _doe.isVoltageStabilized = true;
                 }
 
-                _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
-                        _doe.isVoltageStabilized);
+                // _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+                //         _doe.isVoltageStabilized);
 
                 get_voltage();
                 save_voltages();
@@ -904,8 +904,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 };
 
 template<typename Pipes>
-SiPMAcquisitionManager<Pipes> make_sipmacuiqisition_manager(const Pipes& p) {
-    return SiPMAcquisitionManager<Pipes>(p);
+auto make_sipmacquisition_manager(const Pipes& p) {
+    return std::make_unique<SiPMAcquisitionManager<Pipes>>(p);
 }
 
 }  // namespace SBCQueens

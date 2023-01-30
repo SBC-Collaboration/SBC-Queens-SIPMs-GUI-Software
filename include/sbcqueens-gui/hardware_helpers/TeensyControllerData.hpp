@@ -147,10 +147,15 @@ using TeensyControllerPipeCallback = PipeCallback<TeensyControllerData>;
 
 // It accepts any Queue with a FIFO style.
 template<template<typename, typename> class QueueType, typename Traits>
-class TeensyControllerPipe : public Pipe<QueueType, TeensyControllerData, Traits> {};
+struct TeensyControllerPipe : public Pipe<QueueType, TeensyControllerData, Traits> {};
 
 template<class TPipe>
-class TeensyControllerPipeEnd : public PipeEnd<TPipe> {};
+struct TeensyControllerPipeEnd : public PipeEnd<TPipe> {
+    using PipeEnd<TPipe>::Doe;
+    using PipeEnd<TPipe>::Pipe;
+
+    explicit TeensyControllerPipeEnd(TPipe p) : PipeEnd<TPipe>(p) {}
+};
 
 // It holds everything the outside world can modify or use.
 // So far, I do not like teensy_serial is here.

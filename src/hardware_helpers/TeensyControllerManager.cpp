@@ -1,4 +1,4 @@
-#include "sbcqueens-gui/hardware_helpers/TeensyControllerInterface.hpp"
+#include "sbcqueens-gui/hardware_helpers/TeensyControllerManager.hpp"
 
 // C++ STD includes
 #include <cstddef>

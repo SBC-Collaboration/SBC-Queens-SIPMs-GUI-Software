@@ -27,7 +27,7 @@
 #include "sbcqueens-gui/hardware_helpers/SlowDAQManager.hpp"
 #include "sbcqueens-gui/hardware_helpers/GUIManager.hpp"
 
-// PipeInterface -> The type of Pipe to use and size_t is an internal
+// PipeInterface -> The type of Pipe to use and Traits are an internal
 // memory requirement of the Pipe.
 template <template <typename, typename> class PipeInterface, typename Traits>
 struct Pipes {
@@ -66,7 +66,7 @@ int main() {
     logger->info("Created logger. Let's go!");
 
     SiPMCharacterizationPipes pipes;
-    std::vector<SBCQueens::ThreadManager<SiPMCharacterizationPipes>> _threads;
+    std::vector<std::unique_ptr<SBCQueens::ThreadManager<SiPMCharacterizationPipes>>> _threads;
     logger->info("Created pipes that communicate between threads.");
 
     // This function just holds the rendering framework we are using
@@ -89,13 +89,13 @@ int main() {
     logger->info("Creating Teensy Controller Manager.");
     _threads.push_back(SBCQueens::make_teensy_controller_manager(pipes));
     logger->info("Creating SiPM Controller Manager.");
-    _threads.push_back(SBCQueens::make_sipmacuiqisition_manager(pipes));
+    _threads.push_back(SBCQueens::make_sipmacquisition_manager(pipes));
     logger->info("Creating Slow DAQ Controller Manager.");
     _threads.push_back(SBCQueens::make_slow_daq(pipes));
     // The lambdas we are passing are the functions
     // to read and write to the queue
     logger->info("Starting all manager threads.");
-    for(const auto& _thread : _threads) {
+    for(auto& _thread : _threads) {
         std::thread t(std::move(_thread));
         t.detach();
     }

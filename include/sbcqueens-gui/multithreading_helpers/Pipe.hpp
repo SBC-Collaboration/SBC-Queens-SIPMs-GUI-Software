@@ -29,11 +29,10 @@ struct Pipe : public std::shared_ptr<QueueType<DataType, TypeTraits>> {
 template<class TPipe>
 struct PipeEnd {
     using PipeData = typename TPipe::data_type;
-    using PipeType = typename TPipe::queue_type;
     PipeData Doe;
-    PipeType Pipe;
+    TPipe Pipe;
 
-    explicit PipeEnd(PipeType pipe) : Doe{}, Pipe{pipe} {}
+    explicit PipeEnd(TPipe pipe) : Doe{}, Pipe{pipe} {}
 };
 
 } // namespace SBCQueens

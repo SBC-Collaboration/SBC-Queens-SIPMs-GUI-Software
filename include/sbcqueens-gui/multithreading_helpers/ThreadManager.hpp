@@ -17,8 +17,6 @@ class ThreadManager {
     Pipes _pipes;
 
  public:
-    // To get the pipe interface using in the pipes.
-    using PipeInterface = typename Pipes::PipeInterface_type;
     explicit ThreadManager(const Pipes& pipes) : _pipes(pipes) {}
 
     virtual ~ThreadManager() = 0;

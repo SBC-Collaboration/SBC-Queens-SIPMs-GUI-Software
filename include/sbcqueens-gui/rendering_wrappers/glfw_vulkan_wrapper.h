@@ -68,8 +68,8 @@ namespace ImGUIWrappers {
     void FramePresent(ImGui_ImplVulkanH_Window* wd);
     void glfw_error_callback(int error, const char* description);
 
-    template<typename ImGUIDrawFunction>
-    int main_glfw_vulkan_wrapper(ImGUIDrawFunction& guiFunc)
+    int main_glfw_vulkan_wrapper(std::function<void(void)>&& guiFunc,
+        std::function<void(void)>&& closeFunc)
     {
         // Setup GLFW window
         glfwSetErrorCallback(glfw_error_callback);

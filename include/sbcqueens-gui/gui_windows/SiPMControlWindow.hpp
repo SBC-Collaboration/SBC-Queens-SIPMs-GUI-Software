@@ -23,42 +23,44 @@ namespace SBCQueens {
 
 template<typename Pipes>
 class SiPMControlWindow : public Window<Pipes> {
+    // CAEN Pipe
     using SiPMPipe_type = typename Pipes::SiPMPipe_type;
-    SiPMPipe_type _sipm_pipe_end;
+    SiPMAcquisitionPipeEnd<SiPMPipe_type> _sipm_pipe_end;
     SiPMAcquisitionData& _sipm_doe;
 
     // Teensy Pipe
     using TeensyPipe_type = typename Pipes::TeensyPipe_type;
-    TeensyPipe_type _teensy_pipe_end;
+    TeensyControllerPipeEnd<TeensyPipe_type> _teensy_pipe_end;
     TeensyControllerData& _teensy_doe;
 
  public:
     explicit SiPMControlWindow(const Pipes& p) :
-        Window<Pipes>{p} ,
-        _sipm_pipe_end{p.SiPMPipe}, _sipm_doe{_sipm_pipe_end.Doe},
-        _teensy_pipe_end{p.TeensyPipe}, _teensy_doe{_teensy_pipe_end.Doe}
+        Window<Pipes>{p, "SiPM Controls"} ,
+        _sipm_pipe_end{p.SiPMPipe}, _sipm_doe(_sipm_pipe_end.Doe),
+        _teensy_pipe_end{p.TeensyPipe}, _teensy_doe(_teensy_pipe_end.Doe)
     {}
 
     ~SiPMControlWindow() {}
 
-    template<typename List>
-    void init(const List& list) {
-        auto other_conf = list["Other"];
+    void init_window(const toml::table& tb) {
+        auto other_conf = tb["Other"];
+        auto file_conf = tb["File"];
 
         _sipm_doe.SiPMVoltageSysSupplyEN = false;
         _sipm_doe.SiPMVoltageSysPort
             = other_conf["SiPMVoltageSystem"]["Port"].value_or("COM6");
         _sipm_doe.SiPMVoltageSysVoltage
             = other_conf["SiPMVoltageSystem"]["InitVoltage"].value_or(0.0);
+
+
+        _sipm_doe.VBDData.DataPulses
+            = file_conf["RunWaveforms"].value_or(1000000ull);
+        _sipm_doe.VBDData.SPEEstimationTotalPulses
+            = file_conf["GainWaveforms"].value_or(10000ull);
     }
 
  private:
     void draw()  {
-        if (!ImGui::Begin("SiPM Controls")) {
-            ImGui::End();
-            return;
-        }
-
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.84f, 0.0f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
@@ -164,37 +166,54 @@ class SiPMControlWindow : public Window<Pipes> {
         // }
         ImGui::PopStyleColor(1);
 
-        CAENControlFac.InputFloat("SiPM Voltage", cgui_state.SiPMVoltageSysVoltage,
-            0.01f, 60.00f, "%2.2f V",
-            ImGui::IsItemDeactivated, [=](CAENInterfaceData& old) {
+        // CAENControlFac.InputFloat("SiPM Voltage", cgui_state.SiPMVoltageSysVoltage,
+        //     0.01f, 60.00f, "%2.2f V",
+        //     ImGui::IsItemDeactivated, [=](CAENInterfaceData& old) {
 
+        //         // Ignore the input under BVMode or RunMode
+        //         if (old.CurrentState
+        //             == SiPMAcquisitionStates::MeasurementRoutineMode) {
+        //             return true;
+        //         }
+
+        //         if (cgui_state.SiPMVoltageSysVoltage >= 60.0f) {
+        //             old.SiPMVoltageSysVoltage = 60.0f;
+        //         }
+
+        //         old.SiPMVoltageSysVoltage = cgui_state.SiPMVoltageSysVoltage;
+        //         old.SiPMVoltageSysChange = true;
+        //         return true;
+        //     });
+        draw_at_spot(_sipm_doe, SiPMControls, "SiPM Voltage",
+            _sipm_doe.SiPMVoltageSysVoltage, InputInt, ImGui::IsItemDeactivated,
+            // Callback when IsItemEdited !
+            [doe = _sipm_doe](SiPMAcquisitionData& doe_twin) {
                 // Ignore the input under BVMode or RunMode
-                if (old.CurrentState
+                if (doe_twin.CurrentState
                     == SiPMAcquisitionStates::MeasurementRoutineMode) {
                     return true;
                 }
 
-                if (cgui_state.SiPMVoltageSysVoltage >= 60.0f) {
-                    old.SiPMVoltageSysVoltage = 60.0f;
+                if (doe.SiPMVoltageSysVoltage >= 60.0f) {
+                    doe_twin.SiPMVoltageSysVoltage = 60.0f;
                 }
 
-                old.SiPMVoltageSysVoltage = cgui_state.SiPMVoltageSysVoltage;
-                old.SiPMVoltageSysChange = true;
-                return true;
-            });
+                doe_twin.SiPMVoltageSysVoltage = doe.SiPMVoltageSysVoltage;
+                doe_twin.SiPMVoltageSysChange = true;
+        });
 
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Max voltage allowed is 60V");
         }
 
-        bool tmp;
-        indicatorReceiver.booleanIndicator(IndicatorNames::CURRENT_STABILIZED,
-            "Current stabilized?",
-            tmp,
-            [=](const double& newVal) -> bool {
-                return newVal > 0;
-            }
-        );
+        // bool tmp;
+        // indicatorReceiver.booleanIndicator(IndicatorNames::CURRENT_STABILIZED,
+        //     "Current stabilized?",
+        //     tmp,
+        //     [=](const double& newVal) -> bool {
+        //         return newVal > 0;
+        //     }
+        // );
 
         ImGui::Separator();
         //  VBD mode controls
@@ -202,20 +221,36 @@ class SiPMControlWindow : public Window<Pipes> {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
             ImVec4(.0f, 8.f, .8f, 1.0f));
-        CAENControlFac.Button("Run measurement Routine",
-            [=](CAENInterfaceData& old) {
-                if (old.CurrentState == SiPMAcquisitionStates::OscilloscopeMode) {
-                    old.CurrentState = SiPMAcquisitionStates::MeasurementRoutineMode;
+        draw_at_spot(_sipm_doe, SiPMControls, "Run measurement Routine",
+            tmp, Button, [&](){ return tmp; },
+            // Callback when IsItemEdited !
+            [doe = _sipm_doe, t_doe = _teensy_doe]
+            (SiPMAcquisitionData& doe_twin) {
+                if (doe_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode) {
+                    doe_twin.CurrentState = SiPMAcquisitionStates::MeasurementRoutineMode;
 
-                    if (old.SiPMVoltageSysSupplyEN) {
-                        old.LatestTemperature = tgui_state.PIDTempValues.SetPoint;
+                    if (doe_twin.SiPMVoltageSysSupplyEN) {
+                        doe_twin.LatestTemperature = t_doe.PIDTempValues.SetPoint;
                     } else {
                         spdlog::warn("Gain calculation cannot start without "
                             "enabling the power supply.");
                     }
                 }
-                return true;
         });
+        // CAENControlFac.Button("Run measurement Routine",
+        //     [=](CAENInterfaceData& old) {
+        //         if (old.CurrentState == SiPMAcquisitionStates::OscilloscopeMode) {
+        //             old.CurrentState = SiPMAcquisitionStates::MeasurementRoutineMode;
+
+        //             if (old.SiPMVoltageSysSupplyEN) {
+        //                 old.LatestTemperature = tgui_state.PIDTempValues.SetPoint;
+        //             } else {
+        //                 spdlog::warn("Gain calculation cannot start without "
+        //                     "enabling the power supply.");
+        //             }
+        //         }
+        //         return true;
+        // });
         ImGui::PopStyleColor(3);
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Starts the logic to attempt a VBD calculation, and"
@@ -231,48 +266,56 @@ class SiPMControlWindow : public Window<Pipes> {
             static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, 0.7f)));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive,
             static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, 0.8f)));
-        CAENControlFac.Button("Cancel routine",
-            [=](CAENInterfaceData& old) {
-                if (old.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
-                    old.CancelMeasurements = true;
+        draw_at_spot(_sipm_doe, SiPMControls, "Run measurement Routine",
+            tmp, Button, [&](){ return tmp; },
+            // Callback when IsItemEdited !
+            [] (SiPMAcquisitionData& doe_twin) {
+                if (doe_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
+                    doe_twin.CancelMeasurements = true;
                 }
-                return true;
         });
+        // CAENControlFac.Button("Cancel routine",
+        //     [=](CAENInterfaceData& old) {
+        //         if (old.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
+        //             old.CancelMeasurements = true;
+        //         }
+        //         return true;
+        // });
         ImGui::PopStyleColor(3);
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Cancels any ongoing measurement routine.");
         }
 
-        indicatorReceiver.booleanIndicator(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
-            "Calculating breakdown voltage",
-            tmp,
-            [=](const double& newVal) -> bool {
-                    return newVal > 0;
-        });
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Shows if the measurements for the breakdown voltage "
-                "are ongoing");
-        }
+        // indicatorReceiver.booleanIndicator(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
+        //     "Calculating breakdown voltage",
+        //     tmp,
+        //     [=](const double& newVal) -> bool {
+        //             return newVal > 0;
+        // });
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("Shows if the measurements for the breakdown voltage "
+        //         "are ongoing");
+        // }
 
-        indicatorReceiver.booleanIndicator(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
-            "Acquiring pulse data",
-            tmp,
-            [=](const double& newVal) -> bool {
-                    return newVal > 0;
-        });
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Shows if the measurements are ongoing.");
-        }
+        // indicatorReceiver.booleanIndicator(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
+        //     "Acquiring pulse data",
+        //     tmp,
+        //     [=](const double& newVal) -> bool {
+        //             return newVal > 0;
+        // });
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("Shows if the measurements are ongoing.");
+        // }
 
-        indicatorReceiver.booleanIndicator(IndicatorNames::FINISHED_ROUTINE,
-            "Finished with Cell?",
-            tmp,
-            [=](const double& newVal) -> bool {
-                    return newVal > 0;
-        });
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Shows if the routine is done.");
-        }
+        // indicatorReceiver.booleanIndicator(IndicatorNames::FINISHED_ROUTINE,
+        //     "Finished with Cell?",
+        //     tmp,
+        //     [=](const double& newVal) -> bool {
+        //             return newVal > 0;
+        // });
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("Shows if the routine is done.");
+        // }
 
 
         //  end VBD mode controls
@@ -311,9 +354,6 @@ class SiPMControlWindow : public Window<Pipes> {
         //     }
         //     return true;
         // });
-
-        //  end Data taking controls
-        ImGui::End();
     }
 };
 

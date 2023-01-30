@@ -169,15 +169,14 @@ void from_json(const json& j, BMEs& p);
 
 template<typename Pipes>
 class TeensyControllerManager : public ThreadManager<Pipes> {
-
     std::map<std::string, std::string> _crc_cmds;
 
     using TeensyPipe_type = typename Pipes::TeensyPipe_type;
-    TeensyPipe_type _teensy_pipe_end;
+    TeensyControllerPipeEnd<TeensyPipe_type> _teensy_pipe_end;
     TeensyControllerData& _doe;
 
-    IndicatorSender<IndicatorNames> _indicator_sender;
-    IndicatorSender<uint16_t> _plot_sender;
+    // IndicatorSender<IndicatorNames> _indicator_sender;
+    // IndicatorSender<uint16_t> _plot_sender;
 
     double _init_time;
 
@@ -192,12 +191,10 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
  public:
     explicit TeensyControllerManager(const Pipes& pipes) :
         ThreadManager<Pipes>{pipes},
-        _teensy_pipe_end{pipes.TeensyPipe}, _doe{_teensy_pipe_end.DOE}
-        _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
-        _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
-
-    // No copying
-    TeensyControllerManager(const TeensyControllerManager&) = delete;
+        _teensy_pipe_end{pipes.TeensyPipe}, _doe{_teensy_pipe_end.Doe}
+        // _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
+        // _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
+        { }
 
     ~TeensyControllerManager() {}
 
@@ -214,31 +211,18 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
 
         spdlog::info("Initializing teensy thread");
 
-        // GUI -> Teensy
-        TeensyQueue& guiQueueOut = std::get<TeensyQueue&>(_queues);
-        auto guiQueueFunc = [&guiQueueOut]() -> SBCQueens::TeensyQueueType {
-            SBCQueens::TeensyQueueType new_task;
-            bool success = guiQueueOut.try_dequeue(new_task);
-
-            if (success) {
-                spdlog::info("Received new teensy task");
-                return new_task;
-            } else {
-                return [](SBCQueens::TeensyControllerData&) { return true; };
-            }
-        };
-
         // Main loop lambda
         auto main_loop = [&]() -> bool {
-            TeensyQueueType task = guiQueueFunc();
-
-            // If the queue does not return a valid function, this call will
+            TeensyControllerData new_task;
+            // If the queue does not return a valid callback, this call will
             // do nothing and should return true always.
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (!task(_doe)) {
-                spdlog::warn("Something went wrong with a command!");
+            if (_teensy_pipe_end.Pipe->try_dequeue(new_task)) {
+                if (not new_task.Callback(_doe)) {
+                    spdlog::warn("Something went wrong with a command in Teensy.");
+                }
             }
             // End Communication with the GUI
 
@@ -438,14 +422,14 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 spdlog::info("{0}, {1}, {2}", system_pars.NumRtdBoards,
                     system_pars.NumRtdsPerBoard, system_pars.InRTDOnlyMode);
 
-                _indicator_sender(IndicatorNames::NUM_RTD_BOARDS,
-                    _doe.SystemParameters.NumRtdBoards);
+                // _indicator_sender(IndicatorNames::NUM_RTD_BOARDS,
+                //     _doe.SystemParameters.NumRtdBoards);
 
-                _indicator_sender(IndicatorNames::NUM_RTDS_PER_BOARD,
-                    _doe.SystemParameters.NumRtdsPerBoard);
+                // _indicator_sender(IndicatorNames::NUM_RTDS_PER_BOARD,
+                //     _doe.SystemParameters.NumRtdsPerBoard);
 
-                _indicator_sender(IndicatorNames::IS_RTD_ONLY,
-                    _doe.SystemParameters.InRTDOnlyMode);
+                // _indicator_sender(IndicatorNames::IS_RTD_ONLY,
+                //     _doe.SystemParameters.InRTDOnlyMode);
             } catch (... ) {
                 spdlog::warn("Failed to parse system data from {0}. "
                     "Message received from Teensy: {1}",
@@ -467,11 +451,11 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 auto pids = parse.get<Peltiers>();
 
                 // Send them to GUI to draw them
-                _indicator_sender(IndicatorNames::PELTIER_CURR,
-                    pids.time, pids.PID.Current);
+                // _indicator_sender(IndicatorNames::PELTIER_CURR,
+                //     pids.time, pids.PID.Current);
 
-                _indicator_sender(IndicatorNames::LATEST_PELTIER_CURR,
-                    pids.PID.Current);
+                // _indicator_sender(IndicatorNames::LATEST_PELTIER_CURR,
+                //     pids.PID.Current);
 
                 _peltiers_file->Add(pids);
             } catch (... ) {
@@ -494,30 +478,30 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 // Send them to GUI to draw them
                 for (uint16_t i = 0; i < rtds.Temps.size(); i++) {
                     const double temp = rtds.Temps[i];
-                    _plot_sender(i, rtds.time, temp);
+                    // _plot_sender(i, rtds.time, temp);
 
-                    switch (i) {
-                        case 0:
-                        _indicator_sender(IndicatorNames::LATEST_RTD1_TEMP,
-                            temp);
-                        break;
-                        case 1:
-                        _indicator_sender(IndicatorNames::LATEST_RTD2_TEMP,
-                            temp);
-                        break;
-                        case 2:
-                        _indicator_sender(IndicatorNames::LATEST_RTD3_TEMP,
-                            temp);
-                        break;
-                    }
+                    // switch (i) {
+                    //     case 0:
+                    //     _indicator_sender(IndicatorNames::LATEST_RTD1_TEMP,
+                    //         temp);
+                    //     break;
+                    //     case 1:
+                    //     _indicator_sender(IndicatorNames::LATEST_RTD2_TEMP,
+                    //         temp);
+                    //     break;
+                    //     case 2:
+                    //     _indicator_sender(IndicatorNames::LATEST_RTD3_TEMP,
+                    //         temp);
+                    //     break;
+                    // }
                 }
 
                 double err = rtds.Temps[_doe.PidRTD]
                     - static_cast<double>(_doe.PIDTempValues.SetPoint) - 273.15;
                 _error_temp_cf.Add(err);
 
-                _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
-                    arma::mean(_error_temp_cf.GetBuffer()));
+                // _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
+                //     arma::mean(_error_temp_cf.GetBuffer()));
 
                 _RTDs_file->Add(rtds);
             } catch (... ) {
@@ -537,10 +521,10 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 auto press = parse.get<Pressures>();
 
                 // Send them to GUI to draw them
-                _indicator_sender(IndicatorNames::VACUUM_PRESS,
-                    press.time , press.Vacuum.Pressure);
-                _indicator_sender(IndicatorNames::LATEST_VACUUM_PRESS,
-                    press.Vacuum.Pressure);
+                // _indicator_sender(IndicatorNames::VACUUM_PRESS,
+                //     press.time , press.Vacuum.Pressure);
+                // _indicator_sender(IndicatorNames::LATEST_VACUUM_PRESS,
+                //     press.Vacuum.Pressure);
 
                 _pressures_file->Add(press);
             } catch (... ) {
@@ -560,12 +544,12 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             try {
                 auto bmes = parse.get<BMEs>();
 
-                _indicator_sender(IndicatorNames::LOCAL_BME_TEMPS,
-                    bmes.time , bmes.LocalBME.Temperature);
-                _indicator_sender(IndicatorNames::LOCAL_BME_PRESS,
-                    bmes.time , bmes.LocalBME.Pressure);
-                _indicator_sender(IndicatorNames::LOCAL_BME_HUMD,
-                    bmes.time , bmes.LocalBME.Humidity);
+                // _indicator_sender(IndicatorNames::LOCAL_BME_TEMPS,
+                //     bmes.time , bmes.LocalBME.Temperature);
+                // _indicator_sender(IndicatorNames::LOCAL_BME_PRESS,
+                //     bmes.time , bmes.LocalBME.Pressure);
+                // _indicator_sender(IndicatorNames::LOCAL_BME_HUMD,
+                //     bmes.time , bmes.LocalBME.Humidity);
 
                 _BMEs_file->Add(bmes);
             } catch (... ) {
@@ -775,8 +759,8 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
 };
 
 template<typename Pipes>
-TeensyControllerManager<Pipes> make_teensy_controller_manager(const Pipes& p) {
-    return TeensyControllerManager<Pipes>(p);
+auto make_teensy_controller_manager(const Pipes& p) {
+    return std::make_unique<TeensyControllerManager<Pipes>>(p);
 }
 
 }  // namespace SBCQueens

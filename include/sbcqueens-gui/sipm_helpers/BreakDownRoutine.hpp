@@ -15,7 +15,7 @@
 #include "sbcqueens-gui/caen_helper.hpp"
 #include "sbcqueens-gui/file_helpers.hpp"
 
-#include "sbcqueens-gui/hardware_helpers/CAENInterfaceData.hpp"
+#include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"
 
 #include "sipmanalysis/PulseFunctions.hpp"
 #include "sipmanalysis/SPEAnalysis.hpp"
@@ -39,7 +39,7 @@ class BreakdownRoutine {
     // CAEN Digitizer resource
     CAEN& _caen_port;
     // Information about the current state of the SiPM/CAEN software
-    CAENInterfaceData& _doe;
+    SiPMAcquisitionData& _doe;
     // Manager of the digitizer pulse file
     DataFile<CAENEvent> _pulse_file = nullptr;
     // Logfile to hold all the important values calculated in this routine.
@@ -220,7 +220,7 @@ class BreakdownRoutine {
         2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
 
     // Takes ownership of the port and shared the saveinfo data
-    BreakdownRoutine(CAEN& port, CAENInterfaceData& doe,
+    BreakdownRoutine(CAEN& port, SiPMAcquisitionData& doe,
         const std::string& runName, LogFile svInfoFile) :
         _caen_port{port},
         _doe{doe},

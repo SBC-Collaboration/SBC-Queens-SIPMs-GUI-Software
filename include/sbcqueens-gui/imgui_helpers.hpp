@@ -78,7 +78,7 @@ template<typename DataType,
     typename ImGuiDrawFunc,
     typename Callback = std::function<void(DataType&)>,
     typename... Args>
-constexpr bool draw(DataType& doe, const Control& control,
+bool draw(DataType& doe, const Control& control,
     OutType& out, ImGuiDrawFunc&& draw_func,
     std::function<bool(void)>&& condition, Callback&& callback, Args... args) {
 
@@ -119,31 +119,31 @@ bool InputText(const Control& control, std::string& out) {
     return ImGui::InputText(control.Label.c_str(), &out);
 }
 
-constexpr bool Button(const Control& control, bool& out) {
+bool Button(const Control& control, bool& out) {
     out = ImGui::Button(control.Label.c_str(),
         control.DrawOptions.ControlSize);
     return out;
 }
 
 
-constexpr bool Checkbox(const Control& control, bool& out) {
+bool Checkbox(const Control& control, bool& out) {
     return ImGui::Checkbox(control.Label.c_str(), &out);
 }
 
-constexpr bool InputInt(const Control& control, int& out) {
+bool InputInt(const Control& control, int& out) {
     return ImGui::InputInt(control.Label.c_str(), &out);
 }
 
-constexpr bool InputFloat(const Control& control, float& out) {
+bool InputFloat(const Control& control, float& out) {
     return ImGui::InputFloat(control.Label.c_str(), &out);
 }
 
-constexpr bool InputDouble(const Control& control, double& out) {
+bool InputDouble(const Control& control, double& out) {
     return ImGui::InputDouble(control.Label.c_str(), &out);
 }
 
 template<typename T> requires std::is_integral_v<T>
-constexpr bool InputScalar(const Control& control, T& out) {
+bool InputScalar(const Control& control, T& out) {
     ImGuiDataType_ type = ImGuiDataType_S8;
     if constexpr ( std::is_same_v<T, int8_t>) {
         type = ImGuiDataType_S8;

@@ -63,7 +63,6 @@ constexpr TeensyControllerControlArray create_teensy_controls() {
         TeensyControllerControl{"Teensy COM Port", ""},
         TeensyControllerControl{"Connect##Teensy", ""},
         TeensyControllerControl{"Disconnect##Teensy", ""}
-
     };
 }
 
@@ -74,12 +73,11 @@ constexpr static TeensyControllerControlArray TeensyControls
 /// SlowDAQ
 const std::size_t kNUMSLOWDAQCONTROLS = 3;
 using SlowDAQControlsArray = std::array<SlowDAQControl, kNUMSLOWDAQCONTROLS>;
-constexpr SlowDAQControlsArray create_teensy_controls() {
+constexpr SlowDAQControlsArray create_sloqdaq_controls() {
     return {
         SlowDAQControl{"PFEIFFER Port", ""},
         SlowDAQControl{"Connect##SLOWDAQ", ""},
         SlowDAQControl{"Disconnect##SLOWDAQ", ""}
-
     };
 }
 

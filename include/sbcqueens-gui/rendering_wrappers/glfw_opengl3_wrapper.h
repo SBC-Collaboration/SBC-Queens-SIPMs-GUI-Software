@@ -37,9 +37,8 @@ namespace ImGUIWrappers {
 	  fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 	}
 
-	template<typename ImGUIDrawFunction, typename CloseFunc>
-	int main_glfw_open3gl_wrapper(ImGUIDrawFunction&& guiFunc,
-		CloseFunc&& closeFunc)
+	int main_glfw_open3gl_wrapper(std::function<void(void)>&& guiFunc,
+		std::function<void(void)>&& closeFunc)
 	{
 		// Setup window
 		glfwSetErrorCallback(glfw_error_callback);

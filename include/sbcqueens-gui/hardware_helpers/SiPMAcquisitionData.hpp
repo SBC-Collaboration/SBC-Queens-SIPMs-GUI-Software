@@ -43,10 +43,12 @@ using SiPMAcquisitionDataPipeCallback = PipeCallback<SiPMAcquisitionData>;
 
 // It accepts any Queue with a FIFO style.
 template<template<typename, typename> class QueueType, typename Traits>
-class SiPMAcquisitionPipe : public Pipe<QueueType, SiPMAcquisitionData, Traits> {};
+struct SiPMAcquisitionPipe : public Pipe<QueueType, SiPMAcquisitionData, Traits> { };
 
 template<class TPipe>
-class SiPMAcquisitionPipeEnd : public PipeEnd<TPipe> {};
+struct SiPMAcquisitionPipeEnd : public PipeEnd<TPipe> {
+    explicit SiPMAcquisitionPipeEnd(TPipe p) : PipeEnd<TPipe>(p) {}
+};
 
 // CAEN Interface data that holds every non-volatile items.
 struct SiPMAcquisitionData {
