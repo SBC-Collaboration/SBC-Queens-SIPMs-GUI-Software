@@ -220,9 +220,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             // setting the PID setpoints or constants
             // or an user driven reset
             if (_teensy_pipe_end.Pipe->try_dequeue(new_task)) {
-                if (not new_task.Callback(_doe)) {
-                    spdlog::warn("Something went wrong with a command in Teensy.");
-                }
+                new_task.Callback(_doe);
             }
             // End Communication with the GUI
 

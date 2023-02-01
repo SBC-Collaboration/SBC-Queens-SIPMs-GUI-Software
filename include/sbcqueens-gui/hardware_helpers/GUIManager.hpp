@@ -66,7 +66,7 @@ class GUIManager : public ThreadManager<Pipes> {
     SlowDAQPipeEnd<SlowDAQ_type> _slowdaq_pipe_end;
     SlowDAQData& _slowdaq_doe;
 
-    std::vector<Window<Pipes>> _windows;
+    std::vector<std::unique_ptr<Window<Pipes>>> _windows;
 
     std::string i_run_dir;
     std::string i_run_name;
@@ -108,7 +108,7 @@ class GUIManager : public ThreadManager<Pipes> {
         // including the daughters get cleared
         auto config_file = toml::parse_file("gui_setup.toml");
         for(auto& window: _windows) {
-            window.init(config_file);
+            window->init(config_file);
         }
 
         auto t_conf = config_file["Teensy"];
@@ -144,7 +144,7 @@ class GUIManager : public ThreadManager<Pipes> {
         }
 
         for(auto& window : _windows) {
-            window();
+            (*window)();
         }
 
         //// Plots

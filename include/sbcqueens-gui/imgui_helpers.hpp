@@ -32,10 +32,9 @@ namespace SBCQueens {
 using Color_t = ImVec4;
 using Size_t = ImVec2;
 
-using TextPosition_t = enum class TextPositionEnum { Top, Bottom, Left, Right };
-enum class Type_t { InputText, Button, };
+using TextPosition_t = enum class TextPositionEnum { None, Top, Bottom, Left, Right };
 struct DrawingOptions {
-    TextPosition_t TextPosition = TextPositionEnum::Left;
+    TextPosition_t TextPosition = TextPositionEnum::None;
     Color_t TextColor = ImVec4{1.0, 1.0, 1.0, 1.0};
     Color_t ControlColor;
     Color_t ControlHoveredColor;
@@ -47,100 +46,56 @@ struct ControlOptions {
 
 };
 
+enum class ControlTypes { InputText, Button, Checkbox, InputInt, InputFloat,
+    InputDouble, ComboBox, InputINT8, InputUINT8, InputINT16, InputUINT16, InputINT32,
+    InputUINT32, InputINT64, InputUINT64 };
+
 // This is the interface class of all the controls
-class Control {
- public:
-    // DOE -> data of everything
-    const std::string Label;
-    const std::string Text;
-    const std::string HelpText;
-    const DrawingOptions DrawOptions;
+struct Control {
+    const ControlTypes ControlType = ControlTypes::InputText;
+    const std::string_view Label = "";
+    const std::string_view Text = "";
+    const std::string_view HelpText = "";
+    const DrawingOptions DrawOptions = DrawingOptions{};
 
     constexpr Control() = default;
-    constexpr Control(const std::string& label, const std::string& text,
-        const std::string& help_text,
+    constexpr Control(const ControlTypes& ct, const std::string_view& label,
+        const std::string_view& text, const std::string_view& help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
+        ControlType{ct},
         Label{label},
         Text{text},
         HelpText{help_text},
         DrawOptions{draw_opts}
     {}
 
-    constexpr Control(const std::string& label, const std::string& text) :
-        Control{label, text, ""}
+    constexpr Control(const ControlTypes& ct, const std::string_view& label,
+        const std::string_view& text) :
+        Control{ct, label, text, ""}
     {}
 
     ~Control() = default;
 };
 
-template<typename DataType,
-    typename OutType,
-    typename ImGuiDrawFunc,
-    typename Callback = std::function<void(DataType&)>,
-    typename... Args>
-bool draw(DataType& doe, const Control& control,
-    OutType& out, ImGuiDrawFunc&& draw_func,
-    std::function<bool(void)>&& condition, Callback&& callback, Args... args) {
+// This could be useful if the way the control is drawn changes but for now
+// it can be left alone.
+// struct Painter {
+//     const Control& control;
 
-    bool imgui_out_state = false;
-    switch(control.DrawOptions.TextPosition) {
-    case TextPositionEnum::Left:
-        ImGui::Text("%s", control.Text.c_str()); ImGui::SameLine();
-        imgui_out_state = draw_func(control, out, args...);
-        break;
-    case TextPositionEnum::Right:
-        imgui_out_state = draw_func(control, out, args...); ImGui::SameLine();
-        ImGui::Text("%s", control.Text.c_str());
-        break;
-    case TextPositionEnum::Bottom:
-        imgui_out_state = draw_func(control, out, args...);
-        ImGui::Text("%s", control.Text.c_str());
-        break;
-    case TextPositionEnum::Top:
-    default:
-        ImGui::Text("%s", control.Text.c_str());
-        imgui_out_state = draw_func(control, out, args...);
-        break;
-    }
+//     explicit Painter(const Control& c) : control{c} {}
 
-    if(condition()) {
-        doe.Callback = callback;
-        doe.Changed = true;
-    }
+//     template <typename T>
+//     bool draw(T& out) {
 
-    if(ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(control.HelpText.c_str());
-    }
+//     }
+// };
 
-    return imgui_out_state;
-}
-
-bool InputText(const Control& control, std::string& out) {
-    return ImGui::InputText(control.Label.c_str(), &out);
-}
-
-bool Button(const Control& control, bool& out) {
-    out = ImGui::Button(control.Label.c_str(),
-        control.DrawOptions.ControlSize);
-    return out;
-}
-
-
-bool Checkbox(const Control& control, bool& out) {
-    return ImGui::Checkbox(control.Label.c_str(), &out);
-}
-
-bool InputInt(const Control& control, int& out) {
-    return ImGui::InputInt(control.Label.c_str(), &out);
-}
-
-bool InputFloat(const Control& control, float& out) {
-    return ImGui::InputFloat(control.Label.c_str(), &out);
-}
-
-bool InputDouble(const Control& control, double& out) {
-    return ImGui::InputDouble(control.Label.c_str(), &out);
-}
+bool InputText(const Control& control, std::string& out);
+bool Button(const Control& control, bool& out);
+bool Checkbox(const Control& control, bool& out);
+bool InputInt(const Control& control, int& out);
+bool InputFloat(const Control& control, float& out);
+bool InputDouble(const Control& control, double& out);
 
 template<typename T> requires std::is_integral_v<T>
 bool InputScalar(const Control& control, T& out) {
@@ -163,20 +118,20 @@ bool InputScalar(const Control& control, T& out) {
         type = ImGuiDataType_U64;
     }
 
-    return ImGui::InputScalar(control.Label.c_str(), type, &out);
+    return ImGui::InputScalar(std::string(control.Label).c_str(), type, &out);
 }
 
-auto InputINT8 = InputScalar<int8_t>;
-auto InputUINT8 = InputScalar<uint8_t>;
-auto InputINT16 = InputScalar<int16_t>;
-auto InputUINT16 = InputScalar<uint16_t>;
-auto InputINT32 = InputScalar<int32_t>;
-auto InputUINT32 = InputScalar<uint32_t>;
-auto InputINT64 = InputScalar<int64_t>;
-auto InputUINT64 = InputScalar<uint64_t>;
+bool InputINT8(const Control& control, int8_t& out);
+bool InputUINT8(const Control& control, uint8_t& out);
+bool InputINT16(const Control& control, int16_t& out);
+bool InputUINT16(const Control& control, uint16_t& out);
+bool InputINT32(const Control& control, int32_t& out);
+bool InputUINT32(const Control& control, uint32_t& out);
+bool InputINT64(const Control& control, int64_t& out);
+bool InputUINT64(const Control& control, uint64_t& out);
 
 template<typename T> requires std::is_enum_v<T>
-bool ComboBox(const Control& label, T& state,
+bool ComboBox(const Control& control, T& state,
     const std::unordered_map<T, std::string>& map) {
     static size_t index = 0;
     size_t i = 0;
@@ -198,7 +153,7 @@ bool ComboBox(const Control& label, T& state,
     }
 
     // bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
-    if (ImGui::BeginCombo(label.Label.c_str(), s_states[index].c_str())) {
+    if (ImGui::BeginCombo(std::string(control.Label).c_str(), s_states[index].c_str())) {
         for (i = 0; i < map.size(); i++) {
             const bool is_selected = (index == i);
             if (ImGui::Selectable(s_states[i].c_str(), is_selected)) {
@@ -461,53 +416,121 @@ bool ComboBox(const Control& label, T& state,
 //     }
 // };
 
-template<class T, size_t N>
-constexpr bool find_item(const std::array<T, N>& list, const std::string& name) {
-    for (const auto& control : list) {
-        if(name == control.Label) {
-            return true;
-        }
-    }
+template<size_t N>
+constexpr static Control get_control(const std::array<Control, N>& list, std::string_view name) {
+    auto out = std::find_if(std::cbegin(list), std::cend(list), [_name = name](auto& val) -> bool {
+        return val.Label == _name;
+    });
 
-    return false;
+    // static_assert(out == std::cend(list), "Blah");
+    return *out;
 }
 
-template<typename T, size_t N>
-constexpr T get_item(const std::array<T, N>& list, const std::string& name) {
-    static_assert(find_item(list, name), "Item is not in list");
-
-    for (const auto& item : list) {
-        if(name == item.Label) {
-            return item;
-        }
-    }
-
-    // Return the trivial version of this, but it should never execute
-    // given the static_assert
-    return T{};
+template<size_t N>
+constexpr static ControlTypes get_control_type(const std::array<Control, N>& list, std::string_view name) {
+    return get_control(list, name).ControlType;
 }
 
-// draw at the spot is placed and checks if the item exist in list
-// Helps in debugging the code and compile time.
-// Otherwise, use draw()
-template<typename DataType,
-    size_t N,
+template<ControlTypes T, typename OutType, typename... Args>
+bool get_draw_function(const Control& control, OutType& out, Args&&... args) {
+    if constexpr (T == ControlTypes::Button) {
+        return Button(control, out);
+    } else if constexpr(T == ControlTypes::Checkbox) {
+        return Checkbox(control, out);
+    } else if constexpr(T  == ControlTypes::InputInt) {
+        return InputInt(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputFloat) {
+        return InputFloat(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputDouble) {
+        return InputDouble(control, out);
+    } else if constexpr(T  ==  ControlTypes::ComboBox) {
+        return ComboBox(control, out, args...);
+    } else if constexpr(T  ==  ControlTypes::InputINT8) {
+        return InputINT8(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputUINT8) {
+        return InputUINT8(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputINT16) {
+        return InputINT16(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputUINT16) {
+        return InputUINT16(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputINT32) {
+        return InputINT32(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputUINT32) {
+        return InputUINT32(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputINT64) {
+        return InputINT64(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputUINT64) {
+        return InputUINT64(control, out);
+    } else if constexpr(T  ==  ControlTypes::InputText) {
+        return InputText(control, out);
+    }
+}
+
+template<
+    typename DataType,
+    typename DrawFunc,
     typename OutType,
-    typename ImGuiDrawFunc,
     typename Callback = std::function<void(DataType&)>,
-    typename ...Args>
-bool draw_at_spot(DataType& doe, const std::array<Control, N>& list,
-    const std::string& name, OutType& out, ImGuiDrawFunc&& draw_func,
-    std::function<bool(void)>&& condition, Callback&& callback,
-    Args... args) {
+    typename... Args>
+bool draw_control(DataType& doe, const Control& control, DrawFunc&& f,
+    OutType& out, std::function<bool(void)>&& condition,
+    Callback&& callback, const Args&... args) {
 
-    Control item = get_item(list, name);
-    return draw(doe, item, out,
-        std::forward<ImGuiDrawFunc>(draw_func),
-        std::forward<std::function<bool(void)>>(condition),
-        std::forward<Callback>(callback),
-        std::forward<Args...>(args...));
+    bool imgui_out_state = false;
+    switch (control.DrawOptions.TextPosition) {
+    case TextPositionEnum::Left:
+        ImGui::Text("%s", std::string(control.Text).c_str()); ImGui::SameLine();
+        break;
+    case TextPositionEnum::Top:
+        ImGui::Text("%s", std::string(control.Text).c_str());
+        break;
+    default:
+        break;
+    }
+
+    imgui_out_state = f(control, out, args...);
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", std::string(control.HelpText).c_str());
+    }
+
+    switch (control.DrawOptions.TextPosition) {
+    case TextPositionEnum::Right:
+        ImGui::SameLine();
+        ImGui::Text("%s", std::string(control.Text).c_str());
+        break;
+    case TextPositionEnum::Bottom:
+        ImGui::Text("%s", std::string(control.Text).c_str());
+        break;
+    default:
+        break;
+    }
+
+    if (condition()) {
+        doe.Callback = callback;
+        doe.Changed = true;
+    }
+
+    return imgui_out_state;
 }
+
+// template<
+//     typename DataType,
+//     typename OutType,
+//     typename Callback = std::function<void(DataType&)>,
+//     typename ...Args>
+// bool draw_from_list(DataType& doe, std::string_view label, OutType& out,
+//     std::function<bool(void)>&& condition, Callback&& callback,
+//     Args&&... args) {
+
+//     return draw<get_control_type(, label), DataType, OutType, Callback, Args...>(
+//         doe,
+//         get_control(SiPMGUIControls(), label),
+//         out,
+//         std::forward<std::function<bool(void)>>(condition),
+//         std::forward<Callback>(callback),
+//         std::forward<Args>(args)...);
+// }
 
 template<typename T, class Queue>
 bool send_if_changed(const T& new_value, const Queue& queue) {

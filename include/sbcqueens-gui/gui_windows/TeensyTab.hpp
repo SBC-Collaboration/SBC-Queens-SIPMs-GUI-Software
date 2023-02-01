@@ -104,8 +104,6 @@ class TeensyTab : public Tab<Pipes> {
         //  }
         // );
 
-
-
         if (!_teensy_doe.SystemParameters.InRTDOnlyMode) {
             ImGui::Separator();
             ImGui::PushItemWidth(180);
@@ -122,13 +120,15 @@ class TeensyTab : public Tab<Pipes> {
             //         return true;
             //     }
             // );
-            draw_at_spot(_teensy_doe, TeensyControls, "Peltier ON/OFF",
-                _teensy_doe.PeltierPIDState, Checkbox, ImGui::IsItemEdited,
+
+            constexpr Control peltier_switch = get_control(SiPMGUIControls, "Peltier ON/OFF");
+            draw_control(_teensy_doe, peltier_switch, Checkbox,
+                _teensy_doe.PeltierPIDState, ImGui::IsItemEdited,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPID;
-                    teensy_twin.PeltierPIDState = _teensy_doe.PeltierPIDState;
+                    teensy_twin.PeltierPIDState = doe.PeltierPIDState;
             });
 
 
@@ -141,13 +141,15 @@ class TeensyTab : public Tab<Pipes> {
             //         return true;
             //     }
             // );
-            draw_at_spot(_teensy_doe, TeensyControls, "PID RTD",
-                _teensy_doe.PidRTD, InputUINT16, ImGui::IsItemEdited,
+
+            constexpr Control pid_switch = get_control(SiPMGUIControls, "PID RTD");
+            draw_control(_teensy_doe, pid_switch, InputUINT16,
+                _teensy_doe.PidRTD, ImGui::IsItemEdited,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPIDRTD;
-                    teensy_twin.PidRTD = _teensy_doe.PidRTD;
+                    teensy_twin.PidRTD = doe.PidRTD;
             });
 
             // TeensyControlFac.ComboBox("PID State",
@@ -167,13 +169,14 @@ class TeensyTab : public Tab<Pipes> {
             //  }
             // );
 
-            draw_at_spot(_teensy_doe, TeensyControls, "Update Period (ms)",
-                _teensy_doe.PeltierPidUpdatePeriod, InputUINT32, ImGui::IsItemDeactivated,
+            constexpr Control update_period = get_control(SiPMGUIControls, "Update Period (ms)");
+            draw_control(_teensy_doe, update_period, InputUINT32,
+                _teensy_doe.PeltierPidUpdatePeriod, ImGui::IsItemDeactivated,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPIDUpdatePeriod;
-                    teensy_twin.PeltierPidUpdatePeriod = _teensy_doe.PeltierPidUpdatePeriod;
+                    teensy_twin.PeltierPidUpdatePeriod = doe.PeltierPidUpdatePeriod;
             });
             // TeensyControlFac.InputScalar("Update Period (ms)",
             //     _teensy_doe.PeltierPidUpdatePeriod,
@@ -195,13 +198,15 @@ class TeensyTab : public Tab<Pipes> {
             //         return true;
             //     }
             // );
-            draw_at_spot(_teensy_doe, TeensyControls, "Peltier trip point",
-                _teensy_doe.PIDTempTripPoint, InputUINT32, ImGui::IsItemDeactivated,
+
+            constexpr Control peltier_trip_p = get_control(SiPMGUIControls, "Peltier Trip Point");
+            draw_control(_teensy_doe, peltier_trip_p, InputFloat,
+                _teensy_doe.PIDTempTripPoint, ImGui::IsItemDeactivated,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPIDTripPoint;
-                    teensy_twin.PIDTempTripPoint = _teensy_doe.PIDTempTripPoint;
+                    teensy_twin.PIDTempTripPoint = doe.PIDTempTripPoint;
             });
 
             // TeensyControlFac.InputFloat("Peltier T Setpoint",
@@ -214,13 +219,14 @@ class TeensyTab : public Tab<Pipes> {
             //         return true;
             //     }
             // );
-            draw_at_spot(_teensy_doe, TeensyControls, "Peltier T Setpoint",
-                _teensy_doe.PIDTempValues.SetPoint, InputUINT32, ImGui::IsItemDeactivated,
+            constexpr Control peltier_t_set = get_control(SiPMGUIControls, "Peltier T Setpoint");
+            draw_control(_teensy_doe, peltier_t_set, InputFloat,
+                _teensy_doe.PIDTempValues.SetPoint, ImGui::IsItemDeactivated,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPIDTempSetpoint;
-                    teensy_twin.PIDTempValues.SetPoint = _teensy_doe.PIDTempValues.SetPoint;
+                    teensy_twin.PIDTempValues.SetPoint = doe.PIDTempValues.SetPoint;
             });
 
             // TeensyControlFac.InputFloat("PKp",
@@ -233,13 +239,14 @@ class TeensyTab : public Tab<Pipes> {
             //         return true;
             //     }
             // );
-            draw_at_spot(_teensy_doe, TeensyControls, "PKp",
-                _teensy_doe.PIDTempValues.Kp, InputUINT32, ImGui::IsItemDeactivated,
+            constexpr Control pkp = get_control(SiPMGUIControls, "PKp");
+            draw_control(_teensy_doe, pkp, InputFloat,
+                _teensy_doe.PIDTempValues.Kp, ImGui::IsItemDeactivated,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPIDTempKp;
-                    teensy_twin.PIDTempValues.Kp = _teensy_doe.PIDTempValues.Kp;
+                    teensy_twin.PIDTempValues.Kp = doe.PIDTempValues.Kp;
             });
 
             // TeensyControlFac.InputFloat("PTi",
@@ -251,13 +258,14 @@ class TeensyTab : public Tab<Pipes> {
             //         return true;
             //     }
             // );
-            draw_at_spot(_teensy_doe, TeensyControls, "PTi",
-                _teensy_doe.PIDTempValues.Ti, InputUINT32, ImGui::IsItemDeactivated,
+            constexpr Control pti = get_control(SiPMGUIControls, "PTi");
+            draw_control(_teensy_doe, pti, InputFloat,
+                _teensy_doe.PIDTempValues.Ti, ImGui::IsItemDeactivated,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPIDTempTi;
-                    teensy_twin.PIDTempValues.Ti = _teensy_doe.PIDTempValues.Ti;
+                    teensy_twin.PIDTempValues.Ti = doe.PIDTempValues.Ti;
             });
 
             // TeensyControlFac.InputFloat("PTd",
@@ -270,13 +278,14 @@ class TeensyTab : public Tab<Pipes> {
             //         return true;
             //     }
             // );
-            draw_at_spot(_teensy_doe, TeensyControls, "PTd",
-                _teensy_doe.PIDTempValues.Td, InputUINT32, ImGui::IsItemDeactivated,
+            constexpr Control ptd = get_control(SiPMGUIControls, "PTd");
+            draw_control(_teensy_doe, ptd, InputFloat,
+                _teensy_doe.PIDTempValues.Td, ImGui::IsItemDeactivated,
                 // Callback when IsItemEdited !
                 [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                     teensy_twin.CommandToSend = TeensyCommands::SetPPIDTempTd;
-                    teensy_twin.PIDTempValues.Td = _teensy_doe.PIDTempValues.Td;
+                    teensy_twin.PIDTempValues.Td = doe.PIDTempValues.Td;
             });
 
             // TeensyControlFac.Button("Reset PPID",
@@ -288,10 +297,11 @@ class TeensyTab : public Tab<Pipes> {
             //     }
             // );
             bool tmp;
-            draw_at_spot(_teensy_doe, TeensyControls, "Reset PPID",
-                tmp, Button, [&](){ return tmp; },
+            constexpr Control reset_ppid = get_control(SiPMGUIControls, "Reset PPID");
+            draw_control(_teensy_doe, reset_ppid, Button,
+                tmp, [&](){ return tmp; },
                 // Callback when IsItemEdited !
-                [doe = _teensy_doe, run_dir = i_run_dir]
+                [doe = _teensy_doe]
                 (TeensyControllerData& teensy_twin) {
                      teensy_twin.CommandToSend = TeensyCommands::ResetPPID;
             });
@@ -300,8 +310,8 @@ class TeensyTab : public Tab<Pipes> {
 };
 
 template<typename Pipes>
-TeensyTab<Pipes> make_teensy_tab(const Pipes& p) {
-    return TeensyTab<Pipes>(p);
+auto make_teensy_tab(const Pipes& p) {
+    return std::make_unique<TeensyTab<Pipes>>(p);
 }
 
 }  // namespace SBCQueens

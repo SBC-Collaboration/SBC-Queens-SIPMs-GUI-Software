@@ -143,7 +143,7 @@ const std::unordered_map<TeensyCommands, std::string> cTeensyCommands = {
 struct TeensyControllerData;
 
 // Multi-threading items
-using TeensyControllerPipeCallback = PipeCallback<TeensyControllerData>;
+using TeensyControllerPipeCallback = std::function<void(TeensyControllerData&)>;
 
 // It accepts any Queue with a FIFO style.
 template<template<typename, typename> class QueueType, typename Traits>

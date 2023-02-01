@@ -84,7 +84,7 @@ if(IS_DIRECTORY ${CAEN_DIR})
 
     # include_directories(SYSTEM ${CAEN_DIR}/VME/include)
     add_library(CAENVME SHARED IMPORTED GLOBAL)
-    set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
+    set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/VME/lib/x86_64/CAENVMELib.lib)
     add_library(CAENComm SHARED IMPORTED GLOBAL)
     set_target_properties(CAENComm PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/Comm/lib/x86_64/CAENComm.lib)
     add_library(CAENDigitizer SHARED IMPORTED GLOBAL)

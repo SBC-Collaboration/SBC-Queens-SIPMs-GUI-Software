@@ -60,13 +60,14 @@ class CAENGeneralConfigTab : public Tab<Pipes> {
     void draw() {
         ImGui::PushItemWidth(120);
 
-        draw_at_spot(_sipm_doe, SiPMControls, "Model",
-            _sipm_doe.ConnectionType, ComboBox, ImGui::IsItemEdited,
-            // Callback when IsItemEdited !
-            [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-                caen_twin.Model = doe.Model;
-            },
-            CAENDigitizerModelsMap);
+        // constexpr Control caen_model = get_control(SiPMGUIControls, "Model");
+        // draw_control(_sipm_doe, caen_model, ComboBox,
+        //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
+        //     // Callback when IsItemEdited !
+        //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
+        //         caen_twin.Model = doe.Model;
+        //     },
+        //     CAENDigitizerModelsMap);
 
         // CAENControlFac.ComboBox("Model", _sipm_doe.Model,
         //     CAENDigitizerModelsMap, [](){ return false; },
@@ -74,7 +75,6 @@ class CAENGeneralConfigTab : public Tab<Pipes> {
 
         ImGui::InputScalar("Max Events Per Read", ImGuiDataType_U32,
             &_sipm_doe.GlobalConfig.MaxEventsPerRead);
-
         ImGui::InputScalar("Record Length [counts]", ImGuiDataType_U32,
             &_sipm_doe.GlobalConfig.RecordLength);
         ImGui::InputScalar("Post-Trigger buffer %", ImGuiDataType_U32,
@@ -91,57 +91,61 @@ class CAENGeneralConfigTab : public Tab<Pipes> {
         ImGui::Checkbox("TRG-IN as Gate",
             &_sipm_doe.GlobalConfig.EXTasGate);
 
-        const std::unordered_map<CAEN_DGTZ_TriggerMode_t, std::string> tgg_mode_map = {
-            {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_DISABLED, "Disabled"},
-            {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY, "Acq Only"},
-            {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_EXTOUT_ONLY, "Ext Only"},
-            {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT, "Both"}};
+        // const std::unordered_map<CAEN_DGTZ_TriggerMode_t, std::string> tgg_mode_map = {
+        //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_DISABLED, "Disabled"},
+        //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY, "Acq Only"},
+        //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_EXTOUT_ONLY, "Ext Only"},
+        //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT, "Both"}};
 
-        draw_at_spot(_sipm_doe, SiPMControls, "External Trigger Mode",
-            _sipm_doe.ConnectionType, ComboBox, ImGui::IsItemEdited,
-            // Callback when IsItemEdited !
-            [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-                caen_twin.GlobalConfig.EXTTriggerMode = doe.GlobalConfig.EXTTriggerMode;
-            },
-            tgg_mode_map);
+        // constexpr Control ext_trig_mode = get_control(SiPMGUIControls, "External Trigger Mode");
+        // draw_control(_sipm_doe, ext_trig_mode, ComboBox,
+        //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
+        //     // Callback when IsItemEdited !
+        //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
+        //         caen_twin.GlobalConfig.EXTTriggerMode = doe.GlobalConfig.EXTTriggerMode;
+        //     },
+        //     tgg_mode_map);
         // CAENControlFac.ComboBox("External Trigger Mode",
         //     _sipm_doe.GlobalConfig.EXTTriggerMode,
         //     tgg_mode_map,
         //     []() {return false;}, [](){});
-        draw_at_spot(_sipm_doe, SiPMControls, "Software Trigger Mode",
-            _sipm_doe.ConnectionType, ComboBox, ImGui::IsItemEdited,
-            // Callback when IsItemEdited !
-            [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-                caen_twin.GlobalConfig.SWTriggerMode = doe.GlobalConfig.SWTriggerMode;
-            },
-            tgg_mode_map);
+
+        // constexpr Control soft_trig_mode = get_control(SiPMGUIControls, "Software Trigger Mode");
+        // draw_control(_sipm_doe, soft_trig_mode, ComboBox,
+        //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
+        //     // Callback when IsItemEdited !
+        //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
+        //         caen_twin.GlobalConfig.SWTriggerMode = doe.GlobalConfig.SWTriggerMode;
+        //     },
+        //     tgg_mode_map);
         // CAENControlFac.ComboBox("Software Trigger Mode",
         //     _sipm_doe.GlobalConfig.SWTriggerMode,
         //     tgg_mode_map,
         //     []() {return false;}, [](){});
-
-        draw_at_spot(_sipm_doe, SiPMControls, "Trigger Polarity",
-            _sipm_doe.ConnectionType, ComboBox, ImGui::IsItemEdited,
-            // Callback when IsItemEdited !
-            [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-                caen_twin.GlobalConfig.TriggerPolarity = doe.GlobalConfig.TriggerPolarity;
-            },
-            {{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge, "Falling Edge"},
-            {CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge, "Rising Edge"}});
+        // constexpr Control trig_polarity = get_control(SiPMGUIControls, "Trigger Polarity");
+        // draw_control(_sipm_doe, trig_polarity, ComboBox,
+        //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
+        //     // Callback when IsItemEdited !
+        //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
+        //         caen_twin.GlobalConfig.TriggerPolarity = doe.GlobalConfig.TriggerPolarity;
+        //     },
+        //     {{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge, "Falling Edge"},
+        //     {CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge, "Rising Edge"}});
         // CAENControlFac.ComboBox("Trigger Polarity",
         //     _sipm_doe.GlobalConfig.TriggerPolarity,
         //     {{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge, "Falling Edge"},
         //     {CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge, "Rising Edge"}},
         //     []() {return false;}, [](){});
 
-        draw_at_spot(_sipm_doe, SiPMControls, "IO Level",
-            _sipm_doe.ConnectionType, ComboBox, ImGui::IsItemEdited,
-            // Callback when IsItemEdited !
-            [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-                caen_twin.GlobalConfig.IOLevel = doe.GlobalConfig.IOLevel;
-            },
-            {{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM, "NIM"},
-            {CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_TTL, "TTL"}});
+        // constexpr Control io_level = get_control(SiPMGUIControls, "I/O Level");
+        // draw_control(_sipm_doe, io_level, ComboBox,
+        //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
+        //     // Callback when IsItemEdited !
+        //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
+        //         caen_twin.GlobalConfig.IOLevel = doe.GlobalConfig.IOLevel;
+        //     },
+        //     {{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM, "NIM"},
+        //     {CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_TTL, "TTL"}});
         // CAENControlFac.ComboBox("IO Level",
         //     _sipm_doe.GlobalConfig.IOLevel,
         //     {{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM, "NIM"},
@@ -149,10 +153,11 @@ class CAENGeneralConfigTab : public Tab<Pipes> {
         //     []() {return false;}, [](){});
 
         bool tmp;
-        draw_at_spot(_sipm_doe, SiPMControls, "Connect##CAEN",
-            tmp, Button, [&](){ return tmp; },
+        constexpr Control soft_trigg = get_control(SiPMGUIControls, "Software Trigger");
+        draw_control(_sipm_doe, soft_trigg, Button,
+            tmp, [&](){ return tmp; },
             // Callback when tmp is true !
-            [doe = _sipm_doe, run_dir = i_run_dir]
+            [doe = _sipm_doe]
             (SiPMAcquisitionData& caen_twin) {
                 caen_twin.SoftwareTrigger = true;
         });
@@ -213,8 +218,8 @@ class CAENGeneralConfigTab : public Tab<Pipes> {
 };
 
 template<typename Pipes>
-CAENGeneralConfigTab<Pipes> make_caen_general_config_tab(const Pipes& p) {
-    return CAENGeneralConfigTab<Pipes>(p);
+auto make_caen_general_config_tab(const Pipes& p) {
+    return std::make_unique<CAENGeneralConfigTab<Pipes>>(p);
 }
 
 }  // namespace SBCQueens

@@ -13,11 +13,6 @@
 
 namespace SBCQueens {
 
-template<class DataType>
-struct PipeCallback : public std::function <bool(DataType&)> {
-	using data_type = DataType;
-};
-
 // It accepts any Queue with a FIFO style.
 template<template<typename, typename> class QueueType, typename DataType, typename TypeTraits>
 struct Pipe : public std::shared_ptr<QueueType<DataType, TypeTraits>> {

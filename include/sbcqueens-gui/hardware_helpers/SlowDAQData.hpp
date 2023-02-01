@@ -38,7 +38,7 @@ enum class PFEIFFERSSGState {
 struct SlowDAQData;
 
 // Multi-threading items
-using SlowDAQPipeCallback = PipeCallback<SlowDAQData>;
+using SlowDAQPipeCallback = std::function<void(SlowDAQData&)>;
 
 // It accepts any Queue with a FIFO style.
 template<template<typename, typename> class QueueType, typename Traits>

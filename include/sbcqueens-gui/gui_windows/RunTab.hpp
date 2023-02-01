@@ -133,8 +133,9 @@ class RunTab : public Tab<Pipes> {
         //     connected_mod = 0.5;
         // }
         bool tmp;
-        draw_at_spot(_teensy_doe, TeensyControls, "Connect##Teensy",
-            tmp, Button, [&](){ return tmp; },
+        constexpr Control connect_teensy = get_control(SiPMGUIControls, "Connect##Teensy");
+        draw_control(_teensy_doe, connect_teensy, Button,
+            tmp, [&](){ return tmp; },
             // Callback when IsItemEdited !
             [doe = _teensy_doe, run_dir = i_run_dir]
             (TeensyControllerData& teensy_twin) {
@@ -168,8 +169,9 @@ class RunTab : public Tab<Pipes> {
         // )) {
         //     connected_mod = 1.5f;
         // }
-        draw_at_spot(_teensy_doe, TeensyControls, "Disconnect##Teensy",
-            tmp, InputInt, [&](){ return tmp; },
+        constexpr Control disconnect_teensy = get_control(SiPMGUIControls, "Disconnect##Teensy");
+        draw_control(_teensy_doe, disconnect_teensy, Button,
+            tmp, [&](){ return tmp; },
             // Callback when IsItemEdited !
             [doe = _teensy_doe, run_dir = i_run_dir]
             (TeensyControllerData& teensy_twin) {
@@ -185,8 +187,9 @@ class RunTab : public Tab<Pipes> {
 
         static float c_connected_mod = 1.5f;
         //ImGui::InputInt("CAEN port", , cgui_state.PortNum);
-        draw_at_spot(_sipm_doe, SiPMControls, "CAEN port",
-            _sipm_doe.PortNum, InputInt, ImGui::IsItemEdited,
+        constexpr Control sipm_port = get_control(SiPMGUIControls, "CAEN Port");
+        draw_control(_sipm_doe, sipm_port, InputInt,
+            _sipm_doe.PortNum, ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
               caen_twin.PortNum = doe.PortNum;
@@ -200,21 +203,23 @@ class RunTab : public Tab<Pipes> {
         //     {CAENConnectionType::A4818, "A4818 USB 3.0 to CONET Adapter"}},
         //     []() {return false;}, [](){});
 
-        draw_at_spot(_sipm_doe, SiPMControls, "CAEN port",
-            _sipm_doe.ConnectionType, ComboBox, ImGui::IsItemEdited,
-            // Callback when IsItemEdited !
-            [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-              caen_twin.ConnectionType = doe.ConnectionType;
-            },
-            {{CAENConnectionType::USB, "USB"},
-            {CAENConnectionType::A4818, "A4818 USB 3.0 to CONET Adapter"}});
+        // constexpr Control connection_type = get_control(SiPMGUIControls, "Connection Type");
+        // draw_control(_sipm_doe, connection_type, ComboBox,
+        //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
+        //     // Callback when IsItemEdited !
+        //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
+        //       caen_twin.ConnectionType = doe.ConnectionType;
+        //     },
+        //     {{CAENConnectionType::USB, "USB"},
+        //     {CAENConnectionType::A4818, "A4818 USB 3.0 to CONET Adapter"}});
 
         if (_sipm_doe.ConnectionType == CAENConnectionType::A4818) {
             ImGui::SameLine();
             // ImGui::InputScalar("VME Address", ImGuiDataType_U32,
             //     &cgui_state.VMEAddress);
-            draw_at_spot(_sipm_doe, SiPMControls, "Model",
-                _sipm_doe.VMEAddress, InputUINT32, ImGui::IsItemEdited,
+            constexpr Control caen_model = get_control(SiPMGUIControls, "VME Address");
+            draw_control(_sipm_doe, caen_model, InputUINT32,
+                _sipm_doe.VMEAddress, ImGui::IsItemEdited,
                 // Callback when IsItemEdited !
                 [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
                   caen_twin.VMEAddress = doe.VMEAddress;
@@ -224,8 +229,9 @@ class RunTab : public Tab<Pipes> {
 
         // ImGui::InputText("Keithley COM Port",
         //     &cgui_state.SiPMVoltageSysPort);
-        draw_at_spot(_sipm_doe, SiPMControls, "Keithley COM Port",
-            _sipm_doe.PortNum, InputInt, ImGui::IsItemEdited,
+        constexpr Control keith_com = get_control(SiPMGUIControls, "Keithley COM Port");
+        draw_control(_sipm_doe, keith_com, InputInt,
+            _sipm_doe.PortNum, ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
               caen_twin.SiPMVoltageSysPort = doe.SiPMVoltageSysPort;
@@ -242,8 +248,9 @@ class RunTab : public Tab<Pipes> {
 
         // This button starts the CAEN communication and sends all
         // the setup configuration
-        draw_at_spot(_sipm_doe, SiPMControls, "Connect##CAEN",
-            tmp, Button, [&](){ return tmp; },
+        constexpr Control connect_caen = get_control(SiPMGUIControls, "Connect##CAEN");
+        draw_control(_sipm_doe, connect_caen, Button,
+            tmp, [&](){ return tmp; },
             // Callback when tmp is true !
             [doe = _sipm_doe, run_dir = i_run_dir]
             (SiPMAcquisitionData& caen_twin) {
@@ -294,8 +301,10 @@ class RunTab : public Tab<Pipes> {
         //     // Local stuff
         //     c_connected_mod = 1.5f;
         // }
-        draw_at_spot(_sipm_doe, SiPMControls, "Disconnect##CAEN",
-            tmp, Button, [&](){ return tmp; },
+
+        constexpr Control disconnect_caen = get_control(SiPMGUIControls, "Disconnect##CAEN");
+        draw_control(_sipm_doe, disconnect_caen, Button,
+            tmp, [&](){ return tmp; },
             // Callback when tmp is true !
             [doe = _sipm_doe]
             (SiPMAcquisitionData& caen_twin) {
@@ -311,9 +320,11 @@ class RunTab : public Tab<Pipes> {
 
         static float o_connected_mod = 1.5f;
         static std::string other_port = _slowdaq_doe.PFEIFFERPort;
-        ImGui::InputText("PFEIFFER port", &other_port);
-        draw_at_spot(_slowdaq_doe, SlowDAQControls, "PFEIFFER Port",
-            _slowdaq_doe.PFEIFFERPort, InputText, ImGui::IsItemEdited,
+        // ImGui::InputText("PFEIFFER port", &other_port);
+
+        constexpr Control pfeiffer_port = get_control(SiPMGUIControls, "PFEIFFER Port");
+        draw_control(_slowdaq_doe, pfeiffer_port, InputText,
+            _slowdaq_doe.PFEIFFERPort, ImGui::IsItemEdited,
             // Callback when tmp is true !
             [doe = _slowdaq_doe]
             (SlowDAQData& doe_twin) {
@@ -347,9 +358,9 @@ class RunTab : public Tab<Pipes> {
         //     spdlog::info("Hello");
         //     o_connected_mod = 0.5f;
         // }
-
-        draw_at_spot(_slowdaq_doe, SlowDAQControls, "Connect##SLOWDAQ",
-            tmp, Button, [&](){ return tmp; },
+        constexpr Control connect_slowdaq = get_control(SiPMGUIControls, "Connect##SLOWDAQ");
+        draw_control(_slowdaq_doe, connect_slowdaq, Button,
+            tmp, [&](){ return tmp; },
             // Callback when tmp is true !
             [doe = _slowdaq_doe]
             (SlowDAQData& doe_twin) {
@@ -381,8 +392,9 @@ class RunTab : public Tab<Pipes> {
         //     // Local stuff
         //     o_connected_mod = 1.5f;
         // }
-        draw_at_spot(_slowdaq_doe, SlowDAQControls, "Disconnect##SLOWDAQ",
-            tmp, Button, [&](){ return tmp; },
+        constexpr Control disconnect_slowdaq = get_control(SiPMGUIControls, "Disconnect##SLOWDAQ");
+        draw_control(_slowdaq_doe, disconnect_slowdaq, Button,
+            tmp, [&](){ return tmp; },
             // Callback when tmp is true !
             [doe = _slowdaq_doe]
             (SlowDAQData& doe_twin) {
@@ -401,8 +413,8 @@ class RunTab : public Tab<Pipes> {
 };
 
 template <typename Pipes>
-RunTab<Pipes> make_run_tab(const Pipes& p) {
-    return RunTab<Pipes>(p);
+auto make_run_tab(const Pipes& p) {
+    return std::make_unique<RunTab<Pipes>>(p);
 }
 
 } // namespace SBCQueens

@@ -35,8 +35,8 @@ class GuiConfigTab : public Tab<Pipes> {
 };
 
 template<typename Pipes>
-GuiConfigTab<Pipes> make_gui_config_tab(const Pipes& p) {
-    return GuiConfigTab<Pipes>(p);
+auto make_gui_config_tab(const Pipes& p) {
+    return std::make_unique<GuiConfigTab<Pipes>>(p);
 }
 
 }  // namespace SBCQueens

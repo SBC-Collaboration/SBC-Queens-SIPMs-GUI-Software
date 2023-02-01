@@ -212,8 +212,8 @@ class IndicatorWindow : public Window<Pipes> {
 };
 
 template<typename Pipes>
-IndicatorWindow<Pipes> make_indicator_window(const Pipes& p) {
-    return IndicatorWindow<Pipes>(p);
+auto make_indicator_window(const Pipes& p) {
+    return std::make_unique<IndicatorWindow<Pipes>>(p);
 }
 
 }  // namespace SBCQueens

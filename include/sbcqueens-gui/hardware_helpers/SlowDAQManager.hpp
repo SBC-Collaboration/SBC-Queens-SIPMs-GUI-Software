@@ -53,6 +53,8 @@ class SlowDAQManager : public ThreadManager<Pipes> {
         // _plot_sender(std::get<GeneralIndicatorQueue&>(_queues))
         { }
 
+    ~SlowDAQManager() { }
+
     void operator()() {
         spdlog::info("Initializing slow DAQ thread...");
         spdlog::info("Slow DAQ components: PFEIFFERSingleGauge");
@@ -66,9 +68,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
             // setting the PID setpoints or constants
             // or an user driven reset
             if (_slowdaq_pipe_end.Pipe->try_dequeue(new_task)) {
-                if (not new_task.Callback(_slowdaq_doe)) {
-                    spdlog::warn("Something went wrong with a command in SlowDAQ.");
-                }
+                new_task.Callback(_slowdaq_doe);
             }
             // End Communication with the GUI
 

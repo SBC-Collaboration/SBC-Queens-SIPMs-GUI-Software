@@ -27,7 +27,7 @@ class Tab {
  public:
     explicit Tab(const Pipes& p, const std::string& name) :
         _pipes{p}, _name{name} {}
-    virtual ~Tab() = 0;
+    virtual ~Tab() {}
 
     void init(const toml::table& cfg) {
         init_tab(cfg);
@@ -46,20 +46,20 @@ class Window {
  protected:
     Pipes _pipes;
     std::string _name;
-    std::vector<Tab<Pipes>> _tabs;
+    std::vector<std::unique_ptr<Tab<Pipes>>> _tabs;
     virtual void draw() = 0;
     virtual void init_window(const toml::table& cfg) = 0;
 
  public:
     explicit Window(const Pipes& p, const std::string& name) :
         _pipes{p}, _name{name} {}
-    virtual ~Window() = 0;
+    virtual ~Window() {}
 
     void init(const toml::table& cfg) {
         init_window(cfg);
 
         for(auto& tab: _tabs) {
-            tab.init(cfg);
+            tab->init(cfg);
         }
     }
 
@@ -73,7 +73,7 @@ class Window {
 
         if (ImGui::BeginTabBar(_name.c_str())) {
             for(auto& tab : _tabs) {
-                tab();
+                (*tab)();
             }
         }
 

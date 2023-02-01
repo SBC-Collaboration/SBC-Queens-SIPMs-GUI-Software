@@ -96,7 +96,9 @@ int main() {
     // to read and write to the queue
     logger->info("Starting all manager threads.");
     for(auto& _thread : _threads) {
-        std::thread t(std::move(_thread));
+        std::thread t([thread = std::move(_thread)]() {
+            thread->operator()();
+        });
         t.detach();
     }
 

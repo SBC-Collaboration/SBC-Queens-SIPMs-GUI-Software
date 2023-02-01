@@ -347,12 +347,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // setting the PID setpoints or constants
         // or an user driven reset
         if (_sipm_pipe_end.Pipe->try_dequeue(task)) {
-            if (not task.Callback(_doe)) {
-                spdlog::warn("Something went wrong with a command at the SiPM Manager");
-            } else {
-                switch_state(_doe.CurrentState);
-                return true;
-            }
+            task.Callback(_doe);
+            switch_state(_doe.CurrentState);
         }
 
         return false;

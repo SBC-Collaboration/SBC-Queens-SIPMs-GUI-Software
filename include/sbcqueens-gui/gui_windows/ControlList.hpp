@@ -1,5 +1,7 @@
 #ifndef CONTROLLIST_h
 #define CONTROLLIST_h
+#include "sbcqueens-gui/imgui_helpers.hpp"
+#include <unordered_map>
 #pragma once
 
 // C STD includes
@@ -17,72 +19,144 @@ namespace SBCQueens {
 
 // Here you find all the compile available controls.
 
-const std::size_t kNUMCAENCONTROLS = 20;
-using SiPMAcquisitionControlsArray = std::array<SiPMAcquisitionControl, kNUMCAENCONTROLS>;
-constexpr SiPMAcquisitionControlsArray create_caen_controls() {
-    return {
-        SiPMAcquisitionControl{"Port", "", "Usually 0 as long as there is no "
-                "other CAEN digitizers connected. If there are more, "
-                "the port increases as they were connected to the "
-                "computer."},
-        SiPMAcquisitionControl{"Model", ""},
-        SiPMAcquisitionControl{"VME Address", ""},
-        SiPMAcquisitionControl{"Keithley COM Port", ""},
-        SiPMAcquisitionControl{"Connect##CAEN", ""},
-        SiPMAcquisitionControl{"Disconnect##CAEN", ""},
-        SiPMAcquisitionControl{"Model", ""},
-        SiPMAcquisitionControl{"Max Events Per Read", ""},
-        SiPMAcquisitionControl{"Record Length [sp]", ""},
-        SiPMAcquisitionControl{"Post-Trigger Buffer [%]", ""},
-        SiPMAcquisitionControl{"TRG-IN as Gate", ""},
-        SiPMAcquisitionControl{"External Trigger Mode", ""},
-        SiPMAcquisitionControl{"Software Trigger Mode", ""},
-        SiPMAcquisitionControl{"Trigger Polarity", ""},
-        SiPMAcquisitionControl{"I/O Level", ""},
-        SiPMAcquisitionControl{"Software Trigger", "", "Forces a trigger in "
-                "the digitizer if the feature is enabled"},
-        SiPMAcquisitionControl{"Reset CAEN", "", "Resets the CAEN digitizer "
-                "with new values found in the control tabs."},
-        SiPMAcquisitionControl{"SiPM ID", "", "This is the SiPM ID "
-        "as specified."},
-        SiPMAcquisitionControl{"SiPM Cell", "", "This is the SiPM cell "
-                "being tested.  Be mindful that the number on the "
-                "feedthrough corresponds to different SiPMs and their cells."},
-        SiPMAcquisitionControl{"PS Enable", "", "Enables or disabled the "
-                "SiPM power supply."},
-    };
-}
+// const static std::unordered_map<std::string_view, Control> SiPMGUIControls = {
+//     {"Port", SiPMAcquisitionControl{ControlTypes::InputInt, "Port", "", "Usually 0 as long as there is no "
+//             "other CAEN digitizers connected. If there are more, "
+//             "the port increases as they were connected to the "
+//             "computer."}},
+//     {"", SiPMAcquisitionControl{ControlTypes::ComboBox, "Connection Type", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::ComboBox, "Model", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputUINT32, "VME Address", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputText, "Keithley COM Port", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Button, "Connect##CAEN", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Button, "Disconnect##CAEN", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputUINT32, "Max Events Per Read", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputUINT32, "Record Length [sp]", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputUINT32, "Post-Trigger Buffer [%]", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Checkbox, "TRG-IN as Gate", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::ComboBox, "External Trigger Mode", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::ComboBox, "Software Trigger Mode", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::ComboBox, "Trigger Polarity", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::ComboBox, "I/O Level", ""}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Button, "Software Trigger", "", "Forces a trigger in "
+//             "the digitizer if the feature is enabled"}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Button, "Reset CAEN", "", "Resets the CAEN digitizer "
+//             "with new values found in the control tabs."}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputInt, "SiPM ID", "", "This is the SiPM ID "
+//     "as specified."}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputInt, "SiPM Cell", "", "This is the SiPM cell "
+//             "being tested.  Be mindful that the number on the "
+//             "feedthrough corresponds to different SiPMs and their cells."}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Checkbox, "PS Enable", "", "Enables or disabled the "
+//             "SiPM power supply."}},
+//     {"", SiPMAcquisitionControl{ControlTypes::InputFloat, "SiPM Voltage", "",
+//             "Max voltage allowed is 60V"}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Button, "Run Measurement Routine", "",
+//             "Starts the logic to attempt a VBD calculation, and"
+//             "then takes the pulse data. \n\n"
+//             "It disables the ability to change the voltage. "
+//             "If it fails, it will retry. Cancel by pressing Cancel routine."}},
+//     {"", SiPMAcquisitionControl{ControlTypes::Button, "Cancel Measurement Routine", "", "Cancels any "
+//             "ongoing measurement routine."}},
 
-constexpr static SiPMAcquisitionControlsArray SiPMControls = create_caen_controls();
+//     {"", TeensyControllerControl{ControlTypes::InputText, "Teensy COM Port", ""}},
+//     {"", TeensyControllerControl{ControlTypes::Button, "Connect##Teensy", ""}},
+//     {"", TeensyControllerControl{ControlTypes::Button, "Disconnect##Teensy", ""}},
+//     {"", TeensyControllerControl{ControlTypes::Checkbox, "Peltier ON/OFF", ""}},
+//     {"", TeensyControllerControl{ControlTypes::InputUINT16, "PID RTD", ""}},
+//     {"", TeensyControllerControl{ControlTypes::InputUINT32, "Update Period (ms)", ""}},
+//     {"", TeensyControllerControl{ControlTypes::InputFloat, "Peltier Trip Point", ""}},
+//     {"", TeensyControllerControl{ControlTypes::InputFloat, "Peltier T Setpoint", ""}},
+//     {"", TeensyControllerControl{ControlTypes::InputFloat, "PKp", ""}},
+//     {"", TeensyControllerControl{ControlTypes::InputFloat, "PTi", ""}},
+//     {"", TeensyControllerControl{ControlTypes::InputFloat, "PTd", ""}},
+//     {"", TeensyControllerControl{ControlTypes::Button, "Reset PPID", ""}},
 
-/// Teensy
-const std::size_t kNUMTEENSYCONTROLS = 3;
-using TeensyControllerControlArray = std::array<TeensyControllerControl, kNUMTEENSYCONTROLS>;
-constexpr TeensyControllerControlArray create_teensy_controls() {
-    return {
-        TeensyControllerControl{"Teensy COM Port", ""},
-        TeensyControllerControl{"Connect##Teensy", ""},
-        TeensyControllerControl{"Disconnect##Teensy", ""}
-    };
-}
+//     {"", SlowDAQControl{ControlTypes::InputText, "PFEIFFER Port", ""}},
+//     {"", SlowDAQControl{ControlTypes::Button, "Connect##SLOWDAQ", ""}},
+//     {"", SlowDAQControl{ControlTypes::Button, "Disconnect##SLOWDAQ", ""}}
+// };
 
-constexpr static TeensyControllerControlArray TeensyControls
-    = create_teensy_controls();
-/// End Teensy
+static constexpr auto SiPMGUIControls = std::to_array({
+    SiPMAcquisitionControl{ControlTypes::InputInt, "CAEN Port", "", "Usually 0 as long as there is no "
+            "other CAEN digitizers connected. If there are more, "
+            "the port increases as they were connected to the "
+            "computer."},
+    SiPMAcquisitionControl{ControlTypes::ComboBox, "Connection Type", ""},
+    SiPMAcquisitionControl{ControlTypes::ComboBox, "Model", ""},
+    SiPMAcquisitionControl{ControlTypes::InputUINT32, "VME Address", ""},
+    SiPMAcquisitionControl{ControlTypes::InputText, "Keithley COM Port", ""},
+    SiPMAcquisitionControl{ControlTypes::Button, "Connect##CAEN", ""},
+    SiPMAcquisitionControl{ControlTypes::Button, "Disconnect##CAEN", ""},
+    SiPMAcquisitionControl{ControlTypes::InputUINT32, "Max Events Per Read", ""},
+    SiPMAcquisitionControl{ControlTypes::InputUINT32, "Record Length [sp]", ""},
+    SiPMAcquisitionControl{ControlTypes::InputUINT32, "Post-Trigger Buffer [%]", ""},
+    SiPMAcquisitionControl{ControlTypes::Checkbox, "TRG-IN as Gate", ""},
+    SiPMAcquisitionControl{ControlTypes::ComboBox, "External Trigger Mode", ""},
+    SiPMAcquisitionControl{ControlTypes::ComboBox, "Software Trigger Mode", ""},
+    SiPMAcquisitionControl{ControlTypes::ComboBox, "Trigger Polarity", ""},
+    SiPMAcquisitionControl{ControlTypes::ComboBox, "I/O Level", ""},
+    SiPMAcquisitionControl{ControlTypes::Button, "Software Trigger", "", "Forces a trigger in "
+            "the digitizer if the feature is enabled"},
+    SiPMAcquisitionControl{ControlTypes::Button, "Reset CAEN", "", "Resets the CAEN digitizer "
+            "with new values found in the control tabs."},
+    SiPMAcquisitionControl{ControlTypes::InputInt, "SiPM ID", "", "This is the SiPM ID "
+    "as specified."},
+    SiPMAcquisitionControl{ControlTypes::InputInt, "SiPM Cell", "", "This is the SiPM cell "
+            "being tested.  Be mindful that the number on the "
+            "feedthrough corresponds to different SiPMs and their cells."},
+    SiPMAcquisitionControl{ControlTypes::Checkbox, "PS Enable", "", "Enables or disabled the "
+            "SiPM power supply."},
+    SiPMAcquisitionControl{ControlTypes::InputFloat, "SiPM Voltage", "",
+            "Max voltage allowed is 60V"},
+    SiPMAcquisitionControl{ControlTypes::Button, "Run Measurement Routine", "",
+            "Starts the logic to attempt a VBD calculation, and"
+            "then takes the pulse data. \n\n"
+            "It disables the ability to change the voltage. "
+            "If it fails, it will retry. Cancel by pressing Cancel routine."},
+    SiPMAcquisitionControl{ControlTypes::Button, "Cancel Measurement Routine", "", "Cancels any "
+            "ongoing measurement routine."},
 
-/// SlowDAQ
-const std::size_t kNUMSLOWDAQCONTROLS = 3;
-using SlowDAQControlsArray = std::array<SlowDAQControl, kNUMSLOWDAQCONTROLS>;
-constexpr SlowDAQControlsArray create_sloqdaq_controls() {
-    return {
-        SlowDAQControl{"PFEIFFER Port", ""},
-        SlowDAQControl{"Connect##SLOWDAQ", ""},
-        SlowDAQControl{"Disconnect##SLOWDAQ", ""}
-    };
-}
+    TeensyControllerControl{ControlTypes::InputText, "Teensy COM Port", ""},
+    TeensyControllerControl{ControlTypes::Button, "Connect##Teensy", ""},
+    TeensyControllerControl{ControlTypes::Button, "Disconnect##Teensy", ""},
+    TeensyControllerControl{ControlTypes::Checkbox, "Peltier ON/OFF", ""},
+    TeensyControllerControl{ControlTypes::InputUINT16, "PID RTD", ""},
+    TeensyControllerControl{ControlTypes::InputUINT32, "Update Period (ms)", ""},
+    TeensyControllerControl{ControlTypes::InputFloat, "Peltier Trip Point", ""},
+    TeensyControllerControl{ControlTypes::InputFloat, "Peltier T Setpoint", ""},
+    TeensyControllerControl{ControlTypes::InputFloat, "PKp", ""},
+    TeensyControllerControl{ControlTypes::InputFloat, "PTi", ""},
+    TeensyControllerControl{ControlTypes::InputFloat, "PTd", ""},
+    TeensyControllerControl{ControlTypes::Button, "Reset PPID", ""},
 
-constexpr static SlowDAQControlsArray SlowDAQControls
-    = create_teensy_controls();
+    SlowDAQControl{ControlTypes::InputText, "PFEIFFER Port", ""},
+    SlowDAQControl{ControlTypes::Button, "Connect##SLOWDAQ", ""},
+    SlowDAQControl{ControlTypes::Button, "Disconnect##SLOWDAQ", ""}
+});
+
+// // draw at the spot is placed and checks if the item exist in list
+// // Helps in debugging the code and compile time.
+// // Otherwise, use draw()
+// template<
+//     typename DataType,
+//     typename OutType,
+//     typename Callback = std::function<void(DataType&)>,
+//     typename ...Args>
+// bool draw_from_list(DataType& doe, std::string_view label, OutType& out,
+//     std::function<bool(void)>&& condition, Callback&& callback,
+//     Args&&... args) {
+
+//     constexpr Control c = get_control(list, label);
+
+//     return draw<c.ControlType, DataType, OutType, Callback, Args...>(
+//         doe,
+//         c,
+//         out,
+//         std::forward<std::function<bool(void)>>(condition),
+//         std::forward<Callback>(callback),
+//         std::forward<Args>(args)...);
+// }
 /// End SloqDAQ
 
 } // namespace SBCQueens

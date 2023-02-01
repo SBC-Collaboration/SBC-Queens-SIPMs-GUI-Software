@@ -148,8 +148,8 @@ void ControlWindow<Pipes>::draw() {
 }
 
 template<typename Pipes>
-ControlWindow<Pipes> make_control_window(const Pipes& p) {
-    return ControlWindow<Pipes>(p);
+auto make_control_window(const Pipes& p) {
+    return std::make_unique<ControlWindow<Pipes>>(p);
 }
 
 }  // namespace SBCQueens

@@ -39,7 +39,7 @@ struct BreakdownVoltageConfigData {
 struct SiPMAcquisitionData;
 
 // Multi-threading items
-using SiPMAcquisitionDataPipeCallback = PipeCallback<SiPMAcquisitionData>;
+using SiPMAcquisitionDataPipeCallback = std::function<void(SiPMAcquisitionData&)>;
 
 // It accepts any Queue with a FIFO style.
 template<template<typename, typename> class QueueType, typename Traits>

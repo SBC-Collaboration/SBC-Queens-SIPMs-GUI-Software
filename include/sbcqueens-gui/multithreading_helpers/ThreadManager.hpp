@@ -19,7 +19,7 @@ class ThreadManager {
  public:
     explicit ThreadManager(const Pipes& pipes) : _pipes(pipes) {}
 
-    virtual ~ThreadManager() = 0;
+    virtual ~ThreadManager() { }
     virtual void operator()() = 0;
 };
 

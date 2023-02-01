@@ -76,8 +76,10 @@ class SiPMControlWindow : public Window<Pipes> {
         //     return true;
         // });
         bool tmp;
-        draw_at_spot(_sipm_doe, SiPMControls, "Reset CAEN", tmp,
-            Button, [&](){ return tmp; },
+
+        constexpr Control reset_caen = get_control(SiPMGUIControls, "Reset CAEN");
+        draw_control(_sipm_doe, reset_caen, Button, tmp,
+            [&](){ return tmp; },
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& doe_twin) {
                 if (doe_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode ||
@@ -104,8 +106,9 @@ class SiPMControlWindow : public Window<Pipes> {
         //         old.SiPMID = cgui_state.SiPMID;
         //         return true;
         // });
-        draw_at_spot(_sipm_doe, SiPMControls, "SiPM ID",
-            _sipm_doe.SiPMID, InputInt, ImGui::IsItemEdited,
+        constexpr Control sipm_id = get_control(SiPMGUIControls, "SiPM ID");
+        draw_control(_sipm_doe, sipm_id, InputInt,
+            _sipm_doe.SiPMID, ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& doe_twin) {
               doe_twin.SiPMID = doe.SiPMID;
@@ -115,8 +118,10 @@ class SiPMControlWindow : public Window<Pipes> {
         //     ImGui::SetTooltip("This is the SiPM ID as specified.");
         // }
 
-        draw_at_spot(_sipm_doe, SiPMControls, "SiPM Cell",
-            _sipm_doe.CellNumber, InputInt, ImGui::IsItemEdited,
+
+        constexpr Control sipm_cell = get_control(SiPMGUIControls, "SiPM Cell");
+        draw_control(_sipm_doe, sipm_cell, InputInt,
+            _sipm_doe.CellNumber, ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& doe_twin) {
               doe_twin.CellNumber = doe.CellNumber;
@@ -135,8 +140,10 @@ class SiPMControlWindow : public Window<Pipes> {
         ImGui::Separator();
 
         ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-        draw_at_spot(_sipm_doe, SiPMControls, "PS Enable",
-            _sipm_doe.SiPMVoltageSysSupplyEN, InputInt, ImGui::IsItemEdited,
+
+        constexpr Control ps_enable = get_control(SiPMGUIControls, "PS Enable");
+        draw_control(_sipm_doe, ps_enable, Checkbox,
+            _sipm_doe.SiPMVoltageSysSupplyEN, ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& doe_twin) {
                 // he expects.
@@ -184,14 +191,15 @@ class SiPMControlWindow : public Window<Pipes> {
         //         old.SiPMVoltageSysChange = true;
         //         return true;
         //     });
-        draw_at_spot(_sipm_doe, SiPMControls, "SiPM Voltage",
-            _sipm_doe.SiPMVoltageSysVoltage, InputInt, ImGui::IsItemDeactivated,
+        constexpr Control sipm_voltage = get_control(SiPMGUIControls, "SiPM Voltage");
+        draw_control(_sipm_doe, sipm_voltage, InputFloat,
+            _sipm_doe.SiPMVoltageSysVoltage, ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& doe_twin) {
                 // Ignore the input under BVMode or RunMode
                 if (doe_twin.CurrentState
                     == SiPMAcquisitionStates::MeasurementRoutineMode) {
-                    return true;
+                    return;
                 }
 
                 if (doe.SiPMVoltageSysVoltage >= 60.0f) {
@@ -202,9 +210,9 @@ class SiPMControlWindow : public Window<Pipes> {
                 doe_twin.SiPMVoltageSysChange = true;
         });
 
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Max voltage allowed is 60V");
-        }
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("Max voltage allowed is 60V");
+        // }
 
         // bool tmp;
         // indicatorReceiver.booleanIndicator(IndicatorNames::CURRENT_STABILIZED,
@@ -221,8 +229,9 @@ class SiPMControlWindow : public Window<Pipes> {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
             ImVec4(.0f, 8.f, .8f, 1.0f));
-        draw_at_spot(_sipm_doe, SiPMControls, "Run measurement Routine",
-            tmp, Button, [&](){ return tmp; },
+        constexpr Control start_meas_routine = get_control(SiPMGUIControls, "Run Measurement Routine");
+        draw_control(_sipm_doe, start_meas_routine, Button,
+            tmp, [&](){ return tmp; },
             // Callback when IsItemEdited !
             [doe = _sipm_doe, t_doe = _teensy_doe]
             (SiPMAcquisitionData& doe_twin) {
@@ -251,13 +260,13 @@ class SiPMControlWindow : public Window<Pipes> {
         //         }
         //         return true;
         // });
-        ImGui::PopStyleColor(3);
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Starts the logic to attempt a VBD calculation, and"
-                "then takes the pulse data. \n\n"
-                "It disables the ability to change the voltage. "
-                "If it fails, it will retry. Cancel by pressing Cancel routine.");
-        }
+        // ImGui::PopStyleColor(3);
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("Starts the logic to attempt a VBD calculation, and"
+        //         "then takes the pulse data. \n\n"
+        //         "It disables the ability to change the voltage. "
+        //         "If it fails, it will retry. Cancel by pressing Cancel routine.");
+        // }
         ImGui::SameLine();
 
         ImGui::PushStyleColor(ImGuiCol_Button,
@@ -266,8 +275,10 @@ class SiPMControlWindow : public Window<Pipes> {
             static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, 0.7f)));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive,
             static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, 0.8f)));
-        draw_at_spot(_sipm_doe, SiPMControls, "Run measurement Routine",
-            tmp, Button, [&](){ return tmp; },
+
+        constexpr Control cancel_meas_routine = get_control(SiPMGUIControls, "Cancel Measurement Routine");
+        draw_control(_sipm_doe, cancel_meas_routine, Button,
+            tmp, [&](){ return tmp; },
             // Callback when IsItemEdited !
             [] (SiPMAcquisitionData& doe_twin) {
                 if (doe_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
@@ -281,10 +292,10 @@ class SiPMControlWindow : public Window<Pipes> {
         //         }
         //         return true;
         // });
-        ImGui::PopStyleColor(3);
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Cancels any ongoing measurement routine.");
-        }
+        // ImGui::PopStyleColor(3);
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("Cancels any ongoing measurement routine.");
+        // }
 
         // indicatorReceiver.booleanIndicator(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
         //     "Calculating breakdown voltage",
@@ -358,8 +369,8 @@ class SiPMControlWindow : public Window<Pipes> {
 };
 
 template<typename Pipes>
-SiPMControlWindow<Pipes> make_sipm_control_window(const Pipes& p) {
-    return SiPMControlWindow<Pipes>(p);
+auto make_sipm_control_window(const Pipes& p) {
+    return std::make_unique<SiPMControlWindow<Pipes>>(p);
 }
 
 }  // namespace SBCQueens
