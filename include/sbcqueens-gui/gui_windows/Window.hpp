@@ -75,6 +75,8 @@ class Window {
             for(auto& tab : _tabs) {
                 (*tab)();
             }
+
+            ImGui::EndTabBar();
         }
 
         ImGui::End();

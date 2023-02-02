@@ -67,7 +67,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (_slowdaq_pipe_end.Pipe->try_dequeue(new_task)) {
+            if (_slowdaq_pipe_end.Pipe.Queue->try_dequeue(new_task)) {
                 new_task.Callback(_slowdaq_doe);
             }
             // End Communication with the GUI

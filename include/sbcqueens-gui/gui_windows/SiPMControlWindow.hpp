@@ -61,10 +61,10 @@ class SiPMControlWindow : public Window<Pipes> {
 
  private:
     void draw()  {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.84f, 0.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-            ImVec4(204.f / 255.f, 170.f / 255.f, 0.0f, 1.0f));
+        // ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+        // ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.84f, 0.0f, 1.0f));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        //     ImVec4(204.f / 255.f, 170.f / 255.f, 0.0f, 1.0f));
         // CAENControlFac.Button("Reset CAEN", [&](CAENInterfaceData& old){
         //     if (old.CurrentState == SiPMAcquisitionStates::OscilloscopeMode ||
         //         old.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
@@ -90,7 +90,7 @@ class SiPMControlWindow : public Window<Pipes> {
                     doe_twin.CurrentState = SiPMAcquisitionStates::AttemptConnection;
                 }
         });
-        ImGui::PopStyleColor(3);
+        // ImGui::PopStyleColor(3);
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
                 "Resets the CAEN digitizer with new "
@@ -139,7 +139,7 @@ class SiPMControlWindow : public Window<Pipes> {
 
         ImGui::Separator();
 
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+        // ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
 
         constexpr Control ps_enable = get_control(SiPMGUIControls, "PS Enable");
         draw_control(_sipm_doe, ps_enable, Checkbox,
@@ -171,7 +171,7 @@ class SiPMControlWindow : public Window<Pipes> {
         // if (ImGui::IsItemHovered()) {
         //     ImGui::SetTooltip("Enables or disabled the SiPM power supply.");
         // }
-        ImGui::PopStyleColor(1);
+        // ImGui::PopStyleColor(1);
 
         // CAENControlFac.InputFloat("SiPM Voltage", cgui_state.SiPMVoltageSysVoltage,
         //     0.01f, 60.00f, "%2.2f V",
@@ -225,10 +225,10 @@ class SiPMControlWindow : public Window<Pipes> {
 
         ImGui::Separator();
         //  VBD mode controls
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-            ImVec4(.0f, 8.f, .8f, 1.0f));
+        // ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+        // ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        //     ImVec4(.0f, 8.f, .8f, 1.0f));
         constexpr Control start_meas_routine = get_control(SiPMGUIControls, "Run Measurement Routine");
         draw_control(_sipm_doe, start_meas_routine, Button,
             tmp, [&](){ return tmp; },
@@ -269,12 +269,12 @@ class SiPMControlWindow : public Window<Pipes> {
         // }
         ImGui::SameLine();
 
-        ImGui::PushStyleColor(ImGuiCol_Button,
-            static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-            static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, 0.7f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-            static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, 0.8f)));
+        // ImGui::PushStyleColor(ImGuiCol_Button,
+        //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f)));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, 0.7f)));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+        //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, 0.8f)));
 
         constexpr Control cancel_meas_routine = get_control(SiPMGUIControls, "Cancel Measurement Routine");
         draw_control(_sipm_doe, cancel_meas_routine, Button,

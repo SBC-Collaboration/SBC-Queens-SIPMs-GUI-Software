@@ -1,6 +1,7 @@
 // C++ STD includes
 #include <chrono>
 #include <thread>
+#include <stack>
 
 // C++ 3rd party includes
 #include <spdlog/spdlog.h>
@@ -69,6 +70,24 @@ int main() {
     std::vector<std::unique_ptr<SBCQueens::ThreadManager<SiPMCharacterizationPipes>>> _threads;
     logger->info("Created pipes that communicate between threads.");
 
+    logger->info("Creating Teensy Controller Manager.");
+    _threads.push_back(SBCQueens::make_teensy_controller_manager(pipes));
+    logger->info("Creating SiPM Controller Manager.");
+    _threads.push_back(SBCQueens::make_sipmacquisition_manager(pipes));
+    logger->info("Creating Slow DAQ Controller Manager.");
+    _threads.push_back(SBCQueens::make_slow_daq(pipes));
+
+    // The lambdas we are passing are the functions
+    // to read and write to the queue
+    logger->info("Starting all manager threads.");
+    for(auto& thread : _threads) {
+        std::thread t([thread = std::move(thread)]() {
+            (*thread)();
+        });
+
+        t.detach();
+    }
+
     // This function just holds the rendering framework we are using
     // all of them found under rendering_wrappers
     // We wrapping it under a lambda so we can pass it to a thread
@@ -77,32 +96,25 @@ int main() {
     // labels, inputs, graphs and ect
     logger->info("Creating GUIMangaer using wrapper: ");
 #ifdef USE_VULKAN
-    _threads.push_back(SBCQueens::make_gui_manager(pipes,
-        ImGUIWrappers::main_glfw_vulkan_wrapper));
+    auto _gui_thread = SBCQueens::make_gui_manager(pipes,
+        ImGUIWrappers::main_glfw_vulkan_wrapper);
     logger->info("VULKAN + GLFW backend.");
+    std::thread t([thread = std::move(_gui_thread)]() {
+        (*thread)();
+    });
+    t.join();
 #else
-    _threads.push_back(SBCQueens::make_gui_manager(pipes,
-        ImGUIWrappers::main_glfw_open3gl_wrapper));
+    auto _gui_thread = SBCQueens::make_gui_manager(pipes,
+        ImGUIWrappers::main_glfw_open3gl_wrapper);
     logger->info("OpenGL + GLFW backend.");
+    // (*_gui_thread)();
+    std::thread t([thread = std::move(_gui_thread)]() {
+        (*thread)();
+    });
+    t.join();
 #endif
 
-    logger->info("Creating Teensy Controller Manager.");
-    _threads.push_back(SBCQueens::make_teensy_controller_manager(pipes));
-    logger->info("Creating SiPM Controller Manager.");
-    _threads.push_back(SBCQueens::make_sipmacquisition_manager(pipes));
-    logger->info("Creating Slow DAQ Controller Manager.");
-    _threads.push_back(SBCQueens::make_slow_daq(pipes));
-    // The lambdas we are passing are the functions
-    // to read and write to the queue
-    logger->info("Starting all manager threads.");
-    for(auto& _thread : _threads) {
-        std::thread t([thread = std::move(_thread)]() {
-            thread->operator()();
-        });
-        t.detach();
-    }
-
-    logger->info("Closing spawning thread. See you on the other side!");
+    // logger->info("Closing spawning thread. See you on the other side!");
 
     return 0;
 }

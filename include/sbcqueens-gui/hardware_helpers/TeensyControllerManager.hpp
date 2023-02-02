@@ -219,7 +219,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (_teensy_pipe_end.Pipe->try_dequeue(new_task)) {
+            if (_teensy_pipe_end.Pipe.Queue->try_dequeue(new_task)) {
                 new_task.Callback(_doe);
             }
             // End Communication with the GUI

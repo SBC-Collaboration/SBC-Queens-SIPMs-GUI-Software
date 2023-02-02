@@ -15,10 +15,15 @@ namespace SBCQueens {
 
 // It accepts any Queue with a FIFO style.
 template<template<typename, typename> class QueueType, typename DataType, typename TypeTraits>
-struct Pipe : public std::shared_ptr<QueueType<DataType, TypeTraits>> {
+struct Pipe {
+    std::shared_ptr<QueueType<DataType, TypeTraits>> Queue;
     using TypeTraits_type = TypeTraits;
     using data_type = DataType;
     using queue_type = QueueType<DataType, TypeTraits>;
+
+    explicit Pipe() : Queue{std::make_shared<queue_type>()} {}
+    explicit Pipe(std::shared_ptr<queue_type> queue) : Queue{queue} {}
+    explicit Pipe(queue_type& queue) : Queue{std::make_shared<queue_type>(queue)} {}
 };
 
 template<class TPipe>

@@ -346,7 +346,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // The tasks are essentially any GUI driven modification, example
         // setting the PID setpoints or constants
         // or an user driven reset
-        if (_sipm_pipe_end.Pipe->try_dequeue(task)) {
+        if (_sipm_pipe_end.Pipe.Queue->try_dequeue(task)) {
             task.Callback(_doe);
             switch_state(_doe.CurrentState);
         }
