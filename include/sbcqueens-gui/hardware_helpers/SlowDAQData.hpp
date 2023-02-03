@@ -46,9 +46,6 @@ struct SlowDAQPipe : public Pipe<QueueType, SlowDAQData, Traits> {};
 
 template<class TPipe>
 struct SlowDAQPipeEnd : public PipeEnd<TPipe> {
-    using PipeEnd<TPipe>::Doe;
-    using PipeEnd<TPipe>::Pipe;
-
     explicit SlowDAQPipeEnd(TPipe p) : PipeEnd<TPipe>(p) {}
 };
 
@@ -68,7 +65,8 @@ struct SlowDAQData {
     SlowDAQPipeCallback Callback;
 };
 
-using SlowDAQControl = Control;
+template<ControlTypes ControlType>
+using SlowDAQControl = Control<ControlType>;
 
 } // namespace SBCQueens
 

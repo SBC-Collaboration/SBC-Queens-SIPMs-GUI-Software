@@ -15,28 +15,18 @@
 
 namespace SBCQueens {
 
-template <typename Pipes>
-class GuiConfigTab : public Tab<Pipes> {
+class GuiConfigTab : public Tab<> {
  public:
-
- 	explicit GuiConfigTab(const Pipes& p) : Tab<Pipes>(p, "GUI") {}
+ 	GuiConfigTab() : Tab<>("GUI") {}
  	~GuiConfigTab() { }
 
- 	void init_tab(const toml::table&) {}
-
- 	void draw() {
-        ImGui::SliderFloat("Plot line-width",
-            &ImPlot::GetStyle().LineWeight, 0.0f, 10.0f);
-        ImGui::SliderFloat("Plot Default Size Y",
-            &ImPlot::GetStyle().PlotDefaultSize.y, 0.0f, 1000.0f);
-
-        ImGui::EndTabItem();
- 	}
+ private:
+ 	void init_tab(const toml::table&);
+ 	void draw();
 };
 
-template<typename Pipes>
-auto make_gui_config_tab(const Pipes& p) {
-    return std::make_unique<GuiConfigTab<Pipes>>(p);
+inline auto make_gui_config_tab() {
+    return std::make_unique<GuiConfigTab>();
 }
 
 }  // namespace SBCQueens

@@ -43,13 +43,12 @@ class SlowDAQManager : public ThreadManager<Pipes> {
 
     // PFEIFFER Single Gauge port
     serial_ptr _pfeiffers_port;
-
     double _init_time;
 
  public:
     explicit SlowDAQManager(const Pipes& p) :
         ThreadManager<Pipes>{p},
-        _slowdaq_pipe_end{p.SlowDAQPipe}, _slowdaq_doe{_slowdaq_pipe_end.Doe}
+        _slowdaq_pipe_end(p.SlowDAQPipe), _slowdaq_doe{_slowdaq_pipe_end.Data}
         // _plot_sender(std::get<GeneralIndicatorQueue&>(_queues))
         { }
 

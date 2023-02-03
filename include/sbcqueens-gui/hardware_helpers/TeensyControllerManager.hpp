@@ -166,7 +166,6 @@ void from_json(const json& j, Pressures& p);
 void to_json(json& j, const BMEs& p);
 void from_json(const json& j, BMEs& p);
 
-
 template<typename Pipes>
 class TeensyControllerManager : public ThreadManager<Pipes> {
     std::map<std::string, std::string> _crc_cmds;
@@ -191,7 +190,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
  public:
     explicit TeensyControllerManager(const Pipes& pipes) :
         ThreadManager<Pipes>{pipes},
-        _teensy_pipe_end{pipes.TeensyPipe}, _doe{_teensy_pipe_end.Doe}
+        _teensy_pipe_end(pipes.TeensyPipe), _doe{_teensy_pipe_end.Data}
         // _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
         // _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
         { }

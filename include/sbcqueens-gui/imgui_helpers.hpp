@@ -1,5 +1,6 @@
 #ifndef IMGUIHELPERS_H
 #define IMGUIHELPERS_H
+#include "sbcqueens-gui/implot_helpers.hpp"
 #pragma once
 
 // C STD includes
@@ -51,31 +52,75 @@ enum class ControlTypes { InputText, Button, Checkbox, InputInt, InputFloat,
     InputUINT32, InputINT64, InputUINT64 };
 
 // This is the interface class of all the controls
-struct Control {
-    const ControlTypes ControlType = ControlTypes::InputText;
+struct GraphicalItemInterface {
     const std::string_view Label = "";
     const std::string_view Text = "";
     const std::string_view HelpText = "";
     const DrawingOptions DrawOptions = DrawingOptions{};
 
-    constexpr Control() = default;
-    constexpr Control(const ControlTypes& ct, const std::string_view& label,
+    constexpr ~GraphicalItemInterface() {}
+
+protected:
+    constexpr GraphicalItemInterface() = default;
+    constexpr GraphicalItemInterface(const std::string_view& label,
         const std::string_view& text, const std::string_view& help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
-        ControlType{ct},
+        // ControlType{ct},
         Label{label},
         Text{text},
         HelpText{help_text},
         DrawOptions{draw_opts}
     {}
 
-    constexpr Control(const ControlTypes& ct, const std::string_view& label,
+    constexpr GraphicalItemInterface(const std::string_view& label,
         const std::string_view& text) :
-        Control{ct, label, text, ""}
+        GraphicalItemInterface{label, text, ""}
+    {}
+};
+
+template<ControlTypes ControlType>
+struct Control : public GraphicalItemInterface {
+    constexpr Control() : GraphicalItemInterface{} {}
+    constexpr Control(const std::string_view& label,
+        const std::string_view& text, const std::string_view& help_text,
+        const DrawingOptions& draw_opts = DrawingOptions{}) :
+        GraphicalItemInterface{label, text, help_text, draw_opts}
     {}
 
-    ~Control() = default;
+    constexpr Control(const std::string_view& label,
+        const std::string_view& text) :
+        GraphicalItemInterface{label, text, ""}
+    {}
+
+    constexpr ~Control() {}
 };
+
+enum class IndicatorTypes { Numerical, String, LED };
+
+// template<IndicatorTypes IndicatorType>
+// struct Indicator_t : GraphicalItemInterface {
+//     const std::string_view Label = "";
+//     const std::string_view Text = "";
+//     const std::string_view HelpText = "";
+//     const DrawingOptions = DrawingOptions{};
+
+//     constexpr Indicator() = default;
+//     constexpr Indicator(const IndicatorTypes& ct, const std::string_view& label,
+//         const std::string_view& text, const std::string_view& help_text,
+//         const DrawingOptions& draw_opts = DrawingOptions{}) :
+//         IndicatorType{ct},
+//         Label{label},
+//         Text{text},
+//         HelpText{help_text},
+//         DrawOptions{draw_opts}
+//     {}
+
+//     constexpr Indicator(const IndicatorTypes& ct, const std::string_view& label,
+//         const std::string_view& text) :
+//         Indicator{ct, label, text, ""}
+//     {}
+
+// };
 
 // This could be useful if the way the control is drawn changes but for now
 // it can be left alone.
@@ -90,15 +135,16 @@ struct Control {
 //     }
 // };
 
-bool InputText(const Control& control, std::string& out);
-bool Button(const Control& control, bool& out);
-bool Checkbox(const Control& control, bool& out);
-bool InputInt(const Control& control, int& out);
-bool InputFloat(const Control& control, float& out);
-bool InputDouble(const Control& control, double& out);
+// Controls
+bool InputText(const Control<ControlTypes::InputText>&, std::string&);
+bool Button(const Control<ControlTypes::Button>&, bool&);
+bool Checkbox(const Control<ControlTypes::Checkbox>&, bool&);
+bool InputInt(const Control<ControlTypes::InputInt>&, int&);
+bool InputFloat(const Control<ControlTypes::InputFloat>&, float&);
+bool InputDouble(const Control<ControlTypes::InputDouble>&, double&);
 
-template<typename T> requires std::is_integral_v<T>
-bool InputScalar(const Control& control, T& out) {
+template<ControlTypes ControlType, typename T> requires std::is_integral_v<T>
+bool InputScalar(const Control<ControlType>& control, T& out) {
     ImGuiDataType_ type = ImGuiDataType_S8;
     if constexpr ( std::is_same_v<T, int8_t>) {
         type = ImGuiDataType_S8;
@@ -121,17 +167,17 @@ bool InputScalar(const Control& control, T& out) {
     return ImGui::InputScalar(std::string(control.Label).c_str(), type, &out);
 }
 
-bool InputINT8(const Control& control, int8_t& out);
-bool InputUINT8(const Control& control, uint8_t& out);
-bool InputINT16(const Control& control, int16_t& out);
-bool InputUINT16(const Control& control, uint16_t& out);
-bool InputINT32(const Control& control, int32_t& out);
-bool InputUINT32(const Control& control, uint32_t& out);
-bool InputINT64(const Control& control, int64_t& out);
-bool InputUINT64(const Control& control, uint64_t& out);
+bool InputINT8(const Control<ControlTypes::InputINT8>&, int8_t&);
+bool InputUINT8(const Control<ControlTypes::InputUINT8>&, uint8_t&);
+bool InputINT16(const Control<ControlTypes::InputINT16>&, int16_t&);
+bool InputUINT16(const Control<ControlTypes::InputUINT16>& control, uint16_t&);
+bool InputINT32(const Control<ControlTypes::InputINT32>&, int32_t&);
+bool InputUINT32(const Control<ControlTypes::InputUINT32>& control, uint32_t&);
+bool InputINT64(const Control<ControlTypes::InputINT64>& control, int64_t&);
+bool InputUINT64(const Control<ControlTypes::InputUINT64>& control, uint64_t&);
 
 template<typename T> requires std::is_enum_v<T>
-bool ComboBox(const Control& control, T& state,
+bool ComboBox(const Control<ControlTypes::ComboBox>& control, T& state,
     const std::unordered_map<T, std::string>& map) {
     static size_t index = 0;
     size_t i = 0;
@@ -174,250 +220,8 @@ bool ComboBox(const Control& control, T& state,
     return true;
 }
 
-// Queue is the concurrent queue used to communicate between multi-threaded
-// programs, and QueueType is the function type that sends information around
-// template<typename Queue>
-// class ControlLink {
-//  private:
-//     Queue _q;
-
-//  public:
-//     using QueueType = typename Queue::value_type;
-//     using QueueFunc = std::function<bool(QueueType&&)>;
-
-//     // f -> reference to the concurrent queue
-//     // node -> toml node associated with this factory
-//     explicit ControlLink(Queue q)
-//         : _q(q) { }
-
-//     // No moving nor copying
-//     ControlLink(ControlLink&&) = delete;
-//     ControlLink(const ControlLink&) = delete;
-
-//     // When event is true, callback is added to the queue
-//     // If the Callback cannot be added to the queue, then it calls callback
-//     template<typename Condition, typename Callback>
-//     bool InputText(const std::string& label, std::string& value,
-//         Condition&& condition, Callback&& callback) {
-//         // First call the ImGUI API
-//         bool u = ImGui::InputText(label.c_str(), &value);
-//         // The if must come after the ImGUI API call if not, it will not work
-//         if (condition()) {
-//             // Checks if QueueFunc is callable with input Callback
-//             if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-//                 _q->try_enqueue(std::forward<Callback>(callback));
-//             } else {
-//                 callback();
-//             }
-//         }
-
-//         // Return the ImGUI bool
-//         return u;
-//     }
-
-//     template<typename Callback>
-//     bool Button(const std::string& label, Callback&& callback) {
-//         bool state = ImGui::Button(label.c_str());
-
-//         // The if must come after the ImGUI API call if not,
-//         // it will not work
-//         if (state) {
-//             // Checks if QueueFunc is callable with input Callback
-//             if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-//                 _q->try_enqueue(std::forward<Callback>(callback));
-//             } else {
-//                 callback();
-//             }
-//         }
-
-//         return state;
-//     }
-
-//     template<typename Condition, typename Callback>
-//     bool Checkbox(const std::string& label, bool& value,
-//         Condition&& condition, Callback&& callback) {
-//         bool u = ImGui::Checkbox(label.c_str(), &value);
-
-//         // The if must come after the ImGUI API call if not,
-//         // it will not work
-//         if (condition()) {
-//             // Checks if QueueFunc is callable with input Callback
-//             if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-//                 _q.try_enqueue(std::forward<Callback>(callback));
-//             } else {
-//                 callback();
-//             }
-//         }
-
-//         return u;
-//     }
-
-//     template<typename Condition, typename Callback>
-//     bool InputFloat(const std::string& label, float& value,
-//         const float& step, const float& step_fast,
-//         const std::string& format,
-//         Condition&& condition, Callback&& callback) {
-//         bool u = ImGui::InputFloat(label.c_str(),
-//             &value, step, step_fast, format.c_str());
-
-//         // The if must come after the ImGUI API call if not, it will not work
-//         if (condition()) {
-//             if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-//                 _q.try_enqueue(std::forward<Callback>(callback));
-//             } else {
-//                 callback();
-//             }
-//         }
-
-//         return u;
-//     }
-
-//     template<typename T, typename Condition, typename Callback>
-//     bool InputScalar(const std::string& label, T& value,
-//         Condition&& condition, Callback&& callback) {
-//         ImGuiDataType_ type = ImGuiDataType_S8;
-//         if constexpr ( std::is_same_v<T, int8_t>) {
-//             type = ImGuiDataType_S8;
-//         } else if constexpr ( std::is_same_v<T, uint8_t>) {
-//             type = ImGuiDataType_U8;
-//         } else if constexpr ( std::is_same_v<T, int16_t>) {
-//             type = ImGuiDataType_S16;
-//         } else if constexpr ( std::is_same_v<T, uint16_t>) {
-//             type = ImGuiDataType_U16;
-//         } else if constexpr ( std::is_same_v<T, int32_t>) {
-//             type = ImGuiDataType_S32;
-//         } else if constexpr ( std::is_same_v<T, uint32_t>) {
-//             type = ImGuiDataType_U32;
-//         } else if constexpr ( std::is_same_v<T, int64_t>) {
-//             type = ImGuiDataType_S64;
-//         } else if constexpr ( std::is_same_v<T, uint64_t>) {
-//             type = ImGuiDataType_U64;
-//         } else {
-//             assert(false);
-//         }
-
-//         bool u = ImGui::InputScalar(label.c_str(), type, &value);
-
-//         // The if must come after the ImGUI API call if not, it will not work
-//         if (condition()) {
-//             if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-//                 _q.try_enqueue(std::forward<Callback>(callback));
-//             } else {
-//                 callback();
-//             }
-//         }
-
-//         return u;
-//     }
-
-//     template<typename T, typename Condition, typename Callback>
-//     bool ComboBox(const std::string& label,
-//         T& state,
-//         const std::unordered_map<T, std::string>& map,
-//         Condition&& condition, Callback&& callback) {
-//         static size_t index = 0;
-//         size_t i = 0;
-
-//         std::vector<T> states;
-//         std::vector<std::string> s_states;
-
-//         for (auto pair : map) {
-//             states.push_back(pair.first);
-//             s_states.push_back(pair.second);
-
-//             // This is to make sure the current selected item is the one
-//             // that is already saved in state
-//             if (state == pair.first) {
-//                 index = i;
-//             }
-
-//             i++;
-//         }
-
-//         // bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
-//         if (ImGui::BeginCombo(label.c_str(), s_states[index].c_str())) {
-//             for (i = 0; i < s_states.size(); i++) {
-//                 const bool is_selected = (index == i);
-//                 if (ImGui::Selectable(s_states[i].c_str(), is_selected)) {
-//                     index = i;
-//                 }
-//                 // Set the initial focus when opening the combo
-//                 // (scrolling + keyboard navigation focus)
-//                 if (is_selected) {
-//                     ImGui::SetItemDefaultFocus();
-//                 }
-//             }
-
-//             ImGui::EndCombo();
-//         }
-
-//         state = states[index];
-
-//         if (condition()) {
-//             if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-//                 _q.try_enqueue(std::forward<Callback>(callback));
-//             } else {
-//                 callback();
-//             }
-//         }
-
-//         return true;
-//     }
-
-//     template<typename T, typename Condition, typename Callback>
-//     bool ComboBox(const std::string& label,
-//         T& state,
-//         const std::unordered_map<std::string, T>& map,
-//         Condition&& condition, Callback&& callback) {
-//         static size_t index = 0;
-//         size_t i = 0;
-
-//         std::vector<T> states;
-//         std::vector<std::string> s_states;
-//         for (auto pair : map) {
-//             states.push_back(pair.second);
-//             s_states.push_back(pair.first);
-
-//             if (state == pair.second) {
-//                 index = i;
-//             }
-
-//             i++;
-//         }
-
-//         // bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
-//         if (ImGui::BeginCombo(label.c_str(), s_states[index].c_str())) {
-//             for (i = 0; i < s_states.size(); i++) {
-//                 const bool is_selected = (index == i);
-//                 if (ImGui::Selectable(s_states[i].c_str(), is_selected)) {
-//                     index = i;
-//                 }
-//                 // Set the initial focus when opening the combo
-//                 // (scrolling + keyboard navigation focus)
-//                 if (is_selected) {
-//                     ImGui::SetItemDefaultFocus();
-//                 }
-//             }
-
-//             ImGui::EndCombo();
-//         }
-
-//         state = states[index];
-
-//         if (condition()) {
-//             if constexpr ( std::is_invocable_v<QueueFunc, Callback> ) {
-//                 _q.try_enqueue(std::forward<Callback>(callback));
-//             } else {
-//                 callback();
-//             }
-//         }
-
-//         return true;
-//     }
-// };
-
 template<size_t N>
-constexpr static Control get_control(const std::array<Control, N>& list, std::string_view name) {
+constexpr static GraphicalItemInterface get_control(const std::array<GraphicalItemInterface, N>& list, std::string_view name) {
     auto out = std::find_if(std::cbegin(list), std::cend(list), [_name = name](auto& val) -> bool {
         return val.Label == _name;
     });
@@ -427,12 +231,12 @@ constexpr static Control get_control(const std::array<Control, N>& list, std::st
 }
 
 template<size_t N>
-constexpr static ControlTypes get_control_type(const std::array<Control, N>& list, std::string_view name) {
+constexpr static ControlTypes get_control_type(const std::array<GraphicalItemInterface, N>& list, std::string_view name) {
     return get_control(list, name).ControlType;
 }
 
 template<ControlTypes T, typename OutType, typename... Args>
-bool get_draw_function(const Control& control, OutType& out, Args&&... args) {
+bool get_draw_function(const Control<T>& control, OutType& out, Args&&... args) {
     if constexpr (T == ControlTypes::Button) {
         return Button(control, out);
     } else if constexpr(T == ControlTypes::Checkbox) {
@@ -466,13 +270,12 @@ bool get_draw_function(const Control& control, OutType& out, Args&&... args) {
     }
 }
 
-template<
+template<ControlTypes T,
     typename DataType,
-    typename DrawFunc,
     typename OutType,
     typename Callback = std::function<void(DataType&)>,
     typename... Args>
-bool draw_control(DataType& doe, const Control& control, DrawFunc&& f,
+bool draw_control(const Control<T>& control, DataType& doe,
     OutType& out, std::function<bool(void)>&& condition,
     Callback&& callback, const Args&... args) {
 
@@ -488,7 +291,7 @@ bool draw_control(DataType& doe, const Control& control, DrawFunc&& f,
         break;
     }
 
-    imgui_out_state = f(control, out, args...);
+    imgui_out_state = get_draw_function<T>(control, out, args...);
 
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", std::string(control.HelpText).c_str());

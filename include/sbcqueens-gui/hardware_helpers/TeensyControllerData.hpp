@@ -151,9 +151,6 @@ struct TeensyControllerPipe : public Pipe<QueueType, TeensyControllerData, Trait
 
 template<class TPipe>
 struct TeensyControllerPipeEnd : public PipeEnd<TPipe> {
-    using PipeEnd<TPipe>::Doe;
-    using PipeEnd<TPipe>::Pipe;
-
     explicit TeensyControllerPipeEnd(TPipe p) : PipeEnd<TPipe>(p) {}
 };
 
@@ -191,7 +188,8 @@ struct TeensyControllerData {
     TeensyControllerPipeCallback Callback;
 };
 
-using TeensyControllerControl = Control;
+template<ControlTypes ControlType>
+using TeensyControllerControl = Control<ControlType>;
 
 } // namespace SBCQueens
 

@@ -23,6 +23,8 @@
 // my includes
 #include "sbcqueens-gui/imgui_helpers.hpp"
 
+#include "sbcqueens-gui/multithreading_helpers/Pipe.hpp"
+
 #include "sbcqueens-gui/hardware_helpers/TeensyControllerManager.hpp"
 #include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionManager.hpp"
 #include "sbcqueens-gui/hardware_helpers/SlowDAQManager.hpp"

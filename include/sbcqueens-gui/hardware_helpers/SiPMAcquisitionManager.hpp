@@ -122,7 +122,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
  public:
     explicit SiPMAcquisitionManager(const Pipes& pipes) :
         ThreadManager<Pipes>(pipes),
-        _sipm_pipe_end{pipes.SiPMPipe}, _doe{_sipm_pipe_end.Doe},
+        _sipm_pipe_end(pipes.SiPMPipe), _doe{_sipm_pipe_end.Data},
         _sipm_volt_sys("Keithley 2000/6487") {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
@@ -349,6 +349,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         if (_sipm_pipe_end.Pipe.Queue->try_dequeue(task)) {
             task.Callback(_doe);
             switch_state(_doe.CurrentState);
+            spdlog::info("{0}", _doe.SiPMVoltageSysPort);
         }
 
         return false;
