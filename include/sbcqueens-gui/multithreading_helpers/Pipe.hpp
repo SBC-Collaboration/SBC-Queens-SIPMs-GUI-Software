@@ -15,28 +15,46 @@
 
 namespace SBCQueens {
 
+enum class PipeEndType { GUI, Consumer };
+
 template<typename T>
 concept HasChangedAndCallback = requires (T x) { x.Changed && x.Callback; };
 
 // It accepts any FIFO/LIFO Queue with TypeTraits.
 // DataType must be copyable, default constructable
-template<template<typename, typename> class QueueType, typename DataType, typename TypeTraits>
+template<template<typename, typename> class QueueType,
+         typename DataType,
+         typename TypeTraits,
+         typename TokenType>
 requires std::copyable<DataType> && std::default_initializable<DataType> && HasChangedAndCallback<DataType>
 struct Pipe {
-    std::shared_ptr<QueueType<DataType, TypeTraits>> Queue;
     using TypeTraits_type = TypeTraits;
     using data_type = DataType;
     using queue_type = QueueType<DataType, TypeTraits>;
 
-    explicit Pipe() : Queue{std::make_shared<queue_type>()} {}
-    explicit Pipe(std::shared_ptr<queue_type> queue) : Queue{queue} {}
-    explicit Pipe(queue_type& queue) : Queue{std::make_shared<queue_type>(queue)} {}
+    std::shared_ptr<QueueType<DataType, TypeTraits>> Queue;
+    std::shared_ptr<const TokenType> GUIToken;
+    std::shared_ptr<const TokenType> ThreadToken;
+
+    explicit Pipe(std::shared_ptr<queue_type> queue) :
+        Queue{queue},
+        GUIToken{std::make_shared<const TokenType>(*Queue)},
+        ThreadToken{std::make_shared<const TokenType>(*Queue)}
+    {}
+
+    Pipe() :
+        Pipe{std::make_shared<queue_type>()}
+    {}
+
+    explicit Pipe(queue_type& queue) :
+        Pipe{std::make_shared<queue_type>(queue)}
+    {}
 };
 
-template<class TPipe>
+template<typename TPipe, PipeEndType type>
 struct PipeEnd {
     using PipeData = typename TPipe::data_type;
-    // PipeData
+    // PipeData is the Queue/Pipe data is being sent
     PipeData Data;
     // Pipe contains a pointer to the Queue.
     TPipe Pipe;
@@ -44,14 +62,23 @@ struct PipeEnd {
     // If no PipeData is provided, it will create its own
     explicit PipeEnd(TPipe pipe) :
         Data{}, Pipe{pipe}
-    {}
+    { }
 
     void send_if_changed() {
         if (Data.Changed) {
-            if (Pipe.Queue->try_enqueue(Data)) {
-                Data.Changed = false;
-                // If fails, it should try again.
+            if constexpr (type == PipeEndType::GUI) {
+                Data.Changed |= Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
+            } else {
+                Data.Changed |= Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
             }
+        }
+    }
+
+    bool retrieve(PipeData& out) {
+        if constexpr (type == PipeEndType::GUI) {
+            return Pipe.Queue->try_dequeue_from_producer(*Pipe.ThreadToken, out);
+        } else {
+            return Pipe.Queue->try_dequeue_from_producer(*Pipe.GUIToken, out);
         }
     }
 };

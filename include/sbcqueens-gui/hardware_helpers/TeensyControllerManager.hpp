@@ -59,7 +59,6 @@ using json = nlohmann::json;
 #include "sbcqueens-gui/implot_helpers.hpp"
 #include "sbcqueens-gui/file_helpers.hpp"
 #include "sbcqueens-gui/timing_events.hpp"
-#include "sbcqueens-gui/indicators.hpp"
 #include "sbcqueens-gui/armadillo_helpers.hpp"
 
 #include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
@@ -171,7 +170,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
     std::map<std::string, std::string> _crc_cmds;
 
     using TeensyPipe_type = typename Pipes::TeensyPipe_type;
-    TeensyControllerPipeEnd<TeensyPipe_type> _teensy_pipe_end;
+    TeensyControllerPipeEnd<TeensyPipe_type, PipeEndType::Consumer> _teensy_pipe_end;
     TeensyControllerData& _doe;
 
     // IndicatorSender<IndicatorNames> _indicator_sender;
@@ -218,7 +217,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (_teensy_pipe_end.Pipe.Queue->try_dequeue(new_task)) {
+            if (_teensy_pipe_end.retrieve(new_task)) {
                 new_task.Callback(_doe);
             }
             // End Communication with the GUI

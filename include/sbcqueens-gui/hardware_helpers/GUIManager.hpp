@@ -33,7 +33,6 @@
 #include "sbcqueens-gui/caen_helper.hpp"
 #include "sbcqueens-gui/imgui_helpers.hpp"
 #include "sbcqueens-gui/implot_helpers.hpp"
-#include "sbcqueens-gui/indicators.hpp"
 
 #include "sbcqueens-gui/gui_windows/Window.hpp"
 #include "sbcqueens-gui/gui_windows/ControlList.hpp"
@@ -54,17 +53,17 @@ class GUIManager : public ThreadManager<Pipes> {
 
     // CAEN Pipe
     using SiPMPipe_type = typename Pipes::SiPMPipe_type;
-    SiPMAcquisitionPipeEnd<SiPMPipe_type> _sipm_pipe_end;
+    SiPMAcquisitionPipeEnd<SiPMPipe_type, PipeEndType::GUI> _sipm_pipe_end;
     SiPMAcquisitionData& _sipm_doe;
 
     // Teensy Pipe
     using TeensyPipe_type = typename Pipes::TeensyPipe_type;
-    TeensyControllerPipeEnd<TeensyPipe_type> _teensy_pipe_end;
+    TeensyControllerPipeEnd<TeensyPipe_type, PipeEndType::GUI> _teensy_pipe_end;
     TeensyControllerData& _teensy_doe;
 
     // Slow DAQ pipe
     using SlowDAQ_type = typename Pipes::SlowDAQ_type;
-    SlowDAQPipeEnd<SlowDAQ_type> _slowdaq_pipe_end;
+    SlowDAQPipeEnd<SlowDAQ_type, PipeEndType::GUI> _slowdaq_pipe_end;
     SlowDAQData& _slowdaq_doe;
 
     std::vector<std::unique_ptr<WindowInterface>> _windows;
@@ -80,27 +79,13 @@ class GUIManager : public ThreadManager<Pipes> {
         ThreadManager<Pipes>(p), _draw_func{draw_func},
         // All of these are to have a local and faster access to them
         // inside this class.
-        _sipm_pipe_end(p.SiPMPipe), _sipm_doe(_sipm_pipe_end.Data),
-        _teensy_pipe_end(p.TeensyPipe), _teensy_doe(_teensy_pipe_end.Data),
-        _slowdaq_pipe_end(p.SlowDAQPipe), _slowdaq_doe(_slowdaq_pipe_end.Data)
-
-        // _queues(std::forward_as_tuple(queues...)),
-        // GeneralIndicatorReceiver(std::get<GeneralIndicatorQueue>(_queues)),
-        // MultiPlotReceiver   (std::get<MultiplePlotQueue>(_queues)),
-        // SiPMPlotReceiver    (std::get<SiPMPlotQueue>(_queues)),
-        // TeensyControlFac    (std::get<TeensyQueue>(_queues)),
-        // CAENControlFac  (std::get<CAENQueue>(_queues)),
-        // SlowDAQControlFac   (std::get<SlowDAQQueue>(_queues)),
-        // indicatorWindow     (GeneralIndicatorReceiver,
-        //     std::get<CAENQueue>(_queues),
-        //     _teensy_doe, sdaq_state),
-        // controlWindow(TeensyControlFac, _teensy_doe, CAENControlFac, _sipm_doe,
-        //     SlowDAQControlFac, sdaq_state),
-        // sipmControlWindow(CAENControlFac, _sipm_doe, GeneralIndicatorReceiver,
-        //     _teensy_doe)
+        _sipm_pipe_end(p.SiPMPipe),
+        _sipm_doe(_sipm_pipe_end.Data),
+        _teensy_pipe_end(p.TeensyPipe),
+        _teensy_doe(_teensy_pipe_end.Data),
+        _slowdaq_pipe_end(p.SlowDAQPipe),
+        _slowdaq_doe(_slowdaq_pipe_end.Data)
         {
-
-
         _windows.push_back(
             make_indicator_window(_sipm_doe, _teensy_doe, _slowdaq_doe));
         _windows.push_back(
@@ -134,13 +119,26 @@ class GUIManager : public ThreadManager<Pipes> {
         _teensy_pipe_end.send_if_changed();
         _sipm_pipe_end.send_if_changed();
         _slowdaq_pipe_end.send_if_changed();
+
+        _teensy_doe.Callback = [](TeensyControllerData& state) {
+            state.CurrentState = TeensyControllerStates::Closing;
+        };
+
+        // CAENQueue& cq = std::get<CAENQueue&>(_queues);
+        _sipm_doe.Callback = [](SiPMAcquisitionData& state) {
+            state.CurrentState = SiPMAcquisitionStates::Closing;
+        };
+
+        // SlowDAQQueue& oq = std::get<SlowDAQQueue&>(_queues);
+        _slowdaq_doe.Callback = [](SlowDAQData& state) {
+            state.PFEIFFERState = PFEIFFERSSGState::Closing;
+        };
     }
 
     void operator()() {
         // _draw_func must have a recurring draw function
         // and a close function.
-        _draw_func([&](){ _draw(); },
-            [&](){ closing(); });
+        _draw_func([&](){ _draw(); });
     }
 
  private:
@@ -437,32 +435,34 @@ class GUIManager : public ThreadManager<Pipes> {
 
         // ImGui::End();
 
-        // _teensy_pipe_end.send_if_changed();
-        // _sipm_pipe_end.send_if_changed();
-        // _slowdaq_pipe_end.send_if_changed();
-    }
+        // If they changed on this GUI, update the threads so they can
+        // modify whatever they want based on the data we sent
+        _teensy_pipe_end.send_if_changed();
+        _sipm_pipe_end.send_if_changed();
+        _slowdaq_pipe_end.send_if_changed();
 
-    // closing is called when the GUI is manually closed.
-    void closing() {
-        _teensy_doe.Callback = [](TeensyControllerData& state) {
-            state.CurrentState = TeensyControllerStates::Closing;
-        };
+        // Update local data from threads
+        static TeensyControllerData teensy_thread_data;
+        if (_teensy_pipe_end.retrieve(teensy_thread_data)) {
+            _teensy_doe = teensy_thread_data;
+        }
 
-        // CAENQueue& cq = std::get<CAENQueue&>(_queues);
-        _sipm_doe.Callback = [](SiPMAcquisitionData& state) {
-            state.CurrentState = SiPMAcquisitionStates::Closing;
-        };
+        static SiPMAcquisitionData sipm_thread_data;
+        if (_sipm_pipe_end.retrieve(sipm_thread_data)) {
+            _sipm_doe = sipm_thread_data;
+        }
 
-        // SlowDAQQueue& oq = std::get<SlowDAQQueue&>(_queues);
-        _slowdaq_doe.Callback = [](SlowDAQData& state) {
-            state.PFEIFFERState = PFEIFFERSSGState::Closing;
-        };
+        static SlowDAQData slowdaq_thread_data;
+        if (_slowdaq_pipe_end.retrieve(slowdaq_thread_data)) {
+            _slowdaq_doe = slowdaq_thread_data;
+        }
     }
 };
 
 template<typename Pipes, typename DrawFunc>
 auto make_gui_manager(const Pipes& p, DrawFunc&& df) {
-    return std::make_unique<GUIManager<Pipes, DrawFunc>>(p, std::forward<DrawFunc>(df));
+    return std::make_unique<GUIManager<Pipes, DrawFunc>>(p,
+            std::forward<DrawFunc>(df));
 }
 
 }  // namespace SBCQueens

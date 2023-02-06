@@ -17,8 +17,6 @@
 #include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"
 #include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
 
-#include "sbcqueens-gui/indicators.hpp"
-
 namespace SBCQueens {
 
 class SiPMControlWindow :

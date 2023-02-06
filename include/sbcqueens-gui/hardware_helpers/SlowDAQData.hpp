@@ -41,12 +41,14 @@ struct SlowDAQData;
 using SlowDAQPipeCallback = std::function<void(SlowDAQData&)>;
 
 // It accepts any Queue with a FIFO style.
-template<template<typename, typename> class QueueType, typename Traits>
-struct SlowDAQPipe : public Pipe<QueueType, SlowDAQData, Traits> {};
+template<template<typename, typename> class QueueType,
+         typename Traits,
+         typename TokenType>
+struct SlowDAQPipe : public Pipe<QueueType, SlowDAQData, Traits, TokenType> {};
 
-template<class TPipe>
-struct SlowDAQPipeEnd : public PipeEnd<TPipe> {
-    explicit SlowDAQPipeEnd(TPipe p) : PipeEnd<TPipe>(p) {}
+template<class TPipe, PipeEndType Type>
+struct SlowDAQPipeEnd : public PipeEnd<TPipe, Type> {
+    explicit SlowDAQPipeEnd(TPipe p) : PipeEnd<TPipe, Type>(p) {}
 };
 
 struct SlowDAQData {

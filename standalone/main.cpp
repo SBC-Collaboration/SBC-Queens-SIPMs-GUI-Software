@@ -32,11 +32,13 @@
 
 // PipeInterface -> The type of Pipe to use and Traits are an internal
 // memory requirement of the Pipe.
-template <template <typename, typename> class PipeInterface, typename Traits>
+template <template <typename, typename> class PipeInterface,
+          typename Traits,
+          typename TokenType>
 struct Pipes {
-    using SiPMPipe_type = SBCQueens::SiPMAcquisitionPipe<PipeInterface, Traits>;
-    using TeensyPipe_type = SBCQueens::TeensyControllerPipe<PipeInterface, Traits>;
-    using SlowDAQ_type = SBCQueens::SlowDAQPipe<PipeInterface, Traits>;
+    using SiPMPipe_type = SBCQueens::SiPMAcquisitionPipe<PipeInterface, Traits, TokenType>;
+    using TeensyPipe_type = SBCQueens::TeensyControllerPipe<PipeInterface, Traits, TokenType>;
+    using SlowDAQ_type = SBCQueens::SlowDAQPipe<PipeInterface, Traits, TokenType>;
 
     SiPMPipe_type SiPMPipe;
     TeensyPipe_type TeensyPipe;
@@ -44,7 +46,7 @@ struct Pipes {
 };
 
 using SiPMCharacterizationPipes = Pipes<moodycamel::ConcurrentQueue,
-    moodycamel::ConcurrentQueueDefaultTraits>;
+    moodycamel::ConcurrentQueueDefaultTraits, moodycamel::ProducerToken>;
 
 int main() {
     try{
@@ -77,7 +79,7 @@ int main() {
     logger->info("Creating SiPM Controller Manager.");
     _threads.push_back(SBCQueens::make_sipmacquisition_manager(pipes));
     logger->info("Creating Slow DAQ Controller Manager.");
-    _threads.push_back(SBCQueens::make_slow_daq(pipes));
+    _threads.push_back(SBCQueens::make_slow_daq_manager(pipes));
 
     // The lambdas we are passing are the functions
     // to read and write to the queue

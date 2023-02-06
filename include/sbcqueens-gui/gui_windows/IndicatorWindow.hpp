@@ -11,8 +11,6 @@
 #include <toml.hpp>
 
 // my includes
-#include "sbcqueens-gui/indicators.hpp"
-
 #include "sbcqueens-gui/gui_windows/Window.hpp"
 
 #include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"

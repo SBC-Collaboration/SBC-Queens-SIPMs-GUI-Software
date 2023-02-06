@@ -146,12 +146,16 @@ struct TeensyControllerData;
 using TeensyControllerPipeCallback = std::function<void(TeensyControllerData&)>;
 
 // It accepts any Queue with a FIFO style.
-template<template<typename, typename> class QueueType, typename Traits>
-struct TeensyControllerPipe : public Pipe<QueueType, TeensyControllerData, Traits> {};
+template<template<typename, typename> class QueueType,
+         typename Traits,
+         typename TokenType>
+struct TeensyControllerPipe :
+    public Pipe<QueueType, TeensyControllerData, Traits, TokenType> {};
 
-template<class TPipe>
-struct TeensyControllerPipeEnd : public PipeEnd<TPipe> {
-    explicit TeensyControllerPipeEnd(TPipe p) : PipeEnd<TPipe>(p) {}
+template<class TPipe, PipeEndType Type>
+struct TeensyControllerPipeEnd : public PipeEnd<TPipe, Type> {
+    explicit TeensyControllerPipeEnd(TPipe p) :
+        PipeEnd<TPipe, Type>(p) {}
 };
 
 // It holds everything the outside world can modify or use.

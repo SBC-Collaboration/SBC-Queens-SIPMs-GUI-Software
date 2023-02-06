@@ -36,7 +36,6 @@
 #include "sbcqueens-gui/file_helpers.hpp"
 #include "sbcqueens-gui/caen_helper.hpp"
 #include "sbcqueens-gui/implot_helpers.hpp"
-#include "sbcqueens-gui/indicators.hpp"
 #include "sbcqueens-gui/timing_events.hpp"
 #include "sbcqueens-gui/armadillo_helpers.hpp"
 
@@ -58,7 +57,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // To get the pipe interface used in the pipes.
     using SiPMPipe_type = typename Pipes::SiPMPipe_type;
     // Software related items
-    SiPMAcquisitionPipeEnd<SiPMPipe_type> _sipm_pipe_end;
+    SiPMAcquisitionPipeEnd<SiPMPipe_type, PipeEndType::Consumer> _sipm_pipe_end;
     // A reference to the DOE thats inside _caen_pipe_end
     SiPMAcquisitionData& _doe;
 
@@ -346,7 +345,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // The tasks are essentially any GUI driven modification, example
         // setting the PID setpoints or constants
         // or an user driven reset
-        if (_sipm_pipe_end.Pipe.Queue->try_dequeue(task)) {
+        if (_sipm_pipe_end.retrieve(task)) {
             task.Callback(_doe);
             switch_state(_doe.CurrentState);
             spdlog::info("{0}", _doe.SiPMVoltageSysPort);

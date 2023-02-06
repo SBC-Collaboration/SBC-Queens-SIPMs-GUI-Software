@@ -26,7 +26,6 @@
 #include "sbcqueens-gui/file_helpers.hpp"
 #include "sbcqueens-gui/timing_events.hpp"
 
-#include "sbcqueens-gui/indicators.hpp"
 #include "sbcqueens-gui/hardware_helpers/SlowDAQData.hpp"
 
 namespace SBCQueens {
@@ -34,7 +33,7 @@ namespace SBCQueens {
 template<typename Pipes>
 class SlowDAQManager : public ThreadManager<Pipes> {
     using SlowDAQ_type = typename Pipes::SlowDAQ_type;
-    SlowDAQPipeEnd<SlowDAQ_type> _slowdaq_pipe_end;
+    SlowDAQPipeEnd<SlowDAQ_type, PipeEndType::Consumer> _slowdaq_pipe_end;
     SlowDAQData& _slowdaq_doe;
 
     DataFile<PFEIFFERSingleGaugeData> _pfeiffer_file;
@@ -43,7 +42,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
 
     // PFEIFFER Single Gauge port
     serial_ptr _pfeiffers_port;
-    double _init_time;
+    double _init_time = 0;
 
  public:
     explicit SlowDAQManager(const Pipes& p) :
@@ -66,7 +65,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (_slowdaq_pipe_end.Pipe.Queue->try_dequeue(new_task)) {
+            if (_slowdaq_pipe_end.retrieve(new_task)) {
                 new_task.Callback(_slowdaq_doe);
             }
             // End Communication with the GUI
@@ -257,7 +256,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
 };
 
 template<typename Pipes>
-auto make_slow_daq(const Pipes& p) {
+auto make_slow_daq_manager(const Pipes& p) {
     return std::make_unique<SlowDAQManager<Pipes>>(p);
 }
 

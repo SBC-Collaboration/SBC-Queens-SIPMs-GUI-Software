@@ -10,19 +10,16 @@
 
 // C++ STD includes
 #include <ranges>
-#include <span>
+#include <functional>
+#include <unordered_map>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
-#include <utility>
 #include <vector>
 #include <string_view>
 
 // C++ 3rd party includes
+#include <spdlog/spdlog.h> // for fmt::format
 #include <misc/cpp/imgui_stdlib.h> // for use with std::string
-#include <readerwriterqueue.h>
-#include <spdlog/spdlog.h>
-#include <toml.hpp>
 
 namespace SBCQueens {
 
@@ -41,21 +38,45 @@ struct StringLiteral {
 using Color_t = ImVec4;
 using Size_t = ImVec2;
 
+constexpr static Color_t Red{1.0, 0.0, 0.0, 1.0};
+constexpr static Color_t Green{0.0, 1.0, 0.0, 1.0};
+constexpr static Color_t Blue{0.0, 0.0, 1.0, 1.0};
+constexpr static Color_t White{1.0, 1.0, 1.0, 1.0};
+constexpr static Color_t Black{0.0, 0.0, 0.0, 0.0};
+
 using TextPosition_t = enum class TextPositionEnum {
     None, Top, Bottom, Left, Right
 };
+using NumericFormat_t = enum class NumericFormatEnum {
+    Default, Scientific, HexFloat, Fixed
+};
+using PlotType_t = enum class PlotTypeEnum{ Line, Scatter };
 
 struct DrawingOptions {
+    // Location of the accompanying text. Most ImGUI controls already
+    // have something similar, this is for those who do not (like button)
     TextPosition_t TextPosition = TextPositionEnum::None;
-    Color_t TextColor = ImVec4{1.0, 1.0, 1.0, 1.0};
-    Color_t ControlColor;
-    Color_t ControlHoveredColor;
-    Color_t ControlActiveColor;
+    // Color of the accompanying text.
+    Color_t TextColor = White;
+    // Color of the control in standby - only button supports it ATM.
+    Color_t ControlColor = Blue;
+    // Color of the control when hovered - only button supports it ATM.
+    Color_t ControlHoveredColor = Blue;
+    // Color of the control when active - only button supports it ATM.
+    Color_t ControlActiveColor = Blue;
+    // Size of the control - only button supports it ATM. 0s sizes
+    // the button to the length of the text
     Size_t ControlSize = Size_t{0, 0};
-};
 
-struct ControlOptions {
+    // Numeric indicator/controls specific
+    double StepSize = 0.0;
+    // Numeric indicator/controls specific - Follow printf conventions
+    std::string_view Format = "%.3f";
 
+    // Plot specific - What type of plot are we using
+    PlotType_t PlotType = PlotTypeEnum::Line;
+    // Plot specific - Clear on new data (maybe will  be removed later)
+    bool CleanOnNewData = false;
 };
 
 enum class ControlTypes { InputText, Button, Checkbox, InputInt, InputFloat,
@@ -87,6 +108,7 @@ struct Control {
     {}
 };
 
+
 enum class IndicatorTypes { Numerical, String, LED, Plot };
 
 template<IndicatorTypes IndicatorType, StringLiteral list>
@@ -94,7 +116,7 @@ struct Indicator {
     const std::string_view Label = "";
     const std::string_view Text = "";
     const std::string_view HelpText = "";
-    const DrawingOptions DrawOptions = DrawingOptions{};
+    const DrawingOptions DrawOptions;
 
     constexpr ~Indicator() {}
 
@@ -103,7 +125,6 @@ struct Indicator {
         const std::string_view& text, const std::string_view& help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
         Label{list.value},
-        // IndicatorType{ct},
         Text{text},
         HelpText{help_text},
         DrawOptions{draw_opts}
@@ -113,44 +134,6 @@ struct Indicator {
         Indicator{text, ""}
     {}
 };
-
-// template<IndicatorTypes IndicatorType>
-// struct Indicator_t : GraphicalItemInterface {
-//     const std::string_view Label = "";
-//     const std::string_view Text = "";
-//     const std::string_view HelpText = "";
-//     const DrawingOptions = DrawingOptions{};
-
-//     constexpr Indicator() = default;
-//     constexpr Indicator(const IndicatorTypes& ct, const std::string_view& label,
-//         const std::string_view& text, const std::string_view& help_text,
-//         const DrawingOptions& draw_opts = DrawingOptions{}) :
-//         IndicatorType{ct},
-//         Label{label},
-//         Text{text},
-//         HelpText{help_text},
-//         DrawOptions{draw_opts}
-//     {}
-
-//     constexpr Indicator(const IndicatorTypes& ct, const std::string_view& label,
-//         const std::string_view& text) :
-//         Indicator{ct, label, text, ""}
-//     {}
-
-// };
-
-// This could be useful if the way the control is drawn changes but for now
-// it can be left alone.
-// struct Painter {
-//     const Control& control;
-
-//     explicit Painter(const Control& c) : control{c} {}
-
-//     template <typename T>
-//     bool draw(T& out) {
-
-//     }
-// };
 
 // Controls
 template<StringLiteral Label>
@@ -162,7 +145,16 @@ bool InputText(const Control<ControlTypes::InputText, Label>&,
 template<StringLiteral Label>
 bool Button(const Control<ControlTypes::Button, Label>& control,
             bool& out) {
+    ImGui::PushStyleColor(ImGuiCol_Button,
+        control.DrawOptions.ControlColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        control.DrawOptions.ControlHoveredColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+        control.DrawOptions.ControlActiveColor);
+
     out = ImGui::Button(Label.value, control.DrawOptions.ControlSize);
+
+    ImGui::PopStyleColor(3);
     return out;
 }
 
@@ -175,19 +167,26 @@ bool Checkbox(const Control<ControlTypes::Checkbox, Label>& control,
 template<StringLiteral Label>
 bool InputInt(const Control<ControlTypes::InputInt, Label>& control,
               int& out) {
-    return ImGui::InputInt(Label.value, &out);
+    return ImGui::InputInt(Label.value, &out, static_cast<int>(
+        control.DrawOptions.StepSize));
 }
 
 template<StringLiteral Label>
 bool InputFloat(const Control<ControlTypes::InputFloat, Label>& control,
                 float& out)  {
-    return ImGui::InputFloat(Label.value, &out);
+    return ImGui::InputFloat(Label.value, &out,
+        static_cast<float>(control.DrawOptions.StepSize),
+        100.0f*static_cast<float>(control.DrawOptions.StepSize),
+        std::string(control.DrawOptions.Format).c_str());
 }
 
 template<StringLiteral Label>
 bool InputDouble(const Control<ControlTypes::InputDouble, Label>& control,
                  double& out) {
-    return ImGui::InputDouble(Label.value, &out);
+    return ImGui::InputDouble(Label.value, &out,
+        control.DrawOptions.StepSize,
+        100.0*control.DrawOptions.StepSize,
+        std::string(control.DrawOptions.Format).c_str());
 }
 
 template<ControlTypes ControlType, StringLiteral Label, typename T>
@@ -212,7 +211,12 @@ bool InputScalar(const Control<ControlType, Label>& control, T& out) {
         type = ImGuiDataType_U64;
     }
 
-    return ImGui::InputScalar(Label.value, type, &out);
+    const void* step = &control.DrawOptions.StepSize;
+    // const void* big_step = &(100*control.DrawOptions.StepSize);
+    return ImGui::InputScalar(Label.value, type, &out,
+        step,
+        step,
+        std::string(control.DrawOptions.Format).c_str());
 }
 
 template<StringLiteral Label>
@@ -307,16 +311,101 @@ bool ComboBox(const Control<ControlTypes::ComboBox, Label>& control, T& state,
     return true;
 }
 
+// Indicators
+ // { Numerical, String, LED, Plot };
+template<StringLiteral Label, typename InputType>
+void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
+    const InputType& in_value) {
+    constexpr auto label_name = Label.value;
+    constexpr auto format = indicator.DrawOptions.Format;
+    ImGui::PushStyleColor(ImGuiCol_Button,
+        indicator.DrawOptions.ControlColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        indicator.DrawOptions.ControlHoveredColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+        indicator.DrawOptions.ControlActiveColor);
+
+    if (not indicator.DrawOptions.Format.starts_with("%")) {
+        throw "Not a valid format string. It must start with %";
+    }
+
+    auto format_string = "{:"
+        + indicator.DrawOptions.Format.remove_prefix(1) + "}##{}";
+
+    ImGui::Button(fmt::vformat(format_string, in_value, label_name).c_str(),
+        indicator.DrawOptions.ControlSize);
+
+    ImGui::PopStyleColor(3);
+}
+
+template<StringLiteral Label>
+void String(const Indicator<IndicatorTypes::String, Label>& indicator,
+    std::string_view in_value) {
+    constexpr auto label_name = Label.value;
+    ImGui::PushStyleColor(ImGuiCol_Button,
+        indicator.DrawOptions.ControlColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+        indicator.DrawOptions.ControlHoveredColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+        indicator.DrawOptions.ControlActiveColor);
+
+    ImGui::Button(fmt::format("{}##{}", in_value, label_name).c_str(),
+        indicator.DrawOptions.ControlSize);
+
+    ImGui::PopStyleColor(3);
+}
+
+// LED indicator in a boolean is passed down and the color of the indicator
+// reflects if its on or off. OFF for now is always red. HSV = 0, 0.6, 0.6
+template<StringLiteral Label>
+void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
+    const bool& in_value) {
+    constexpr auto label_name = Label.value;
+
+    if (in_value) {
+        ImGui::PushStyleColor(ImGuiCol_Button,
+            indicator.DrawOptions.ControlColor);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+            indicator.DrawOptions.ControlHoveredColor);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+            indicator.DrawOptions.ControlActiveColor);
+    } else {
+        const auto off_color =
+            static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f));
+        ImGui::PushStyleColor(ImGuiCol_Button, off_color);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, off_color);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, off_color);
+    }
+
+    ImGui::Button(fmt::format("##{}", label_name).c_str(),
+        indicator.DrawOptions.ControlSize);
+
+    ImGui::PopStyleColor(3);
+}
+
+// LED indicator in which an arbitrary value can be passed down and a pairing
+// function to turn it into a boolean.
+template<StringLiteral Label, typename InputType,
+    typename ConditionFunc = std::function<bool(const InputType&)>>
+void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
+    const InputType& in_value, ConditionFunc&& condition) {
+    LED<Label>(indicator, condition(in_value));
+}
+
+
+
+
+
+
 template<ControlTypes T, StringLiteral Label, typename... Types>
 constexpr static auto get_control(const std::tuple<Types...>& list) {
     return std::get<Control<T, Label>>(list);
 }
 
-// template<size_t N>
-// constexpr static ControlTypes get_control_type(
-//     const std::tuple<GraphicalItemInterface, N>& list, std::string_view name) {
-//     return get_control(list, name).ControlType;
-// }
+template<IndicatorTypes T, StringLiteral Label, typename... Types>
+constexpr static auto get_indicator(const std::tuple<Types...>& list) {
+    return std::get<Indicator<T, Label>>(list);
+}
 
 template<ControlTypes T, StringLiteral Label, typename OutType, typename... Args>
 constexpr bool get_draw_function(const Control<T, Label>& control,
@@ -356,6 +445,67 @@ constexpr bool get_draw_function(const Control<T, Label>& control,
     throw("Draw function not supported");
 }
 
+template<IndicatorTypes T, StringLiteral Label, typename InType, typename... Args>
+constexpr void get_draw_function(const Indicator<T, Label>& indicator,
+                                 InType& in, Args&&... args) {
+    if constexpr (T == IndicatorTypes::Numerical) {
+        Numerical(indicator, in);
+    } else if constexpr (T == IndicatorTypes::String) {
+        String(indicator, in);
+    } else if constexpr (T == IndicatorTypes::LED) {
+        static_assert(sizeof...(args) > 1 && not std::is_same_v<InType, bool>,
+            "LED indicator does not take"
+            "more than 1 optional argument if InType is not bool");
+
+        // If called with 0 extra arguments, the in type should be bool
+        static_assert(sizeof...(args) == 0 && std::is_same_v<InType, bool>,
+            "LED in type should be bool if no transformation "
+            "function is passed");
+
+        if constexpr (sizeof...(args) == 0 && std::is_same_v<InType, bool>) {
+            LED(indicator, in);
+            return;
+        } else if constexpr (sizeof...(args) == 1) {
+            LED(indicator, in, args...);
+            return;
+        }
+    } else if constexpr (T == IndicatorTypes::Plot) {
+    }
+}
+
+template<typename DrawItem>
+void __draw_imgui_begin(const DrawItem& item) {
+    switch (item.DrawOptions.TextPosition) {
+    case TextPositionEnum::Left:
+        ImGui::Text("%s", std::string(item.Text).c_str()); ImGui::SameLine();
+        break;
+    case TextPositionEnum::Top:
+        ImGui::Text("%s", std::string(item.Text).c_str());
+        break;
+    default:
+        break;
+    }
+}
+
+template<typename DrawItem>
+void __draw_imgui_end(const DrawItem& item) {
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", std::string(item.HelpText).c_str());
+    }
+
+    switch (item.DrawOptions.TextPosition) {
+    case TextPositionEnum::Right:
+        ImGui::SameLine();
+        ImGui::Text("%s", std::string(item.Text).c_str());
+        break;
+    case TextPositionEnum::Bottom:
+        ImGui::Text("%s", std::string(item.Text).c_str());
+        break;
+    default:
+        break;
+    }
+}
+
 template<ControlTypes T, StringLiteral Label,
     typename DataType,
     typename OutType,
@@ -365,36 +515,11 @@ bool draw_control(const Control<T, Label>& control,
     DataType& doe,
     OutType& out, std::function<bool(void)>&& condition,
     Callback&& callback, const Args&... args) {
-
     bool imgui_out_state = false;
-    switch (control.DrawOptions.TextPosition) {
-    case TextPositionEnum::Left:
-        ImGui::Text("%s", std::string(control.Text).c_str()); ImGui::SameLine();
-        break;
-    case TextPositionEnum::Top:
-        ImGui::Text("%s", std::string(control.Text).c_str());
-        break;
-    default:
-        break;
-    }
 
+    __draw_imgui_begin(control);
     imgui_out_state = get_draw_function<T>(control, out, args...);
-
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", std::string(control.HelpText).c_str());
-    }
-
-    switch (control.DrawOptions.TextPosition) {
-    case TextPositionEnum::Right:
-        ImGui::SameLine();
-        ImGui::Text("%s", std::string(control.Text).c_str());
-        break;
-    case TextPositionEnum::Bottom:
-        ImGui::Text("%s", std::string(control.Text).c_str());
-        break;
-    default:
-        break;
-    }
+    __draw_imgui_end(control);
 
     if (condition()) {
         doe.Callback = callback;
@@ -404,35 +529,17 @@ bool draw_control(const Control<T, Label>& control,
     return imgui_out_state;
 }
 
-// template<
-//     typename DataType,
-//     typename OutType,
-//     typename Callback = std::function<void(DataType&)>,
-//     typename ...Args>
-// bool draw_from_list(DataType& doe, std::string_view label, OutType& out,
-//     std::function<bool(void)>&& condition, Callback&& callback,
-//     Args&&... args) {
-
-//     return draw<get_control_type(, label), DataType, OutType, Callback, Args...>(
-//         doe,
-//         get_control(SiPMGUIControls(), label),
-//         out,
-//         std::forward<std::function<bool(void)>>(condition),
-//         std::forward<Callback>(callback),
-//         std::forward<Args>(args)...);
-// }
-
-template<typename T, class Queue>
-bool send_if_changed(const T& new_value, const Queue& queue) {
-    if (new_value.Changed) {
-        if (queue->try_enqueue(new_value)) {
-            new_value.reset();
-            return true;
-        }
-    }
-
-    return false;
+template<IndicatorTypes T, StringLiteral Label,
+    typename DataType,
+    typename InType,
+    typename... Args>
+bool draw_indicator(const Indicator<T, Label>& indicator,
+    InType& in, const Args&... args) {
+    __draw_imgui_begin(indicator);
+    get_draw_function(indicator, in, args...);
+    __draw_imgui_end(indicator);
 }
+
 
 }  // namespace SBCQueens
 #endif
