@@ -93,8 +93,8 @@ struct SiPMAcquisitionData {
 
 
 // Control and indicators
-template<ControlTypes ControlType>
-using SiPMAcquisitionControl = Control<ControlType>;
+template<ControlTypes ControlType, StringLiteral Label>
+using SiPMAcquisitionControl = Control<ControlType, Label>;
 
 }  // namespace SBCQueens
 

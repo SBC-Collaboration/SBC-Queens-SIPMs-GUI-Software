@@ -188,8 +188,8 @@ struct TeensyControllerData {
     TeensyControllerPipeCallback Callback;
 };
 
-template<ControlTypes ControlType>
-using TeensyControllerControl = Control<ControlType>;
+template<ControlTypes ControlType, StringLiteral Label>
+using TeensyControllerControl = Control<ControlType, Label>;
 
 } // namespace SBCQueens
 

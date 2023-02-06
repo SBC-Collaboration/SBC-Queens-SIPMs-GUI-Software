@@ -91,9 +91,10 @@ void TeensyTab::draw() {
         //     }
         // );
 
-        constexpr Control peltier_switch = get_control(SiPMGUIControls, "Peltier ON/OFF");
-        draw_control(_teensy_doe, peltier_switch, Checkbox,
-            _teensy_doe.PeltierPIDState, ImGui::IsItemEdited,
+        constexpr auto peltier_switch = get_control<ControlTypes::Checkbox,
+                                            "Peltier ON/OFF">(SiPMGUIControls);
+        draw_control(peltier_switch, _teensy_doe, _teensy_doe.PeltierPIDState,
+            ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
             (TeensyControllerData& teensy_twin) {
@@ -112,9 +113,10 @@ void TeensyTab::draw() {
         //     }
         // );
 
-        constexpr Control pid_switch = get_control(SiPMGUIControls, "PID RTD");
-        draw_control(_teensy_doe, pid_switch, InputUINT16,
-            _teensy_doe.PidRTD, ImGui::IsItemEdited,
+        constexpr auto pid_switch = get_control<ControlTypes::InputUINT16,
+                                                "PID RTD">(SiPMGUIControls);
+        draw_control(pid_switch, _teensy_doe, _teensy_doe.PidRTD,
+            ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
             (TeensyControllerData& teensy_twin) {
@@ -139,8 +141,9 @@ void TeensyTab::draw() {
         //  }
         // );
 
-        constexpr Control update_period = get_control(SiPMGUIControls, "Update Period (ms)");
-        draw_control(_teensy_doe, update_period, InputUINT32,
+        constexpr auto update_period = get_control<ControlTypes::InputUINT32,
+                                        "Update Period (ms)">(SiPMGUIControls);
+        draw_control(update_period, _teensy_doe,
             _teensy_doe.PeltierPidUpdatePeriod, ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
@@ -169,9 +172,10 @@ void TeensyTab::draw() {
         //     }
         // );
 
-        constexpr Control peltier_trip_p = get_control(SiPMGUIControls, "Peltier Trip Point");
-        draw_control(_teensy_doe, peltier_trip_p, InputFloat,
-            _teensy_doe.PIDTempTripPoint, ImGui::IsItemDeactivated,
+        constexpr auto peltier_trip_p = get_control<ControlTypes::InputFloat,
+                                        "Peltier Trip Point">(SiPMGUIControls);
+        draw_control(peltier_trip_p, _teensy_doe, _teensy_doe.PIDTempTripPoint,
+            ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
             (TeensyControllerData& teensy_twin) {
@@ -189,8 +193,9 @@ void TeensyTab::draw() {
         //         return true;
         //     }
         // );
-        constexpr Control peltier_t_set = get_control(SiPMGUIControls, "Peltier T Setpoint");
-        draw_control(_teensy_doe, peltier_t_set, InputFloat,
+        constexpr auto peltier_t_set = get_control<ControlTypes::InputFloat,
+                                        "Peltier T Setpoint">(SiPMGUIControls);
+        draw_control(peltier_t_set, _teensy_doe,
             _teensy_doe.PIDTempValues.SetPoint, ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
@@ -209,9 +214,10 @@ void TeensyTab::draw() {
         //         return true;
         //     }
         // );
-        constexpr Control pkp = get_control(SiPMGUIControls, "PKp");
-        draw_control(_teensy_doe, pkp, InputFloat,
-            _teensy_doe.PIDTempValues.Kp, ImGui::IsItemDeactivated,
+        constexpr auto pkp = get_control<ControlTypes::InputFloat,
+                                         "PKp">(SiPMGUIControls);
+        draw_control(pkp, _teensy_doe, _teensy_doe.PIDTempValues.Kp,
+            ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
             (TeensyControllerData& teensy_twin) {
@@ -228,9 +234,10 @@ void TeensyTab::draw() {
         //         return true;
         //     }
         // );
-        constexpr Control pti = get_control(SiPMGUIControls, "PTi");
-        draw_control(_teensy_doe, pti, InputFloat,
-            _teensy_doe.PIDTempValues.Ti, ImGui::IsItemDeactivated,
+        constexpr auto pti = get_control<ControlTypes::InputFloat,
+                                         "PTi">(SiPMGUIControls);
+        draw_control(pti, _teensy_doe, _teensy_doe.PIDTempValues.Ti,
+            ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
             (TeensyControllerData& teensy_twin) {
@@ -248,9 +255,10 @@ void TeensyTab::draw() {
         //         return true;
         //     }
         // );
-        constexpr Control ptd = get_control(SiPMGUIControls, "PTd");
-        draw_control(_teensy_doe, ptd, InputFloat,
-            _teensy_doe.PIDTempValues.Td, ImGui::IsItemDeactivated,
+        constexpr auto ptd = get_control<ControlTypes::InputFloat,
+                                         "PTd">(SiPMGUIControls);
+        draw_control(ptd, _teensy_doe, _teensy_doe.PIDTempValues.Td,
+            ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
             [doe = _teensy_doe]
             (TeensyControllerData& teensy_twin) {
@@ -267,8 +275,9 @@ void TeensyTab::draw() {
         //     }
         // );
         bool tmp;
-        constexpr Control reset_ppid = get_control(SiPMGUIControls, "Reset PPID");
-        draw_control(_teensy_doe, reset_ppid, Button,
+        constexpr auto reset_ppid = get_control<ControlTypes::Button,
+                                                "Reset PPID">(SiPMGUIControls);
+        draw_control(reset_ppid, _teensy_doe,
             tmp, [&](){ return tmp; },
             // Callback when IsItemEdited !
             [doe = _teensy_doe]

@@ -83,7 +83,7 @@ int main() {
     // to read and write to the queue
     logger->info("Starting all manager threads.");
     for(auto& thread : _threads) {
-        std::thread t([thread = std::move(thread)]() {
+        std::jthread t([thread = std::move(thread)]() {
             (*thread)();
         });
 

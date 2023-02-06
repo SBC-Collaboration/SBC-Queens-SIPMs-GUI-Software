@@ -1,4 +1,5 @@
 #include "sbcqueens-gui/gui_windows/RunTab.hpp"
+#include "sbcqueens-gui/imgui_helpers.hpp"
 
 namespace SBCQueens {
 
@@ -86,8 +87,9 @@ void RunTab::draw() {
     //     connected_mod = 0.5;
     // }
     bool tmp;
-    constexpr Control connect_teensy = get_control(SiPMGUIControls, "Connect##Teensy");
-    draw_control(_teensy_doe, connect_teensy, Button,
+    constexpr auto connect_teensy = get_control<ControlTypes::Button,
+                                    "Connect##Teensy">(SiPMGUIControls);
+    draw_control(connect_teensy, _teensy_doe,
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
         [doe = _teensy_doe, run_dir = i_run_dir]
@@ -122,8 +124,9 @@ void RunTab::draw() {
     // )) {
     //     connected_mod = 1.5f;
     // }
-    constexpr Control disconnect_teensy = get_control(SiPMGUIControls, "Disconnect##Teensy");
-    draw_control(_teensy_doe, disconnect_teensy, Button,
+    constexpr Control disconnect_teensy = get_control<ControlTypes::Button,
+                                    "Disconnect##Teensy">(SiPMGUIControls);
+    draw_control(disconnect_teensy, _teensy_doe,
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
         [doe = _teensy_doe, run_dir = i_run_dir]
@@ -140,8 +143,9 @@ void RunTab::draw() {
 
     static float c_connected_mod = 1.5f;
     //ImGui::InputInt("CAEN port", , cgui_state.PortNum);
-    constexpr Control sipm_port = get_control(SiPMGUIControls, "CAEN Port");
-    draw_control(_sipm_doe, sipm_port, InputInt,
+    constexpr Control sipm_port = get_control<ControlTypes::InputInt,
+                                        "CAEN Port">(SiPMGUIControls);
+    draw_control(sipm_port, _sipm_doe,
         _sipm_doe.PortNum, ImGui::IsItemEdited,
         // Callback when IsItemEdited !
         [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
@@ -170,8 +174,9 @@ void RunTab::draw() {
         ImGui::SameLine();
         // ImGui::InputScalar("VME Address", ImGuiDataType_U32,
         //     &cgui_state.VMEAddress);
-        constexpr Control caen_model = get_control(SiPMGUIControls, "VME Address");
-        draw_control(_sipm_doe, caen_model, InputUINT32,
+        constexpr auto caen_model = get_control<ControlTypes::InputUINT32,
+            "VME Address">(SiPMGUIControls);
+        draw_control(caen_model, _sipm_doe,
             _sipm_doe.VMEAddress, ImGui::IsItemEdited,
             // Callback when IsItemEdited !
             [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
@@ -182,8 +187,9 @@ void RunTab::draw() {
 
     // ImGui::InputText("Keithley COM Port",
     //     &cgui_state.SiPMVoltageSysPort);
-    constexpr Control keith_com = get_control(SiPMGUIControls, "Keithley COM Port");
-    draw_control(_sipm_doe, keith_com, InputText,
+    constexpr auto keith_com = get_control<ControlTypes::InputText,
+                                    "Keithley COM Port">(SiPMGUIControls);
+    draw_control(keith_com, _sipm_doe,
         _sipm_doe.SiPMVoltageSysPort, ImGui::IsItemEdited,
         // Callback when IsItemEdited !
         [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
@@ -201,8 +207,9 @@ void RunTab::draw() {
 
     // This button starts the CAEN communication and sends all
     // the setup configuration
-    constexpr Control connect_caen = get_control(SiPMGUIControls, "Connect##CAEN");
-    draw_control(_sipm_doe, connect_caen, Button,
+    constexpr auto connect_caen = get_control<ControlTypes::Button,
+                                        "Connect##CAEN">(SiPMGUIControls);
+    draw_control(connect_caen, _sipm_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
         [doe = _sipm_doe, run_dir = i_run_dir]
@@ -255,8 +262,9 @@ void RunTab::draw() {
     //     c_connected_mod = 1.5f;
     // }
 
-    constexpr Control disconnect_caen = get_control(SiPMGUIControls, "Disconnect##CAEN");
-    draw_control(_sipm_doe, disconnect_caen, Button,
+    constexpr auto disconnect_caen = get_control<ControlTypes::Button,
+                                        "Disconnect##CAEN">(SiPMGUIControls);
+    draw_control(disconnect_caen, _sipm_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
         [doe = _sipm_doe]
@@ -275,8 +283,9 @@ void RunTab::draw() {
     static std::string other_port = _slowdaq_doe.PFEIFFERPort;
     // ImGui::InputText("PFEIFFER port", &other_port);
 
-    constexpr Control pfeiffer_port = get_control(SiPMGUIControls, "PFEIFFER Port");
-    draw_control(_slowdaq_doe, pfeiffer_port, InputText,
+    constexpr auto pfeiffer_port = get_control<ControlTypes::InputText,
+                                        "PFEIFFER Port">(SiPMGUIControls);
+    draw_control(pfeiffer_port, _slowdaq_doe,
         _slowdaq_doe.PFEIFFERPort, ImGui::IsItemEdited,
         // Callback when tmp is true !
         [doe = _slowdaq_doe]
@@ -311,8 +320,9 @@ void RunTab::draw() {
     //     spdlog::info("Hello");
     //     o_connected_mod = 0.5f;
     // }
-    constexpr Control connect_slowdaq = get_control(SiPMGUIControls, "Connect##SLOWDAQ");
-    draw_control(_slowdaq_doe, connect_slowdaq, Button,
+    constexpr auto connect_slowdaq = get_control<ControlTypes::Button,
+                                    "Connect##SLOWDAQ">(SiPMGUIControls);
+    draw_control(connect_slowdaq, _slowdaq_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
         [doe = _slowdaq_doe]
@@ -345,8 +355,9 @@ void RunTab::draw() {
     //     // Local stuff
     //     o_connected_mod = 1.5f;
     // }
-    constexpr Control disconnect_slowdaq = get_control(SiPMGUIControls, "Disconnect##SLOWDAQ");
-    draw_control(_slowdaq_doe, disconnect_slowdaq, Button,
+    constexpr auto disconnect_slowdaq = get_control<ControlTypes::Button,
+                                    "Disconnect##SLOWDAQ">(SiPMGUIControls);
+    draw_control(disconnect_slowdaq, _slowdaq_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
         [doe = _slowdaq_doe]

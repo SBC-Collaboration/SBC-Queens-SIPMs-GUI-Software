@@ -65,8 +65,8 @@ struct SlowDAQData {
     SlowDAQPipeCallback Callback;
 };
 
-template<ControlTypes ControlType>
-using SlowDAQControl = Control<ControlType>;
+template<ControlTypes ControlType, StringLiteral Label>
+using SlowDAQControl = Control<ControlType, Label>;
 
 } // namespace SBCQueens
 

@@ -36,8 +36,9 @@ void SiPMControlWindow::draw()  {
     // });
     bool tmp;
 
-    constexpr Control reset_caen = get_control(SiPMGUIControls, "Reset CAEN");
-    draw_control(_sipm_data, reset_caen, Button, tmp,
+    constexpr auto reset_caen = get_control<ControlTypes::Button,
+                                            "Reset CAEN">(SiPMGUIControls);
+    draw_control(reset_caen, _sipm_data, tmp,
         [&](){ return tmp; },
         // Callback when IsItemEdited !
         [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
@@ -65,9 +66,9 @@ void SiPMControlWindow::draw()  {
     //         old.SiPMID = cgui_state.SiPMID;
     //         return true;
     // });
-    constexpr Control sipm_id = get_control(SiPMGUIControls, "SiPM ID");
-    draw_control(_sipm_data, sipm_id, InputInt,
-        _sipm_data.SiPMID, ImGui::IsItemEdited,
+    constexpr auto sipm_id = get_control<ControlTypes::InputInt, "SiPM ID">(SiPMGUIControls);
+    draw_control(sipm_id, _sipm_data, _sipm_data.SiPMID,
+        ImGui::IsItemEdited,
         // Callback when IsItemEdited !
         [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
           doe_twin.SiPMID = doe.SiPMID;
@@ -77,9 +78,9 @@ void SiPMControlWindow::draw()  {
     //     ImGui::SetTooltip("This is the SiPM ID as specified.");
     // }
 
-
-    constexpr Control sipm_cell = get_control(SiPMGUIControls, "SiPM Cell");
-    draw_control(_sipm_data, sipm_cell, InputInt,
+    constexpr auto sipm_cell = get_control<ControlTypes::InputInt,
+                                            "SiPM Cell">(SiPMGUIControls);
+    draw_control(sipm_cell, _sipm_data,
         _sipm_data.CellNumber, ImGui::IsItemEdited,
         // Callback when IsItemEdited !
         [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
@@ -100,9 +101,10 @@ void SiPMControlWindow::draw()  {
 
     // ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
 
-    constexpr Control ps_enable = get_control(SiPMGUIControls, "PS Enable");
-    draw_control(_sipm_data, ps_enable, Checkbox,
-        _sipm_data.SiPMVoltageSysSupplyEN, ImGui::IsItemEdited,
+    constexpr auto ps_enable = get_control<ControlTypes::Checkbox,
+                                           "PS Enable">(SiPMGUIControls);
+    draw_control(ps_enable, _sipm_data, _sipm_data.SiPMVoltageSysSupplyEN,
+        ImGui::IsItemEdited,
         // Callback when IsItemEdited !
         [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
             // he expects.
@@ -150,9 +152,10 @@ void SiPMControlWindow::draw()  {
     //         old.SiPMVoltageSysChange = true;
     //         return true;
     //     });
-    constexpr Control sipm_voltage = get_control(SiPMGUIControls, "SiPM Voltage");
-    draw_control(_sipm_data, sipm_voltage, InputFloat,
-        _sipm_data.SiPMVoltageSysVoltage, ImGui::IsItemDeactivated,
+    constexpr auto sipm_voltage = get_control<ControlTypes::InputFloat,
+                                              "SiPM Voltage">(SiPMGUIControls);
+    draw_control(sipm_voltage, _sipm_data, _sipm_data.SiPMVoltageSysVoltage,
+        ImGui::IsItemDeactivated,
         // Callback when IsItemEdited !
         [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
             // Ignore the input under BVMode or RunMode
@@ -188,8 +191,9 @@ void SiPMControlWindow::draw()  {
     // ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.60f, 0.6f, 1.0f));
     // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
     //     ImVec4(.0f, 8.f, .8f, 1.0f));
-    constexpr Control start_meas_routine = get_control(SiPMGUIControls, "Run Measurement Routine");
-    draw_control(_sipm_data, start_meas_routine, Button,
+    constexpr auto start_meas_routine = get_control<ControlTypes::Button,
+                                    "Run Measurement Routine">(SiPMGUIControls);
+    draw_control(start_meas_routine, _sipm_data,
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
         [doe = _sipm_data, t_doe = _teensy_data]
@@ -235,8 +239,9 @@ void SiPMControlWindow::draw()  {
     // ImGui::PushStyleColor(ImGuiCol_ButtonActive,
     //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, 0.8f)));
 
-    constexpr Control cancel_meas_routine = get_control(SiPMGUIControls, "Cancel Measurement Routine");
-    draw_control(_sipm_data, cancel_meas_routine, Button,
+    constexpr auto cancel_meas_routine = get_control<ControlTypes::Button,
+                                "Cancel Measurement Routine">(SiPMGUIControls);
+    draw_control(cancel_meas_routine, _sipm_data,
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
         [] (SiPMAcquisitionData& doe_twin) {

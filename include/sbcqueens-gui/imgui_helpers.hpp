@@ -11,16 +11,12 @@
 // C++ STD includes
 #include <ranges>
 #include <span>
-#include <variant>
-#include <memory>
-#include <optional>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <functional>
-#include <any>
+#include <string_view>
 
 // C++ 3rd party includes
 #include <misc/cpp/imgui_stdlib.h> // for use with std::string
@@ -30,10 +26,25 @@
 
 namespace SBCQueens {
 
+// stolen from https://ctrpeach.io/posts/cpp20-string-literal-template-parameters/
+// it is a great idea!
+template<size_t N>
+struct StringLiteral {
+    constexpr StringLiteral(const char (&str)[N]) {
+        // The explicit breaks this, maybe we can find a more suitable solution?
+        std::copy_n(str, N, value);
+    }
+
+    char value[N];
+};
+
 using Color_t = ImVec4;
 using Size_t = ImVec2;
 
-using TextPosition_t = enum class TextPositionEnum { None, Top, Bottom, Left, Right };
+using TextPosition_t = enum class TextPositionEnum {
+    None, Top, Bottom, Left, Right
+};
+
 struct DrawingOptions {
     TextPosition_t TextPosition = TextPositionEnum::None;
     Color_t TextColor = ImVec4{1.0, 1.0, 1.0, 1.0};
@@ -48,54 +59,60 @@ struct ControlOptions {
 };
 
 enum class ControlTypes { InputText, Button, Checkbox, InputInt, InputFloat,
-    InputDouble, ComboBox, InputINT8, InputUINT8, InputINT16, InputUINT16, InputINT32,
-    InputUINT32, InputINT64, InputUINT64 };
+    InputDouble, ComboBox, InputINT8, InputUINT8, InputINT16, InputUINT16,
+    InputINT32, InputUINT32, InputINT64, InputUINT64 };
 
-// This is the interface class of all the controls
-struct GraphicalItemInterface {
+template<ControlTypes ControlType, StringLiteral list>
+struct Control {
     const std::string_view Label = "";
     const std::string_view Text = "";
     const std::string_view HelpText = "";
     const DrawingOptions DrawOptions = DrawingOptions{};
 
-    constexpr ~GraphicalItemInterface() {}
+    constexpr ~Control() {}
 
-protected:
-    constexpr GraphicalItemInterface() = default;
-    constexpr GraphicalItemInterface(const std::string_view& label,
+    constexpr Control() = default;
+    constexpr Control(
         const std::string_view& text, const std::string_view& help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
+        Label{list.value},
         // ControlType{ct},
-        Label{label},
         Text{text},
         HelpText{help_text},
         DrawOptions{draw_opts}
     {}
 
-    constexpr GraphicalItemInterface(const std::string_view& label,
-        const std::string_view& text) :
-        GraphicalItemInterface{label, text, ""}
+    explicit constexpr Control(const std::string_view& text) :
+        Control{text, ""}
     {}
 };
 
-template<ControlTypes ControlType>
-struct Control : public GraphicalItemInterface {
-    constexpr Control() : GraphicalItemInterface{} {}
-    constexpr Control(const std::string_view& label,
+enum class IndicatorTypes { Numerical, String, LED, Plot };
+
+template<IndicatorTypes IndicatorType, StringLiteral list>
+struct Indicator {
+    const std::string_view Label = "";
+    const std::string_view Text = "";
+    const std::string_view HelpText = "";
+    const DrawingOptions DrawOptions = DrawingOptions{};
+
+    constexpr ~Indicator() {}
+
+    constexpr Indicator() = default;
+    constexpr Indicator(
         const std::string_view& text, const std::string_view& help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
-        GraphicalItemInterface{label, text, help_text, draw_opts}
+        Label{list.value},
+        // IndicatorType{ct},
+        Text{text},
+        HelpText{help_text},
+        DrawOptions{draw_opts}
     {}
 
-    constexpr Control(const std::string_view& label,
-        const std::string_view& text) :
-        GraphicalItemInterface{label, text, ""}
+    explicit constexpr Indicator(const std::string_view& text) :
+        Indicator{text, ""}
     {}
-
-    constexpr ~Control() {}
 };
-
-enum class IndicatorTypes { Numerical, String, LED };
 
 // template<IndicatorTypes IndicatorType>
 // struct Indicator_t : GraphicalItemInterface {
@@ -136,15 +153,46 @@ enum class IndicatorTypes { Numerical, String, LED };
 // };
 
 // Controls
-bool InputText(const Control<ControlTypes::InputText>&, std::string&);
-bool Button(const Control<ControlTypes::Button>&, bool&);
-bool Checkbox(const Control<ControlTypes::Checkbox>&, bool&);
-bool InputInt(const Control<ControlTypes::InputInt>&, int&);
-bool InputFloat(const Control<ControlTypes::InputFloat>&, float&);
-bool InputDouble(const Control<ControlTypes::InputDouble>&, double&);
+template<StringLiteral Label>
+bool InputText(const Control<ControlTypes::InputText, Label>&,
+               std::string& out) {
+    return ImGui::InputText(Label.value, &out);
+}
 
-template<ControlTypes ControlType, typename T> requires std::is_integral_v<T>
-bool InputScalar(const Control<ControlType>& control, T& out) {
+template<StringLiteral Label>
+bool Button(const Control<ControlTypes::Button, Label>& control,
+            bool& out) {
+    out = ImGui::Button(Label.value, control.DrawOptions.ControlSize);
+    return out;
+}
+
+template<StringLiteral Label>
+bool Checkbox(const Control<ControlTypes::Checkbox, Label>& control,
+              bool& out) {
+    return ImGui::Checkbox(Label.value, &out);
+}
+
+template<StringLiteral Label>
+bool InputInt(const Control<ControlTypes::InputInt, Label>& control,
+              int& out) {
+    return ImGui::InputInt(Label.value, &out);
+}
+
+template<StringLiteral Label>
+bool InputFloat(const Control<ControlTypes::InputFloat, Label>& control,
+                float& out)  {
+    return ImGui::InputFloat(Label.value, &out);
+}
+
+template<StringLiteral Label>
+bool InputDouble(const Control<ControlTypes::InputDouble, Label>& control,
+                 double& out) {
+    return ImGui::InputDouble(Label.value, &out);
+}
+
+template<ControlTypes ControlType, StringLiteral Label, typename T>
+requires std::is_integral_v<T>
+bool InputScalar(const Control<ControlType, Label>& control, T& out) {
     ImGuiDataType_ type = ImGuiDataType_S8;
     if constexpr ( std::is_same_v<T, int8_t>) {
         type = ImGuiDataType_S8;
@@ -164,20 +212,59 @@ bool InputScalar(const Control<ControlType>& control, T& out) {
         type = ImGuiDataType_U64;
     }
 
-    return ImGui::InputScalar(std::string(control.Label).c_str(), type, &out);
+    return ImGui::InputScalar(Label.value, type, &out);
 }
 
-bool InputINT8(const Control<ControlTypes::InputINT8>&, int8_t&);
-bool InputUINT8(const Control<ControlTypes::InputUINT8>&, uint8_t&);
-bool InputINT16(const Control<ControlTypes::InputINT16>&, int16_t&);
-bool InputUINT16(const Control<ControlTypes::InputUINT16>& control, uint16_t&);
-bool InputINT32(const Control<ControlTypes::InputINT32>&, int32_t&);
-bool InputUINT32(const Control<ControlTypes::InputUINT32>& control, uint32_t&);
-bool InputINT64(const Control<ControlTypes::InputINT64>& control, int64_t&);
-bool InputUINT64(const Control<ControlTypes::InputUINT64>& control, uint64_t&);
+template<StringLiteral Label>
+bool InputINT8(const Control<ControlTypes::InputINT8, Label>& control,
+               int8_t& out) {
+    return InputScalar<ControlTypes::InputINT8, Label, int8_t>(control, out);
+}
 
-template<typename T> requires std::is_enum_v<T>
-bool ComboBox(const Control<ControlTypes::ComboBox>& control, T& state,
+template<StringLiteral Label>
+bool InputUINT8(const Control<ControlTypes::InputUINT8, Label>& control,
+                uint8_t& out) {
+    return InputScalar<ControlTypes::InputUINT8, Label, uint8_t>(control, out);
+}
+
+template<StringLiteral Label>
+bool InputINT16(const Control<ControlTypes::InputINT16, Label>& control,
+                int16_t& out) {
+    return InputScalar<ControlTypes::InputINT16, Label, int16_t>(control, out);
+}
+
+template<StringLiteral Label>
+bool InputUINT16(const Control<ControlTypes::InputUINT16, Label>& control,
+                uint16_t& out) {
+    return InputScalar<ControlTypes::InputUINT16, Label, uint16_t>(control, out);
+}
+
+template<StringLiteral Label>
+bool InputINT32(const Control<ControlTypes::InputINT32, Label>& control,
+                int32_t& out) {
+    return InputScalar<ControlTypes::InputINT32, Label, int32_t>(control, out);
+}
+
+template<StringLiteral Label>
+bool InputUINT32(const Control<ControlTypes::InputUINT32, Label>& control,
+                uint32_t& out) {
+    return InputScalar<ControlTypes::InputUINT32, Label, uint32_t>(control, out);
+}
+
+template<StringLiteral Label>
+bool InputINT64(const Control<ControlTypes::InputINT64, Label>& control,
+                int64_t& out) {
+    return InputScalar<ControlTypes::InputINT64, Label, int64_t>(control, out);
+}
+
+template<StringLiteral Label>
+bool InputUINT64(const Control<ControlTypes::InputUINT64, Label>& control,
+                uint64_t& out) {
+    return InputScalar<ControlTypes::InputUINT64, Label, uint64_t>(control, out);
+}
+
+template<StringLiteral Label, typename T> requires std::is_enum_v<T>
+bool ComboBox(const Control<ControlTypes::ComboBox, Label>& control, T& state,
     const std::unordered_map<T, std::string>& map) {
     static size_t index = 0;
     size_t i = 0;
@@ -199,7 +286,7 @@ bool ComboBox(const Control<ControlTypes::ComboBox>& control, T& state,
     }
 
     // bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
-    if (ImGui::BeginCombo(std::string(control.Label).c_str(), s_states[index].c_str())) {
+    if (ImGui::BeginCombo(Label, s_states[index].c_str())) {
         for (i = 0; i < map.size(); i++) {
             const bool is_selected = (index == i);
             if (ImGui::Selectable(s_states[i].c_str(), is_selected)) {
@@ -220,62 +307,62 @@ bool ComboBox(const Control<ControlTypes::ComboBox>& control, T& state,
     return true;
 }
 
-template<size_t N>
-constexpr static GraphicalItemInterface get_control(const std::array<GraphicalItemInterface, N>& list, std::string_view name) {
-    auto out = std::find_if(std::cbegin(list), std::cend(list), [_name = name](auto& val) -> bool {
-        return val.Label == _name;
-    });
-
-    // static_assert(out == std::cend(list), "Blah");
-    return *out;
+template<ControlTypes T, StringLiteral Label, typename... Types>
+constexpr static auto get_control(const std::tuple<Types...>& list) {
+    return std::get<Control<T, Label>>(list);
 }
 
-template<size_t N>
-constexpr static ControlTypes get_control_type(const std::array<GraphicalItemInterface, N>& list, std::string_view name) {
-    return get_control(list, name).ControlType;
-}
+// template<size_t N>
+// constexpr static ControlTypes get_control_type(
+//     const std::tuple<GraphicalItemInterface, N>& list, std::string_view name) {
+//     return get_control(list, name).ControlType;
+// }
 
-template<ControlTypes T, typename OutType, typename... Args>
-bool get_draw_function(const Control<T>& control, OutType& out, Args&&... args) {
+template<ControlTypes T, StringLiteral Label, typename OutType, typename... Args>
+constexpr bool get_draw_function(const Control<T, Label>& control,
+                                 OutType& out, Args&&... args) {
     if constexpr (T == ControlTypes::Button) {
-        return Button(control, out);
+        return Button<Label>(control, out);
     } else if constexpr(T == ControlTypes::Checkbox) {
-        return Checkbox(control, out);
+        return Checkbox<Label>(control, out);
     } else if constexpr(T  == ControlTypes::InputInt) {
-        return InputInt(control, out);
+        return InputInt<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputFloat) {
-        return InputFloat(control, out);
+        return InputFloat<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputDouble) {
-        return InputDouble(control, out);
+        return InputDouble<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::ComboBox) {
-        return ComboBox(control, out, args...);
+        return ComboBox<Label>(control, out, args...);
     } else if constexpr(T  ==  ControlTypes::InputINT8) {
-        return InputINT8(control, out);
+        return InputINT8<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputUINT8) {
-        return InputUINT8(control, out);
+        return InputUINT8<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputINT16) {
-        return InputINT16(control, out);
+        return InputINT16<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputUINT16) {
-        return InputUINT16(control, out);
+        return InputUINT16<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputINT32) {
-        return InputINT32(control, out);
+        return InputINT32<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputUINT32) {
-        return InputUINT32(control, out);
+        return InputUINT32<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputINT64) {
-        return InputINT64(control, out);
+        return InputINT64<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputUINT64) {
-        return InputUINT64(control, out);
+        return InputUINT64<Label>(control, out);
     } else if constexpr(T  ==  ControlTypes::InputText) {
-        return InputText(control, out);
+        return InputText<Label>(control, out);
     }
+
+    throw("Draw function not supported");
 }
 
-template<ControlTypes T,
+template<ControlTypes T, StringLiteral Label,
     typename DataType,
     typename OutType,
     typename Callback = std::function<void(DataType&)>,
     typename... Args>
-bool draw_control(const Control<T>& control, DataType& doe,
+bool draw_control(const Control<T, Label>& control,
+    DataType& doe,
     OutType& out, std::function<bool(void)>&& condition,
     Callback&& callback, const Args&... args) {
 

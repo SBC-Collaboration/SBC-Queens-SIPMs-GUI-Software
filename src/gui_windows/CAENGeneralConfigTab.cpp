@@ -1,4 +1,5 @@
 #include "sbcqueens-gui/gui_windows/CAENGeneralConfigTab.hpp"
+#include "sbcqueens-gui/imgui_helpers.hpp"
 
 namespace SBCQueens {
 void CAENGeneralConfigTab::init_tab(const toml::table& tb) {
@@ -120,8 +121,9 @@ void CAENGeneralConfigTab::draw() {
     //     []() {return false;}, [](){});
 
     bool tmp;
-    constexpr Control soft_trigg = get_control(SiPMGUIControls, "Software Trigger");
-    draw_control(_sipm_doe, soft_trigg, Button,
+    constexpr auto soft_trigg = get_control<ControlTypes::Button,
+                                    "Software Trigger">(SiPMGUIControls);
+    draw_control(soft_trigg, _sipm_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
         [doe = _sipm_doe]
