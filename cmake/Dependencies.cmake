@@ -165,6 +165,6 @@ if(date_ADDED)
     $<BUILD_INTERFACE:${date_SOURCE_DIR}>/include)
 endif()
 
-CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacteriazation)
+CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacterization)
 
 # CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacteriazation)
