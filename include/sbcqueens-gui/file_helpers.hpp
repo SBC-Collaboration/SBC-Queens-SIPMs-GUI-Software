@@ -225,7 +225,7 @@ void save(DataFile<T>& file, FormatFunc&& f,  Args&&... args) noexcept {
             (*file) << f(std::forward<Args>(args)...);
         }
 
-        file->flush();
+        //file->flush();
     }
 }
 

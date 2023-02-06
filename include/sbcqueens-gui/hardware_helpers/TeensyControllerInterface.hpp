@@ -160,16 +160,16 @@ struct BME_COMPENSATION_REGISTERS {
 
 enum class BME_TYPE {LOCAL};
 // These are the constant compensation or calibration parameters for each BME
-const BME_COMPENSATION_REGISTERS LOCAL_COMPENSATION {
-    // Temps
-    28414u, 26857, 50,
-    // Pressure
-    38146u, -10599, 3024, 7608, -223, -7, 9900, -10230, 4285,
-    // Hum
-    75u, 380, 0u, 277, 50, 30
-};
+// const BME_COMPENSATION_REGISTERS OTHER_COMPENSATION {
+//     // Temps
+//     28414u, 26857, 50,
+//     // Pressure
+//     38146u, -10599, 3024, 7608, -223, -7, 9900, -10230, 4285,
+//     // Hum
+//     75u, 380, 0u, 277, 50, 30
+// };
 
-const BME_COMPENSATION_REGISTERS BOX_COMPENSATION {
+const BME_COMPENSATION_REGISTERS LOCAL_COMPENSATION {
     // Temps
     28155u, 26962, 50,
     // Pressure
@@ -223,7 +223,6 @@ void from_json(const json& j, BMEs& p);
 
 
 // end Sensors structs
-
 enum class TeensyCommands {
     CheckError,
     GetError,
@@ -288,11 +287,8 @@ const std::unordered_map<TeensyCommands, std::string> cTeensyCommands = {
     {TeensyCommands::GetBMEs,               "GET_BMES"},
     //// !Getters
     /// !Hardware specific commands
-
     {TeensyCommands::None, ""}
 };
-
-
 
 // It holds everything the outside world can modify or use.
 // So far, I do not like teensy_serial is here.
@@ -769,13 +765,13 @@ class TeensyControllerInterface {
                 retrieve_pressures();
         });
 
-        // static auto retrieve_bmes_nb = make_total_timed_event(
-        //     std::chrono::milliseconds(114),
-        //     // Lambda hacking to allow the class function to be pass to
-        //     // make_total_timed_event. Is there any other way?
-        //     [&]() {
-        //         retrieve_bmes();
-        // });
+        static auto retrieve_bmes_nb = make_total_timed_event(
+            std::chrono::milliseconds(1000),
+            // Lambda hacking to allow the class function to be pass to
+            // make_total_timed_event. Is there any other way?
+            [&]() {
+                retrieve_bmes();
+        });
 
         // This looks intimidating but it is actually pretty simple once
         // broken down. First, by make_total_timed_event it is going to call
@@ -783,7 +779,7 @@ class TeensyControllerInterface {
         // Inside this lambda, there are two functions: async_save but twice
         // One for PIDs, other for BMEs
         static auto save_files = make_total_timed_event(
-            std::chrono::seconds(30),
+            std::chrono::seconds(300),
             [&]() {
                 spdlog::info("Saving teensy data...");
 
@@ -838,8 +834,8 @@ class TeensyControllerInterface {
             retrieve_pids_nb();
             retrieve_pres_nb();
 
-            // This should be called every 114ms
-            // retrieve_bmes_nb();
+            // This should be called every 1s
+            retrieve_bmes_nb();
         }
 
         retrieve_rtds_nb();

@@ -217,8 +217,8 @@ class BreakdownRoutine {
         52.0, 53.0, 54.0 });
 
     constexpr static auto OverVoltages = std::to_array<double>({
-        // 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 };
-        2.0, 4.0, 8.0 });
+        2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 });
+        // 2.0, 4.0, 8.0 });
 
     // Takes ownership of the port and shared the saveinfo data
     BreakdownRoutine(CAEN& port, CAENInterfaceData& doe,

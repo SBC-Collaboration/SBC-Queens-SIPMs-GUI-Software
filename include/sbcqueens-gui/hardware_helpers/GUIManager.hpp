@@ -156,40 +156,40 @@ class GUIManager {
         }
 
         if (ImGui::BeginTabBar("Other Plots")) {
-            // if (!tgui_state.SystemParameters.InRTDOnlyMode) {
-            //     if (ImGui::BeginTabItem("Local BME")) {
-            //         if (ImPlot::BeginPlot("Local BME", ImVec2(-1, 0))) {
-            //             // We setup the axis
-            //             ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
-            //             ImPlot::SetupAxes("time [s]", "Humidity [%]",
-            //                 g_axis_flags, g_axis_flags);
-            //             ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]",
-            //                 g_axis_flags | ImPlotAxisFlags_Opposite);
-            //             ImPlot::SetupAxis(ImAxis_Y2, "Temperature [degC]",
-            //                 g_axis_flags | ImPlotAxisFlags_Opposite);
+            if (!tgui_state.SystemParameters.InRTDOnlyMode) {
+                if (ImGui::BeginTabItem("Local BME")) {
+                    if (ImPlot::BeginPlot("Local BME", ImVec2(-1, 0))) {
+                        // We setup the axis
+                        ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
+                        ImPlot::SetupAxes("time [s]", "Humidity [%]",
+                            g_axis_flags, g_axis_flags);
+                        ImPlot::SetupAxis(ImAxis_Y3, "Pressure [Pa]",
+                            g_axis_flags | ImPlotAxisFlags_Opposite);
+                        ImPlot::SetupAxis(ImAxis_Y2, "Temperature [degC]",
+                            g_axis_flags | ImPlotAxisFlags_Opposite);
 
-            //             // This one does not need an SetAxes as it takes the
-            //             // default.
-            //             // This functor is almost the same as calling ImPlot
-            //             GeneralIndicatorReceiver.plot(
-            //                 IndicatorNames::LOCAL_BME_HUMD, "Humidity");
+                        // This one does not need an SetAxes as it takes the
+                        // default.
+                        // This functor is almost the same as calling ImPlot
+                        GeneralIndicatorReceiver.plot(
+                            IndicatorNames::LOCAL_BME_HUMD, "Humidity");
 
-            //             // We need to call SetAxes before ImPlot::PlotLines
-            //             // to let the API know the axis of our data
-            //             ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-            //             GeneralIndicatorReceiver.plot(
-            //                 IndicatorNames::LOCAL_BME_TEMPS, "Temperature");
+                        // We need to call SetAxes before ImPlot::PlotLines
+                        // to let the API know the axis of our data
+                        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+                        GeneralIndicatorReceiver.plot(
+                            IndicatorNames::LOCAL_BME_TEMPS, "Temperature");
 
-            //             ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
-            //             GeneralIndicatorReceiver.plot(
-            //                 IndicatorNames::LOCAL_BME_PRESS, "Pressure");
+                        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
+                        GeneralIndicatorReceiver.plot(
+                            IndicatorNames::LOCAL_BME_PRESS, "Pressure");
 
-            //             ImPlot::EndPlot();
-            //         }
+                        ImPlot::EndPlot();
+                    }
 
-            //         ImGui::EndTabItem();
-            //     }
-            // }
+                    ImGui::EndTabItem();
+                }
+            }
 
             if (ImGui::BeginTabItem("Pressures")) {
                 static ImPlotScale press_scale_axis = ImPlotScale_Linear;

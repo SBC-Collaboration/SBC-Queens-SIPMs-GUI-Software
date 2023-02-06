@@ -1,4 +1,4 @@
-pacman This is the GUI interface for the CAEN [DT5740D](https://www.caen.it/products/dt5740d/) / [DT5730B](https://www.caen.it/products/dt5730/) digitizers, or a specially programmed [Teensy 4.1](https://www.pjrc.com/store/teensy41.html) using [FreeRTOS](https://www.freertos.org/).
+This is the GUI interface for the CAEN [DT5740D](https://www.caen.it/products/dt5740d/) / [DT5730B](https://www.caen.it/products/dt5730/) digitizers, or a specially programmed [Teensy 4.1](https://www.pjrc.com/store/teensy41.html) using [FreeRTOS](https://www.freertos.org/).
 
 It is developed for the SBC collaboration and the SBC-Queens SiPM tester.
 
@@ -11,6 +11,8 @@ If compiling this for windows make sure you have downloaded and installed:
 - Git for windows (to git clone the dependencies if not included)
 - CMake (version 3.11 or higher)
 - (optional) VULKAN-SDK (if using the vulkan backend)
+- Armadillo on MSYS
+- Optional: Vulkan SDK
 
 Then clone the repository
 
@@ -25,38 +27,26 @@ You do not need to install any of these dependencies directly, I just want to ha
 - [json](https://github.com/nlohmann/json)
 - [serial](https://github.com/wjwwood/serial)
 - [spglog](https://github.com/gabime/spdlog)
-- [readerwriterqueue](https://github.com/cameron314/readerwriterqueue)
 - [concurrentqueue](https://github.com/cameron314/concurrentqueue)
 - [tomlcplusplus](https://github.com/marzer/tomlplusplus)
 
-The dependencies can be installed (after calling git clone or downloading the rep) by calling:
-
-`git submodule init`
-`git submodule update`
-
-The compilation steps are (WINDOWS):
-
 `mkdir build`
-`cd build`
-`cmake ../ -G "MinGW Makefiles"`
-`mingw32-make -j8`
+`cmake all -B build -G \"MinGW Makefiles\" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release"`
+`cmake --build build -j`
 
 ## LINUX
 
-Have a working C++ compiler with C++17 features, cmake, and git. Then clone the repository:
+Have a working C++ compiler with C++20 features, cmake, and git. Install Armadillo and optionally Vulkan SDK.
+
+Then clone the repository:
 
 `git clone https://github.com/SBC-Collaboration/SBC-SIPM-Testing-Software`
 
-The dependencies can be installed by calling:
-
-`git submodule init`
-`git submodule update`
 
 The compilation steps are (Linux):
 `mkdir build`
-`cd build`
-`cmake ../`
-`make -j8`
+`cmake all -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON -DCAEN_DIR=/usr `
+`cmake --build build -j`
 
 You will probably have some errors in the cmake running, most of them can be solved by googling the library that is required!
 
@@ -64,7 +54,7 @@ You will probably have some errors in the cmake running, most of them can be sol
 
 If the intention is to use this software to run the CAEN digitizer functionalities. It is required to install CAEN libraries. For both linux and windows, this can be done by following the CAENVME, CAENComm and CAENDigitizer libraries installation instruction.
 
-If they are installed in an unusual location, it is possible to add `-DCAEN_DIR=dir\to\CAEN` while runnin gcmake.
+If they are installed in an unusual location, it is possible to add `-DCAEN_DIR=dir\to\CAEN` while running cmake.
 
 # Developer instructions
 
@@ -79,17 +69,7 @@ If the intention is to develop the code:
 
 # Common Problems:
 
-## LINUX:
-
- - If you install CAEN libraries the way it tell you to install them, cmake wont find them. My proposed solution is to imitate the Windows installation structure: first, create a folder named CAEN. Then, copy all the files extracted directly from the tar file (for example CAENComm-1.5.0). Then, rename: CAENComm-X.X.X to CAENComm, CAENDigitizer-X.X.X to CAENDigitizer, CAENVMELib-X.X.X to CAENVME. Finally, install the libs by running the install_64 that are found in each lib. If you do not have this problem, ignore it.
-
-## WINDOWS:
-
- - If during linking the compiler says "ld.exe: cannot find -lCAENVME", go where the library CAENVME was installed and rename all the files "CAENVMElib" to "CAENVME"
-
-## ALL:
-
- - Do not forget to do "git submodule init" and "git submodule update" if it is possible not to find some dependencies.
+Not for now...
 
 # Details about the binary save format (SBC preferred data format)
 
