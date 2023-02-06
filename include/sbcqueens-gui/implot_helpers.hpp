@@ -23,6 +23,9 @@
 // #include <sstream>
 // #include <deque>
 
+// C++ 3rd party includes
+#include <armadillo>
+
 // // my includes
 
 namespace SBCQueens {
@@ -213,36 +216,59 @@ namespace SBCQueens {
 
 // // Internal structure to be used for Plot class. Servers as an interface
 // // between this API and ImPlot
-// struct PlotDataBuffer {
-//     const std::size_t N;
-//     std::size_t Start = 0;
-//     std::size_t Size = 0;
-//     std::size_t CurrentIndex = 0;
+template<size_t NumPlots = 1>
+class PlotDataBuffer {
+	static_assert(NumPlots > 0, "There must be a least one plot!");
 
-//     std::vector< std::pair <double, double> > Data;
+    arma::uword N;
+    arma::uword _start = 0;
+    arma::uword _size = 0;
+    arma::uword _current_index = 0;
 
-//     explicit PlotDataBuffer(const std::size_t& max)
-//         : N(max), Data(max) {}
+    arma::mat Data;
+ public:
+    explicit PlotDataBuffer(const arma::uword& max)
+        : N(max), Data(NumPlots + 1, N, arma::fill::zeros) {}
 
-//     std::pair<double, double>& operator[](const std::size_t& i) {
-//         std::size_t index = (i + Start) % Size;
-//         return Data[index];
-//     }
+    auto operator[](const arma::uword& i) {
+        arma::uword index = (i + _start) % _size;
+        return Data.unsafe_col( index );
+    }
 
-//     void operator()(const double& x, const double& y) {
-//         Data[CurrentIndex] = std::make_pair(
-//                 static_cast<double>(x),
-//                 static_cast<double>(y));
+    void operator()(const double& x, const double& y) {
+        Data.col(_current_index) = {x, y};
 
-//         if (Size < N) {
-//             Size++;
-//             CurrentIndex = Size == N ? 0 : CurrentIndex + 1;
-//         } else {
-//             Start = (Start + 1) % Size;
-//             CurrentIndex = Start;
-//         }
-//     }
-// };
+        if (_size < N) {
+            _size++;
+            _current_index = _size == N ? 0 : _current_index + 1;
+        } else {
+            _start = (_start + 1) % _size;
+            _current_index = _start;
+        }
+    }
+
+    // Resizes the internal data buffer with new_size. Clears the data (faster)
+    // if clear_data is true, otherwise, it keeps the data (slower)
+    void resize(const arma::uword& new_size, const bool& clear_data = false) {
+    	N = new_size;
+    	if (clear_data) {
+    		Data.set_size(NumPlots + 1, N);
+		    _size = 0;
+        	_current_index = 0;
+    	} else {
+    		Data.resize(NumPlots + 1, N);
+    	}
+    }
+
+    void clear() {
+	    _size = 0;
+    	_current_index = 0;
+    }
+
+    auto size() const {
+    	return _size;
+    }
+};
 
 // enum class PlotStyle {
 //     Line,

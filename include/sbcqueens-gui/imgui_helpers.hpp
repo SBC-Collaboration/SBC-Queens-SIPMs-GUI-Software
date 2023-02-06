@@ -59,24 +59,19 @@ struct DrawingOptions {
     // Color of the accompanying text.
     Color_t TextColor = White;
     // Color of the control in standby - only button supports it ATM.
-    Color_t ControlColor = Blue;
+    Color_t Color = Blue;
     // Color of the control when hovered - only button supports it ATM.
-    Color_t ControlHoveredColor = Blue;
+    Color_t HoveredColor = Blue;
     // Color of the control when active - only button supports it ATM.
-    Color_t ControlActiveColor = Blue;
+    Color_t ActiveColor = Blue;
     // Size of the control - only button supports it ATM. 0s sizes
     // the button to the length of the text
-    Size_t ControlSize = Size_t{0, 0};
+    Size_t Size = Size_t{0, 0};
 
     // Numeric indicator/controls specific
     double StepSize = 0.0;
     // Numeric indicator/controls specific - Follow printf conventions
     std::string_view Format = "%.3f";
-
-    // Plot specific - What type of plot are we using
-    PlotType_t PlotType = PlotTypeEnum::Line;
-    // Plot specific - Clear on new data (maybe will  be removed later)
-    bool CleanOnNewData = false;
 };
 
 enum class ControlTypes { InputText, Button, Checkbox, InputInt, InputFloat,
@@ -135,6 +130,66 @@ struct Indicator {
     {}
 };
 
+template<size_t NPlots = 1, size_t NYAxis = 1>
+struct PlotOptions {
+    static_assert(NYAxis >= 4, "More than 4 axes not allowed.");
+    static_assert(NPlots < NYAxis, "Number of graphs has to be equal or higher"
+        " than the number of y-axes");
+    static_assert(NPlots > 0, "There must be a least one plot!");
+
+    PlotType_t PlotType = PlotTypeEnum::Line;
+    bool ShowAllOptions = false;
+
+    // Labels of each plot
+    std::array<std::string_view, NPlots> PlotLabels;
+    // Group (in term of axes) where each plot belongs. Max 3
+    std::array<unsigned int, NPlots> PlotGroupings;
+
+    const std::string_view XAxisLabel = "x";
+    std::string_view XAxisUnit = "[arb.]";
+    ImPlotScale XAxisScale = ImPlotScale_Linear;
+    ImPlotAxisFlags XAxisFlags = ImPlotAxisFlags_None;
+
+    const std::array<std::string_view, NYAxis> YAxisLabels = {"y"};
+    std::array<std::string_view, NYAxis> YAxisUnits = {"[arb.]"};
+    std::array<ImPlotScale, NYAxis> YAxisScales;
+    std::array<ImPlotAxisFlags, NYAxis> YAxisFlags;
+};
+
+template<StringLiteral list, size_t NPlots = 1, size_t NYAxis = 1>
+struct PlotIndicator {
+    static_assert(NYAxis >= 4, "More than 4 axes not allowed.");
+    static_assert(NPlots < NYAxis, "Number of graphs has to be equal or higher"
+        " than the number of y-axes");
+    static_assert(NPlots > 0, "There must be a least one plot!");
+
+    const std::string_view Label = "";
+    const std::string_view Text = "";
+    const std::string_view HelpText = "";
+
+    // What type of plot are we using
+    PlotOptions<NPlots, NYAxis> PlotDrawOptions;
+    const DrawingOptions DrawOptions;
+
+    constexpr ~PlotIndicator() {}
+
+    constexpr PlotIndicator() = default;
+    constexpr PlotIndicator(
+        const std::string_view& text, const std::string_view& help_text,
+        const PlotOptions<NPlots, NYAxis>& plot_draw_opts = PlotOptions<NYAxis>{},
+        const DrawingOptions& draw_opts = DrawingOptions{}) :
+        Label{list.value},
+        Text{text},
+        HelpText{help_text},
+        PlotDrawOptions{plot_draw_opts},
+        DrawOptions{draw_opts}
+    { }
+
+    explicit constexpr PlotIndicator(const std::string_view& text) :
+        PlotIndicator{text, ""}
+    {}
+};
+
 // Controls
 template<StringLiteral Label>
 bool InputText(const Control<ControlTypes::InputText, Label>&,
@@ -146,13 +201,13 @@ template<StringLiteral Label>
 bool Button(const Control<ControlTypes::Button, Label>& control,
             bool& out) {
     ImGui::PushStyleColor(ImGuiCol_Button,
-        control.DrawOptions.ControlColor);
+        control.DrawOptions.Color);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        control.DrawOptions.ControlHoveredColor);
+        control.DrawOptions.HoveredColor);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        control.DrawOptions.ControlActiveColor);
+        control.DrawOptions.ActiveColor);
 
-    out = ImGui::Button(Label.value, control.DrawOptions.ControlSize);
+    out = ImGui::Button(Label.value, control.DrawOptions.Size);
 
     ImGui::PopStyleColor(3);
     return out;
@@ -319,11 +374,11 @@ void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
     constexpr auto label_name = Label.value;
     constexpr auto format = indicator.DrawOptions.Format;
     ImGui::PushStyleColor(ImGuiCol_Button,
-        indicator.DrawOptions.ControlColor);
+        indicator.DrawOptions.Color);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        indicator.DrawOptions.ControlHoveredColor);
+        indicator.DrawOptions.HoveredColor);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        indicator.DrawOptions.ControlActiveColor);
+        indicator.DrawOptions.ActiveColor);
 
     if (not indicator.DrawOptions.Format.starts_with("%")) {
         throw "Not a valid format string. It must start with %";
@@ -333,7 +388,7 @@ void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
         + indicator.DrawOptions.Format.remove_prefix(1) + "}##{}";
 
     ImGui::Button(fmt::vformat(format_string, in_value, label_name).c_str(),
-        indicator.DrawOptions.ControlSize);
+        indicator.DrawOptions.Size);
 
     ImGui::PopStyleColor(3);
 }
@@ -343,14 +398,14 @@ void String(const Indicator<IndicatorTypes::String, Label>& indicator,
     std::string_view in_value) {
     constexpr auto label_name = Label.value;
     ImGui::PushStyleColor(ImGuiCol_Button,
-        indicator.DrawOptions.ControlColor);
+        indicator.DrawOptions.Color);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        indicator.DrawOptions.ControlHoveredColor);
+        indicator.DrawOptions.HoveredColor);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        indicator.DrawOptions.ControlActiveColor);
+        indicator.DrawOptions.ActiveColor);
 
     ImGui::Button(fmt::format("{}##{}", in_value, label_name).c_str(),
-        indicator.DrawOptions.ControlSize);
+        indicator.DrawOptions.Size);
 
     ImGui::PopStyleColor(3);
 }
@@ -364,11 +419,11 @@ void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
 
     if (in_value) {
         ImGui::PushStyleColor(ImGuiCol_Button,
-            indicator.DrawOptions.ControlColor);
+            indicator.DrawOptions.Color);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-            indicator.DrawOptions.ControlHoveredColor);
+            indicator.DrawOptions.HoveredColor);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-            indicator.DrawOptions.ControlActiveColor);
+            indicator.DrawOptions.ActiveColor);
     } else {
         const auto off_color =
             static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f));
@@ -378,7 +433,7 @@ void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
     }
 
     ImGui::Button(fmt::format("##{}", label_name).c_str(),
-        indicator.DrawOptions.ControlSize);
+        indicator.DrawOptions.Size);
 
     ImGui::PopStyleColor(3);
 }
@@ -392,10 +447,64 @@ void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
     LED<Label>(indicator, condition(in_value));
 }
 
+template<StringLiteral Label, size_t NPlots, size_t NYAxis>
+void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
+    const PlotDataBuffer<NPlots>& plot_data) {
+    static_assert(NYAxis >= 4, "Plotting does not support more than 4 axis");
 
+    if (ImPlot::BeginPlot(Label.value, plot.DrawOptions.Size)) {
+        ImPlot::SetupAxisScale(ImAxis_X1, plot.PlotDrawOptions.XAxisScale);
+        ImPlot::SetupAxes(
+            std::string(plot.PlotDrawOptions.XAxisLabel
+                        + plot.PlotDrawOptions.XAxisUnit).c_str(),
+            std::string(plot.PlotDrawOptions.YAxisLabels[0]
+                        + plot.PlotDrawOptions.YAxisUnits[0]).c_str(),
+            plot.PlotDrawOptions.XAxisFlags,
+            plot.PlotDrawOptions.YAxisFlags[0]);
 
+        if constexpr (NYAxis == 2) {
+            ImPlot::SetupAxis(ImAxis_Y2,
+                              plot.PlotDrawOptions.YAxisLabels[1],
+                              plot.PlotDrawOptions.YAxisFlags[1]);
+        } else if constexpr (NYAxis == 3) {
+            ImPlot::SetupAxis(ImAxis_Y2,
+                              plot.PlotDrawOptions.YAxisLabels[1],
+                              plot.PlotDrawOptions.YAxisFlags[1]);
+            ImPlot::SetupAxis(ImAxis_Y3,
+                              plot.PlotDrawOptions.YAxisLabels[1],
+                              plot.PlotDrawOptions.YAxisFlags[2]);
+        }
 
+        static auto transform = [](std::size_t i)
+        {
+            return [_i = i](int idx, void* data) {
+                auto myData = static_cast<PlotDataBuffer<NPlots>*>(data);
+                auto data_column = (*myData)[idx];
+                return ImPlotPoint(data_column(0), data_column(_i));
+            };
+        };
 
+        for (std::size_t i = 1; i < NPlots; i++) {
+            switch (plot.PlotDrawOptions.PlotType) {
+                case PlotTypeEnum::Scatter:
+                    ImPlot::PlotScatterG(plot.PlotDrawOptions.PlotLabels[i],
+                                         transform(i),
+                                         &plot_data,
+                                         plot_data.size());
+                break;
+                case PlotTypeEnum::Line:
+                default:
+                    ImPlot::PlotLineG(plot.PlotDrawOptions.PlotLabels[i],
+                         transform(i),
+                         &plot_data,
+                         plot_data.size());
+                break;
+            }
+        }
+
+        ImPlot::EndPlot();
+    }
+}
 
 template<ControlTypes T, StringLiteral Label, typename... Types>
 constexpr static auto get_control(const std::tuple<Types...>& list) {
