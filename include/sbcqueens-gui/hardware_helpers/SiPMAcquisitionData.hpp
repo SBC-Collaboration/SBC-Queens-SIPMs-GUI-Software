@@ -89,6 +89,9 @@ struct SiPMAcquisitionData {
     std::string SiPMName = "";
     BreakdownVoltageConfigData VBDData;
 
+    // Indicator/"Out" data members
+    uint32_t FileStatistics = 0;
+
     // This API required items.
     bool Changed = false;
     SiPMAcquisitionDataPipeCallback Callback;

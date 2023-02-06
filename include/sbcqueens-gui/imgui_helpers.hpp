@@ -104,12 +104,17 @@ struct Control {
 };
 
 
-enum class IndicatorTypes { Numerical, String, LED, Plot };
+enum class IndicatorTypes { Numerical, String, LED };
 
-template<IndicatorTypes IndicatorType, StringLiteral list>
+template<IndicatorTypes IndicatorType, StringLiteral Label>
 struct Indicator {
-    const std::string_view Label = "";
+    // Label of the indicator that is drawn depending on
+    // DrawOptions.TextPosition value
     const std::string_view Text = "";
+    // Units label that is always drawn on the right of the indicator
+    // only drawn on NumericalIndicator
+    const std::string_view UnitText = "";
+    // Help text that appears when hovering the text.
     const std::string_view HelpText = "";
     const DrawingOptions DrawOptions;
 
@@ -117,33 +122,53 @@ struct Indicator {
 
     constexpr Indicator() = default;
     constexpr Indicator(
-        const std::string_view& text, const std::string_view& help_text,
+        std::string_view text,
+        std::string_view units,
+        std::string_view help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
-        Label{list.value},
         Text{text},
+        UnitText{units},
         HelpText{help_text},
         DrawOptions{draw_opts}
     {}
 
-    explicit constexpr Indicator(const std::string_view& text) :
-        Indicator{text, ""}
+    // Sets the Text equal to the Label, and sets drawing options to the
+    // defaults.
+    explicit constexpr Indicator(std::string_view help_text) :
+        Indicator{Label.value, "", help_text}
+    {}
+
+    explicit constexpr Indicator(std::string_view units,
+        std::string_view help_text) :
+        Indicator{Label.value, units, help_text}
     {}
 };
 
+template<StringLiteral ConstLabel>
+using NumericalIndicator = Indicator<IndicatorTypes::Numerical, ConstLabel>;
+template<StringLiteral ConstLabel>
+using StringIndicator = Indicator<IndicatorTypes::String, ConstLabel>;
+template<StringLiteral ConstLabel>
+using LEDIndicator = Indicator<IndicatorTypes::LED, ConstLabel>;
+
+using PlotGroupings_t = enum class PlotGroupingsEnum { One, Two, Three };
+
 template<size_t NPlots = 1, size_t NYAxis = 1>
 struct PlotOptions {
-    static_assert(NYAxis >= 4, "More than 4 axes not allowed.");
-    static_assert(NPlots < NYAxis, "Number of graphs has to be equal or higher"
+    static_assert(NYAxis < 4, "More than 4 axes not allowed.");
+    static_assert(NPlots >= NYAxis, "Number of graphs has to be equal or higher"
         " than the number of y-axes");
     static_assert(NPlots > 0, "There must be a least one plot!");
 
+    // Type of plot drawn
     PlotType_t PlotType = PlotTypeEnum::Line;
+    //
     bool ShowAllOptions = false;
 
     // Labels of each plot
     std::array<std::string_view, NPlots> PlotLabels;
     // Group (in term of axes) where each plot belongs. Max 3
-    std::array<unsigned int, NPlots> PlotGroupings;
+    std::array<PlotGroupings_t, NPlots> PlotGroupings;
 
     const std::string_view XAxisLabel = "x";
     std::string_view XAxisUnit = "[arb.]";
@@ -158,32 +183,35 @@ struct PlotOptions {
 
 template<StringLiteral list, size_t NPlots = 1, size_t NYAxis = 1>
 struct PlotIndicator {
-    static_assert(NYAxis >= 4, "More than 4 axes not allowed.");
-    static_assert(NPlots < NYAxis, "Number of graphs has to be equal or higher"
+    static_assert(NYAxis < 4, "More than 4 axes not allowed.");
+    static_assert(NPlots >= NYAxis, "Number of graphs has to be equal or higher"
         " than the number of y-axes");
     static_assert(NPlots > 0, "There must be a least one plot!");
 
     const std::string_view Label = "";
-    const std::string_view Text = "";
-    const std::string_view HelpText = "";
+    // const std::string_view Text = "";
+    // const std::string_view HelpText = "";
 
-    // What type of plot are we using
+    // Information about the plots, their axes, and names
     PlotOptions<NPlots, NYAxis> PlotDrawOptions;
     const DrawingOptions DrawOptions;
 
     constexpr ~PlotIndicator() {}
 
     constexpr PlotIndicator() = default;
-    constexpr PlotIndicator(
-        const std::string_view& text, const std::string_view& help_text,
+    explicit constexpr PlotIndicator(
+        // const std::string_view& text, const std::string_view& help_text,
         const PlotOptions<NPlots, NYAxis>& plot_draw_opts = PlotOptions<NYAxis>{},
         const DrawingOptions& draw_opts = DrawingOptions{}) :
         Label{list.value},
-        Text{text},
-        HelpText{help_text},
+        // Text{text},
+        // HelpText{help_text},
         PlotDrawOptions{plot_draw_opts},
         DrawOptions{draw_opts}
-    { }
+    {
+        // static_assert(, );
+
+    }
 
     explicit constexpr PlotIndicator(const std::string_view& text) :
         PlotIndicator{text, ""}
@@ -485,20 +513,31 @@ void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
         };
 
         for (std::size_t i = 1; i < NPlots; i++) {
+            switch (plot.PlotDrawOptions.PlotGroupings[i]) {
+            case PlotGroupingsEnum::Two:
+                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+            break;
+            case PlotGroupingsEnum::Three:
+                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
+            break;
+            default:
+                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+            }
+
             switch (plot.PlotDrawOptions.PlotType) {
-                case PlotTypeEnum::Scatter:
-                    ImPlot::PlotScatterG(plot.PlotDrawOptions.PlotLabels[i],
-                                         transform(i),
-                                         &plot_data,
-                                         plot_data.size());
-                break;
-                case PlotTypeEnum::Line:
-                default:
-                    ImPlot::PlotLineG(plot.PlotDrawOptions.PlotLabels[i],
-                         transform(i),
-                         &plot_data,
-                         plot_data.size());
-                break;
+            case PlotTypeEnum::Scatter:
+                ImPlot::PlotScatterG(plot.PlotDrawOptions.PlotLabels[i],
+                                     transform(i),
+                                     &plot_data,
+                                     plot_data.size());
+            break;
+            case PlotTypeEnum::Line:
+            default:
+                ImPlot::PlotLineG(plot.PlotDrawOptions.PlotLabels[i],
+                                  transform(i),
+                                  &plot_data,
+                                  plot_data.size());
+            break;
             }
         }
 
@@ -516,7 +555,8 @@ constexpr static auto get_indicator(const std::tuple<Types...>& list) {
     return std::get<Indicator<T, Label>>(list);
 }
 
-template<ControlTypes T, StringLiteral Label, typename OutType, typename... Args>
+template<ControlTypes T, StringLiteral Label,
+         typename OutType, typename... Args>
 constexpr bool get_draw_function(const Control<T, Label>& control,
                                  OutType& out, Args&&... args) {
     if constexpr (T == ControlTypes::Button) {
@@ -554,7 +594,8 @@ constexpr bool get_draw_function(const Control<T, Label>& control,
     throw("Draw function not supported");
 }
 
-template<IndicatorTypes T, StringLiteral Label, typename InType, typename... Args>
+template<IndicatorTypes T, StringLiteral Label,
+         typename InType, typename... Args>
 constexpr void get_draw_function(const Indicator<T, Label>& indicator,
                                  InType& in, Args&&... args) {
     if constexpr (T == IndicatorTypes::Numerical) {
@@ -578,7 +619,6 @@ constexpr void get_draw_function(const Indicator<T, Label>& indicator,
             LED(indicator, in, args...);
             return;
         }
-    } else if constexpr (T == IndicatorTypes::Plot) {
     }
 }
 
@@ -598,7 +638,7 @@ void __draw_imgui_begin(const DrawItem& item) {
 
 template<typename DrawItem>
 void __draw_imgui_end(const DrawItem& item) {
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered() and not item.HelpText.empty()) {
         ImGui::SetTooltip("%s", std::string(item.HelpText).c_str());
     }
 
@@ -639,13 +679,17 @@ bool draw_control(const Control<T, Label>& control,
 }
 
 template<IndicatorTypes T, StringLiteral Label,
-    typename DataType,
     typename InType,
     typename... Args>
-bool draw_indicator(const Indicator<T, Label>& indicator,
+void draw_indicator(const Indicator<T, Label>& indicator,
     InType& in, const Args&... args) {
     __draw_imgui_begin(indicator);
     get_draw_function(indicator, in, args...);
+
+    if constexpr(T == IndicatorTypes::Numerical){
+        ImGui::SameLine();
+        ImGui::Text("%s", indicator.UnitText);
+    }
     __draw_imgui_end(indicator);
 }
 

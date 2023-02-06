@@ -1,11 +1,17 @@
 #include "sbcqueens-gui/gui_windows/IndicatorWindow.hpp"
 
+#include "sbcqueens-gui/gui_windows/IndicatorList.hpp"
+#include "sbcqueens-gui/imgui_helpers.hpp"
+
 namespace SBCQueens {
 void IndicatorWindow::init_window(const toml::table&) {
     // Nothing to do here for this window :)
 }
 
 void IndicatorWindow::draw() {
+    constexpr auto file_stats = get_indicator<IndicatorTypes::Numerical,
+                                        "File Statistics">(SiPMGUIIndicators);
+    draw_indicator(file_stats, _sipm_doe.FileStatistics);
     // ImGui::Text("File Statistics");
     // _indicator_receiver.indicator(
     //     IndicatorNames::SAVED_WAVEFORMS, "Saved SiPM Pulses", 200);
