@@ -41,11 +41,11 @@ void SiPMControlWindow::draw()  {
     draw_control(reset_caen, _sipm_data, tmp,
         [&](){ return tmp; },
         // Callback when IsItemEdited !
-        [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
+        [&](SiPMAcquisitionData& doe_twin) {
             if (doe_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode ||
             doe_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
                 // Setting it to AttemptConnection will force it to reset
-                doe_twin = doe;
+                doe_twin = _sipm_data;
                 doe_twin.SiPMVoltageSysChange = false;
                 doe_twin.CurrentState = SiPMAcquisitionStates::AttemptConnection;
             }
@@ -70,8 +70,8 @@ void SiPMControlWindow::draw()  {
     draw_control(sipm_id, _sipm_data, _sipm_data.SiPMID,
         ImGui::IsItemEdited,
         // Callback when IsItemEdited !
-        [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
-          doe_twin.SiPMID = doe.SiPMID;
+        [&](SiPMAcquisitionData& doe_twin) {
+          doe_twin.SiPMID = _sipm_data.SiPMID;
     });
 
     // if (ImGui::IsItemHovered()) {
@@ -83,8 +83,8 @@ void SiPMControlWindow::draw()  {
     draw_control(sipm_cell, _sipm_data,
         _sipm_data.CellNumber, ImGui::IsItemEdited,
         // Callback when IsItemEdited !
-        [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
-          doe_twin.CellNumber = doe.CellNumber;
+        [&](SiPMAcquisitionData& doe_twin) {
+          doe_twin.CellNumber = _sipm_data.CellNumber;
     });
     // CAENControlFac.InputScalar("SiPM Cell", cgui_state.CellNumber,
     //     ImGui::IsItemDeactivated, [=](CAENInterfaceData& old){
@@ -106,13 +106,12 @@ void SiPMControlWindow::draw()  {
     draw_control(ps_enable, _sipm_data, _sipm_data.SiPMVoltageSysSupplyEN,
         ImGui::IsItemEdited,
         // Callback when IsItemEdited !
-        [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
+        [&](SiPMAcquisitionData& doe_twin) {
             // he expects.
+            doe_twin.SiPMVoltageSysSupplyEN = _sipm_data.SiPMVoltageSysSupplyEN;
             if (doe_twin.SiPMVoltageSysVoltage >= 60.0f) {
                 doe_twin.SiPMVoltageSysVoltage = 60.0f;
             }
-
-            doe_twin.SiPMVoltageSysSupplyEN = doe.SiPMVoltageSysSupplyEN;
     });
     // CAENControlFac.Checkbox("PS Enable", cgui_state.SiPMVoltageSysSupplyEN,
     //     ImGui::IsItemEdited, [=](CAENInterfaceData& old) {
@@ -157,18 +156,19 @@ void SiPMControlWindow::draw()  {
     draw_control(sipm_voltage, _sipm_data, _sipm_data.SiPMVoltageSysVoltage,
         ImGui::IsItemDeactivated,
         // Callback when IsItemEdited !
-        [doe = _sipm_data](SiPMAcquisitionData& doe_twin) {
+        [&](SiPMAcquisitionData& doe_twin) {
             // Ignore the input under BVMode or RunMode
             if (doe_twin.CurrentState
                 == SiPMAcquisitionStates::MeasurementRoutineMode) {
                 return;
             }
 
-            if (doe.SiPMVoltageSysVoltage >= 60.0f) {
+            doe_twin.SiPMVoltageSysVoltage = _sipm_data.SiPMVoltageSysVoltage;
+
+            if (doe_twin.SiPMVoltageSysVoltage >= 60.0f) {
                 doe_twin.SiPMVoltageSysVoltage = 60.0f;
             }
 
-            doe_twin.SiPMVoltageSysVoltage = doe.SiPMVoltageSysVoltage;
             doe_twin.SiPMVoltageSysChange = true;
     });
 
@@ -196,13 +196,12 @@ void SiPMControlWindow::draw()  {
     draw_control(start_meas_routine, _sipm_data,
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
-        [doe = _sipm_data, t_doe = _teensy_data]
-        (SiPMAcquisitionData& doe_twin) {
+        [&](SiPMAcquisitionData& doe_twin) {
             if (doe_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode) {
                 doe_twin.CurrentState = SiPMAcquisitionStates::MeasurementRoutineMode;
 
                 if (doe_twin.SiPMVoltageSysSupplyEN) {
-                    doe_twin.LatestTemperature = t_doe.PIDTempValues.SetPoint;
+                    doe_twin.LatestTemperature = _teensy_data.PIDTempValues.SetPoint;
                 } else {
                     spdlog::warn("Gain calculation cannot start without "
                         "enabling the power supply.");
@@ -244,7 +243,7 @@ void SiPMControlWindow::draw()  {
     draw_control(cancel_meas_routine, _sipm_data,
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
-        [] (SiPMAcquisitionData& doe_twin) {
+        [](SiPMAcquisitionData& doe_twin) {
             if (doe_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
                 doe_twin.CancelMeasurements = true;
             }

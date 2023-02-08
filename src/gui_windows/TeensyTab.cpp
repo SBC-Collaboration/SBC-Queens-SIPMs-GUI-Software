@@ -96,10 +96,9 @@ void TeensyTab::draw() {
         draw_control(peltier_switch, _teensy_doe, _teensy_doe.PeltierPIDState,
             ImGui::IsItemEdited,
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
+            [&](TeensyControllerData& teensy_twin) {
                 teensy_twin.CommandToSend = TeensyCommands::SetPPID;
-                teensy_twin.PeltierPIDState = doe.PeltierPIDState;
+                teensy_twin.PeltierPIDState = _teensy_doe.PeltierPIDState;
         });
 
 
@@ -118,10 +117,9 @@ void TeensyTab::draw() {
         draw_control(pid_switch, _teensy_doe, _teensy_doe.PidRTD,
             ImGui::IsItemEdited,
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
+            [&](TeensyControllerData& teensy_twin) {
                 teensy_twin.CommandToSend = TeensyCommands::SetPPIDRTD;
-                teensy_twin.PidRTD = doe.PidRTD;
+                teensy_twin.PidRTD = _teensy_doe.PidRTD;
         });
 
         // TeensyControlFac.ComboBox("PID State",
@@ -146,10 +144,9 @@ void TeensyTab::draw() {
         draw_control(update_period, _teensy_doe,
             _teensy_doe.PeltierPidUpdatePeriod, ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
+            [&](TeensyControllerData& teensy_twin) {
                 teensy_twin.CommandToSend = TeensyCommands::SetPPIDUpdatePeriod;
-                teensy_twin.PeltierPidUpdatePeriod = doe.PeltierPidUpdatePeriod;
+                teensy_twin.PeltierPidUpdatePeriod = _teensy_doe.PeltierPidUpdatePeriod;
         });
         // TeensyControlFac.InputScalar("Update Period (ms)",
         //     _teensy_doe.PeltierPidUpdatePeriod,
@@ -177,10 +174,9 @@ void TeensyTab::draw() {
         draw_control(peltier_trip_p, _teensy_doe, _teensy_doe.PIDTempTripPoint,
             ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
+            [&](TeensyControllerData& teensy_twin) {
                 teensy_twin.CommandToSend = TeensyCommands::SetPPIDTripPoint;
-                teensy_twin.PIDTempTripPoint = doe.PIDTempTripPoint;
+                teensy_twin.PIDTempTripPoint = _teensy_doe.PIDTempTripPoint;
         });
 
         // TeensyControlFac.InputFloat("Peltier T Setpoint",
@@ -198,10 +194,9 @@ void TeensyTab::draw() {
         draw_control(peltier_t_set, _teensy_doe,
             _teensy_doe.PIDTempValues.SetPoint, ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
+            [&] (TeensyControllerData& teensy_twin) {
                 teensy_twin.CommandToSend = TeensyCommands::SetPPIDTempSetpoint;
-                teensy_twin.PIDTempValues.SetPoint = doe.PIDTempValues.SetPoint;
+                teensy_twin.PIDTempValues.SetPoint = _teensy_doe.PIDTempValues.SetPoint;
         });
 
         // TeensyControlFac.InputFloat("PKp",
@@ -219,10 +214,9 @@ void TeensyTab::draw() {
         draw_control(pkp, _teensy_doe, _teensy_doe.PIDTempValues.Kp,
             ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
+            [&](TeensyControllerData& teensy_twin) {
                 teensy_twin.CommandToSend = TeensyCommands::SetPPIDTempKp;
-                teensy_twin.PIDTempValues.Kp = doe.PIDTempValues.Kp;
+                teensy_twin.PIDTempValues.Kp = _teensy_doe.PIDTempValues.Kp;
         });
 
         // TeensyControlFac.InputFloat("PTi",
@@ -260,10 +254,9 @@ void TeensyTab::draw() {
         draw_control(ptd, _teensy_doe, _teensy_doe.PIDTempValues.Td,
             ImGui::IsItemDeactivated,
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
+            [&](TeensyControllerData& teensy_twin) {
                 teensy_twin.CommandToSend = TeensyCommands::SetPPIDTempTd;
-                teensy_twin.PIDTempValues.Td = doe.PIDTempValues.Td;
+                teensy_twin.PIDTempValues.Td = _teensy_doe.PIDTempValues.Td;
         });
 
         // TeensyControlFac.Button("Reset PPID",
@@ -280,9 +273,8 @@ void TeensyTab::draw() {
         draw_control(reset_ppid, _teensy_doe,
             tmp, [&](){ return tmp; },
             // Callback when IsItemEdited !
-            [doe = _teensy_doe]
-            (TeensyControllerData& teensy_twin) {
-                 teensy_twin.CommandToSend = TeensyCommands::ResetPPID;
+            [](TeensyControllerData& teensy_twin) {
+                teensy_twin.CommandToSend = TeensyCommands::ResetPPID;
         });
     }
 }

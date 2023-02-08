@@ -178,7 +178,10 @@ class GUIManager : public ThreadManager<Pipes> {
         //         IndicatorNames::VACUUM_PRESS);
         // }
 
-        // if (ImGui::BeginTabBar("Other Plots")) {
+        if (ImGui::BeginTabBar("Other Plots")) {
+            constexpr auto test_plot = get_plot<"I-V", 2, 2>(GUIPlots);
+
+        }
         //     // if (!_teensy_doe.SystemParameters.InRTDOnlyMode) {
         //     //     if (ImGui::BeginTabItem("Local BME")) {
         //     //         if (ImPlot::BeginPlot("Local BME", ImVec2(-1, 0))) {

@@ -129,8 +129,7 @@ void RunTab::draw() {
     draw_control(disconnect_teensy, _teensy_doe,
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
-        [doe = _teensy_doe, run_dir = i_run_dir]
-        (TeensyControllerData& teensy_twin) {
+        [](TeensyControllerData& teensy_twin) {
             if (teensy_twin.CurrentState == TeensyControllerStates::Connected) {
                 teensy_twin.CurrentState
                     = TeensyControllerStates::Disconnected;
@@ -148,8 +147,8 @@ void RunTab::draw() {
     draw_control(sipm_port, _sipm_doe,
         _sipm_doe.PortNum, ImGui::IsItemEdited,
         // Callback when IsItemEdited !
-        [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-          caen_twin.PortNum = doe.PortNum;
+        [&](SiPMAcquisitionData& caen_twin) {
+          caen_twin.PortNum = _sipm_doe.PortNum;
     });
 
     ImGui::SameLine();
@@ -192,8 +191,8 @@ void RunTab::draw() {
     draw_control(keith_com, _sipm_doe,
         _sipm_doe.SiPMVoltageSysPort, ImGui::IsItemEdited,
         // Callback when IsItemEdited !
-        [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-          caen_twin.SiPMVoltageSysPort = doe.SiPMVoltageSysPort;
+        [&](SiPMAcquisitionData& caen_twin) {
+          caen_twin.SiPMVoltageSysPort = _sipm_doe.SiPMVoltageSysPort;
     });
 
     // ImGui::SameLine(300);
@@ -259,8 +258,7 @@ void RunTab::draw() {
     draw_control(disconnect_caen, _sipm_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
-        [doe = _sipm_doe]
-        (SiPMAcquisitionData& caen_twin) {
+        [](SiPMAcquisitionData& caen_twin) {
             if(caen_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode ||
                 caen_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
                     caen_twin.CurrentState = SiPMAcquisitionStates::Disconnected;
@@ -280,9 +278,8 @@ void RunTab::draw() {
     draw_control(pfeiffer_port, _slowdaq_doe,
         _slowdaq_doe.PFEIFFERPort, ImGui::IsItemEdited,
         // Callback when tmp is true !
-        [doe = _slowdaq_doe]
-        (SlowDAQData& doe_twin) {
-            doe_twin.PFEIFFERPort = doe.PFEIFFERPort;
+        [&](SlowDAQData& doe_twin) {
+            doe_twin.PFEIFFERPort = _slowdaq_doe.PFEIFFERPort;
     });
 
     ImGui::SameLine(300);
@@ -317,8 +314,7 @@ void RunTab::draw() {
     draw_control(connect_slowdaq, _slowdaq_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
-        [doe = _slowdaq_doe]
-        (SlowDAQData& doe_twin) {
+        [](SlowDAQData& doe_twin) {
             doe_twin.PFEIFFERState = PFEIFFERSSGState::AttemptConnection;
     });
 
@@ -352,8 +348,7 @@ void RunTab::draw() {
     draw_control(disconnect_slowdaq, _slowdaq_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
-        [doe = _slowdaq_doe]
-        (SlowDAQData& doe_twin) {
+        [](SlowDAQData& doe_twin) {
             if (doe_twin.PFEIFFERState == PFEIFFERSSGState::AttemptConnection ||
                 doe_twin.PFEIFFERState == PFEIFFERSSGState::Connected){
                     doe_twin.PFEIFFERState = PFEIFFERSSGState::Disconnected;

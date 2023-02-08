@@ -493,8 +493,6 @@ void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
 template<StringLiteral Label, size_t NPlots, size_t NYAxis>
 void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
     const PlotDataBuffer<NPlots>& plot_data) {
-    static_assert(NYAxis >= 4, "Plotting does not support more than 4 axis");
-
     if (ImPlot::BeginPlot(Label.value, plot.DrawOptions.Size)) {
         ImPlot::SetupAxisScale(ImAxis_X1, plot.PlotDrawOptions.XAxisScale);
         ImPlot::SetupAxes(
@@ -568,6 +566,14 @@ constexpr static auto get_control(const std::tuple<Types...>& list) {
 template<IndicatorTypes T, StringLiteral Label, typename... Types>
 constexpr static auto get_indicator(const std::tuple<Types...>& list) {
     return std::get<Indicator<T, Label>>(list);
+}
+
+template<StringLiteral Label,
+         size_t NPlots = 1,
+         size_t NYAxis = 1,
+         typename... Types>
+constexpr static auto get_plot(const std::tuple<Types...>& list) {
+    return std::get<PlotIndicator<Label>>(list);
 }
 
 template<ControlTypes T, StringLiteral Label,
