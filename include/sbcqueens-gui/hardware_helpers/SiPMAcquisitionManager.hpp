@@ -348,7 +348,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         if (_sipm_pipe_end.retrieve(task)) {
             task.Callback(_doe);
             switch_state(_doe.CurrentState);
-            spdlog::info("{0}", _doe.SiPMVoltageSysPort);
+            spdlog::info("S: {0}", _doe.SiPMVoltageSysPort);
         }
 
         return false;

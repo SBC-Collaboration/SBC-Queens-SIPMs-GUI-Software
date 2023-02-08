@@ -92,11 +92,13 @@ struct Control {
         const std::string_view& text, const std::string_view& help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
         Label{list.value},
-        // ControlType{ct},
         Text{text},
         HelpText{help_text},
         DrawOptions{draw_opts}
-    {}
+    {
+        // static_assert(DrawOptions.Format.starts_with("%"), "format string must"
+        //     "start with %");
+    }
 
     explicit constexpr Control(const std::string_view& text) :
         Control{text, ""}
@@ -130,7 +132,13 @@ struct Indicator {
         UnitText{units},
         HelpText{help_text},
         DrawOptions{draw_opts}
-    {}
+    {
+        // static_assert(DrawOptions.Format.starts_with("%"), "format string must"
+        //     "start with %");
+        // Remove the % from the format string, as we will not need it for
+        // all the indicators.
+        // DrawOptions.Format.remove_prefix(1);
+    }
 
     // Sets the Text equal to the Label, and sets drawing options to the
     // defaults.
@@ -142,6 +150,8 @@ struct Indicator {
         std::string_view help_text) :
         Indicator{Label.value, units, help_text}
     {}
+ private:
+    const std::string_view _full_format_string;
 };
 
 template<StringLiteral ConstLabel>
@@ -397,10 +407,11 @@ bool ComboBox(const Control<ControlTypes::ComboBox, Label>& control, T& state,
 // Indicators
  // { Numerical, String, LED, Plot };
 template<StringLiteral Label, typename InputType>
+requires std::is_floating_point_v<InputType> || std::is_integral_v<InputType>
 void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
     const InputType& in_value) {
-    constexpr auto label_name = Label.value;
-    constexpr auto format = indicator.DrawOptions.Format;
+    const auto& label_name = Label.value;
+    const auto& format = indicator.DrawOptions.Format;
     ImGui::PushStyleColor(ImGuiCol_Button,
         indicator.DrawOptions.Color);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
@@ -412,11 +423,15 @@ void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
         throw "Not a valid format string. It must start with %";
     }
 
-    auto format_string = "{:"
-        + indicator.DrawOptions.Format.remove_prefix(1) + "}##{}";
-
-    ImGui::Button(fmt::vformat(format_string, in_value, label_name).c_str(),
-        indicator.DrawOptions.Size);
+    if constexpr (std::is_integral_v<InputType>) {
+        ImGui::Button(fmt::format("{}##{}", in_value, label_name).c_str(),
+                      indicator.DrawOptions.Size);
+    } else if (std::is_floating_point_v<InputType>) {
+        // So inefficient!
+        auto format_string = "{:" + std::string(format).substr(1) + "}##{}";
+        ImGui::Button(fmt::format("{}##{}", in_value, label_name).c_str(),
+                      indicator.DrawOptions.Size);
+    }
 
     ImGui::PopStyleColor(3);
 }
@@ -424,7 +439,7 @@ void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
 template<StringLiteral Label>
 void String(const Indicator<IndicatorTypes::String, Label>& indicator,
     std::string_view in_value) {
-    constexpr auto label_name = Label.value;
+    const auto& label_name = Label.value;
     ImGui::PushStyleColor(ImGuiCol_Button,
         indicator.DrawOptions.Color);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
@@ -443,7 +458,7 @@ void String(const Indicator<IndicatorTypes::String, Label>& indicator,
 template<StringLiteral Label>
 void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
     const bool& in_value) {
-    constexpr auto label_name = Label.value;
+    const auto& label_name = Label.value;
 
     if (in_value) {
         ImGui::PushStyleColor(ImGuiCol_Button,
@@ -661,8 +676,8 @@ template<ControlTypes T, StringLiteral Label,
     typename Callback = std::function<void(DataType&)>,
     typename... Args>
 bool draw_control(const Control<T, Label>& control,
-    DataType& doe,
-    OutType& out, std::function<bool(void)>&& condition,
+    DataType& doe, OutType& out,
+    std::function<bool(void)>&& condition,
     Callback&& callback, const Args&... args) {
     bool imgui_out_state = false;
 
@@ -671,6 +686,7 @@ bool draw_control(const Control<T, Label>& control,
     __draw_imgui_end(control);
 
     if (condition()) {
+        spdlog::info("I");
         doe.Callback = callback;
         doe.Changed = true;
     }
@@ -688,7 +704,7 @@ void draw_indicator(const Indicator<T, Label>& indicator,
 
     if constexpr(T == IndicatorTypes::Numerical){
         ImGui::SameLine();
-        ImGui::Text("%s", indicator.UnitText);
+        ImGui::Text("%s", std::string(indicator.UnitText).c_str());
     }
     __draw_imgui_end(indicator);
 }

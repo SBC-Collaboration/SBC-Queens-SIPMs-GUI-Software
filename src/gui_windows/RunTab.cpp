@@ -56,12 +56,12 @@ void RunTab::draw() {
 
     ImGui::SameLine(300);
     // Colors to pop up or shadow it depending on the conditions
-    ImGui::PushStyleColor(ImGuiCol_Button,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, connected_mod*0.6f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, connected_mod*0.7f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, connected_mod*0.8f)));
+    // ImGui::PushStyleColor(ImGuiCol_Button,
+    //     static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, connected_mod*0.6f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+    //     static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, connected_mod*0.7f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+    //     static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, connected_mod*0.8f)));
     // The operator () carries the ImGUI drawing functions
     // and the task it sends to its associated queue/thread
     // is the lambda (callback) we pass
@@ -100,17 +100,17 @@ void RunTab::draw() {
                 = TeensyControllerStates::AttemptConnection;
     });
 
-    ImGui::PopStyleColor(3);
+    // ImGui::PopStyleColor(3);
 
     /// Disconnect button
     float disconnected_mod = 1.5f - connected_mod;
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Button,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, disconnected_mod*0.6f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, disconnected_mod*0.7f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, disconnected_mod*0.8f)));
+    // ImGui::PushStyleColor(ImGuiCol_Button,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, disconnected_mod*0.6f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, disconnected_mod*0.7f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, disconnected_mod*0.8f)));
 
     // if (TeensyControlFac.Button("Disconnect##teensy",
     //     [=](TeensyControllerData& oldState) {
@@ -138,7 +138,7 @@ void RunTab::draw() {
     });
 
 
-    ImGui::PopStyleColor(3);
+    // ImGui::PopStyleColor(3);
     ImGui::Separator();
 
     static float c_connected_mod = 1.5f;
@@ -198,12 +198,6 @@ void RunTab::draw() {
 
     // ImGui::SameLine(300);
     // Colors to pop up or shadow it depending on the conditions
-    ImGui::PushStyleColor(ImGuiCol_Button,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, c_connected_mod*0.6f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, c_connected_mod*0.7f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, c_connected_mod*0.8f)));
 
     // This button starts the CAEN communication and sends all
     // the setup configuration
@@ -234,8 +228,6 @@ void RunTab::draw() {
     // )) {
     //     c_connected_mod = 0.5;
     // }
-
-    ImGui::PopStyleColor(3);
 
     /// Disconnect button
     float c_disconnected_mod = 1.5f - c_connected_mod;
@@ -295,12 +287,12 @@ void RunTab::draw() {
 
     ImGui::SameLine(300);
     // Colors to pop up or shadow it depending on the conditions
-    ImGui::PushStyleColor(ImGuiCol_Button,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, o_connected_mod*0.6f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, o_connected_mod*0.7f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, o_connected_mod*0.8f)));
+    // ImGui::PushStyleColor(ImGuiCol_Button,
+    //     static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, o_connected_mod*0.6f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+    //     static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.7f, o_connected_mod*0.7f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+    //     static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.8f, o_connected_mod*0.8f)));
 
     // This button starts the CAEN communication and sends all
     // the setup configuration
@@ -330,17 +322,17 @@ void RunTab::draw() {
             doe_twin.PFEIFFERState = PFEIFFERSSGState::AttemptConnection;
     });
 
-    ImGui::PopStyleColor(3);
+    // ImGui::PopStyleColor(3);
 
                     /// Disconnect button
     float o_disconnected_mod = 1.5f - o_connected_mod;
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Button,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, o_disconnected_mod*0.6f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, o_disconnected_mod*0.7f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, o_disconnected_mod*0.8f)));
+    // ImGui::PushStyleColor(ImGuiCol_Button,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, o_disconnected_mod*0.6f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, o_disconnected_mod*0.7f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, o_disconnected_mod*0.8f)));
 
     // if (SlowDAQControlFac.Button("Disconnect##sdaq",
     //     [=](SlowDAQData& state) {
@@ -368,7 +360,7 @@ void RunTab::draw() {
             }
     });
 
-    ImGui::PopStyleColor(3);
+    // ImGui::PopStyleColor(3);
 
     ImGui::PopItemWidth();
 

@@ -1,11 +1,11 @@
 #ifndef PIPE_H
 #define PIPE_H
-#include <algorithm>
 #pragma once
 
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <concepts>
@@ -67,9 +67,9 @@ struct PipeEnd {
     void send_if_changed() {
         if (Data.Changed) {
             if constexpr (type == PipeEndType::GUI) {
-                Data.Changed |= Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
+                Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
             } else {
-                Data.Changed |= Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
+                Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
             }
         }
     }

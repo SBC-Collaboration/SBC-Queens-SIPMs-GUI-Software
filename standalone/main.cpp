@@ -71,6 +71,7 @@ int main() {
     logger->info("Created logger. Let's go!");
 
     SiPMCharacterizationPipes pipes;
+    moodycamel::ConcurrentQueue<int> q;
     std::vector<std::unique_ptr<SBCQueens::ThreadManager<SiPMCharacterizationPipes>>> _threads;
     logger->info("Created pipes that communicate between threads.");
 
