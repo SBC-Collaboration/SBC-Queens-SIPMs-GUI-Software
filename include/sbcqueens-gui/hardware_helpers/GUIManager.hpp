@@ -36,6 +36,7 @@
 
 #include "sbcqueens-gui/gui_windows/Window.hpp"
 #include "sbcqueens-gui/gui_windows/ControlList.hpp"
+#include "sbcqueens-gui/gui_windows/IndicatorList.hpp"
 #include "sbcqueens-gui/gui_windows/IndicatorWindow.hpp"
 #include "sbcqueens-gui/gui_windows/ControlWindow.hpp"
 #include "sbcqueens-gui/gui_windows/SiPMControlWindow.hpp"
@@ -178,10 +179,14 @@ class GUIManager : public ThreadManager<Pipes> {
         //         IndicatorNames::VACUUM_PRESS);
         // }
 
+        ImGui::Begin("Test");
         if (ImGui::BeginTabBar("Other Plots")) {
             constexpr auto test_plot = get_plot<"I-V", 2, 2>(GUIPlots);
+            Plot(test_plot, _sipm_doe.IVData);
 
+            ImGui::EndTabBar();
         }
+        ImGui::End();
         //     // if (!_teensy_doe.SystemParameters.InRTDOnlyMode) {
         //     //     if (ImGui::BeginTabItem("Local BME")) {
         //     //         if (ImPlot::BeginPlot("Local BME", ImVec2(-1, 0))) {

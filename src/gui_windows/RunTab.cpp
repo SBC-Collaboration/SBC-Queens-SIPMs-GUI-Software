@@ -231,12 +231,12 @@ void RunTab::draw() {
     /// Disconnect button
     float c_disconnected_mod = 1.5f - c_connected_mod;
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Button,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, c_disconnected_mod*0.6f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, c_disconnected_mod*0.7f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, c_disconnected_mod*0.8f)));
+    // ImGui::PushStyleColor(ImGuiCol_Button,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, c_disconnected_mod*0.6f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.7f, c_disconnected_mod*0.7f)));
+    // ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+    //     static_cast<ImVec4>(ImColor::HSV(0.0f, 0.8f, c_disconnected_mod*0.8f)));
 
     // if (CAENControlFac.Button("Disconnect##caen",
     //     [=](SiPMAcquisitionData& state) {
@@ -265,7 +265,7 @@ void RunTab::draw() {
             }
     });
 
-    ImGui::PopStyleColor(3);
+    // ImGui::PopStyleColor(3);
 
     ImGui::Separator();
 

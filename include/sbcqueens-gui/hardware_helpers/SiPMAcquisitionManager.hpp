@@ -126,7 +126,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
         standby_state = std::make_shared<SiPMAcquisitioneState>(
-            std::chrono::milliseconds(200),
+            std::chrono::milliseconds(1000),
             std::bind(&SiPMAcquisitionManager::standby, this));
 
         attemptConnection_state = std::make_shared<SiPMAcquisitioneState>(
@@ -154,10 +154,14 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             std::bind(&SiPMAcquisitionManager::closing_mode, this));
     }
 
-    ~SiPMAcquisitionManager() {}
+    ~SiPMAcquisitionManager() {
+        spdlog::info("Closing SiPMAcquisitionManager");
+    }
 
     void operator()() {
         spdlog::info("Initializing CAEN thread");
+
+        _doe.IVData = PlotDataBuffer<2>(100);
 
         main_loop_state = standby_state;
 
@@ -364,6 +368,11 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
     // Does nothing other than wait 100ms to avoid clogging PC resources.
     bool standby() {
+        static double i = 0;
+        _doe.IVData(i, cos(i/30.0), sin(i/30.0));
+        i += 1.0;
+
+        _sipm_pipe_end.send();
         change_state();
         return true;
     }

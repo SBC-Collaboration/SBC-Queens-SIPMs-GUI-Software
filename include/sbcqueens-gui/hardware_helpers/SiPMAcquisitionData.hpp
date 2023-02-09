@@ -92,6 +92,9 @@ struct SiPMAcquisitionData {
     // Indicator/"Out" data members
     uint32_t FileStatistics = 0;
 
+    // Shared plot data
+    PlotDataBuffer<2> IVData;
+
     // This API required items.
     bool Changed = false;
     SiPMAcquisitionDataPipeCallback Callback;

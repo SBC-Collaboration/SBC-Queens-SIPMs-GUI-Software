@@ -1,5 +1,7 @@
 #ifndef IMPLOTHELPERS_H
 #define IMPLOTHELPERS_H
+#include <array>
+#include <implot.h>
 #pragma once
 
 // // C 3rd party includes
@@ -22,6 +24,7 @@
 // #include <vector>
 // #include <sstream>
 // #include <deque>
+#include <memory>
 
 // C++ 3rd party includes
 #include <armadillo>
@@ -216,7 +219,7 @@ namespace SBCQueens {
 
 // // Internal structure to be used for Plot class. Servers as an interface
 // // between this API and ImPlot
-template<size_t NumPlots = 1>
+template<size_t NumPlots = 1, typename T = double>
 class PlotDataBuffer {
 	static_assert(NumPlots > 0, "There must be a least one plot!");
 
@@ -225,18 +228,62 @@ class PlotDataBuffer {
     arma::uword _size = 0;
     arma::uword _current_index = 0;
 
-    arma::mat Data;
- public:
-    explicit PlotDataBuffer(const arma::uword& max)
-        : N(max), Data(NumPlots + 1, N, arma::fill::zeros) {}
+    std::shared_ptr<arma::Mat<T>> Data;
 
-    auto operator[](const arma::uword& i) {
-        arma::uword index = (i + _start) % _size;
-        return Data.unsafe_col( index );
+    typedef ImPlotPoint(*ImPlotGetterFunc)(int, void*);
+
+    template<size_t CH>
+    constexpr static auto transform() {
+        return [](int idx, void* data) {
+            auto myData = static_cast<PlotDataBuffer<NumPlots>*>(data);
+            auto data_column = (*myData)[idx];
+            return ImPlotPoint(data_column(0), data_column(CH + 1));
+        };
     }
 
-    void operator()(const double& x, const double& y) {
-        Data.col(_current_index) = {x, y};
+    template<std::size_t... Indices>
+    constexpr static auto make_trans_func(std::index_sequence<Indices...>)
+    -> std::array<ImPlotGetterFunc, sizeof...(Indices)>{
+        return {{transform<Indices>()...}};
+    }
+
+    constexpr static std::array<ImPlotGetterFunc, NumPlots> generate_tans_funcs() {
+        return make_trans_func(std::make_index_sequence<NumPlots>{});
+    }
+ public:
+
+    constexpr static std::array<ImPlotGetterFunc, NumPlots> TranformFunctions = generate_tans_funcs();
+
+    PlotDataBuffer() = default;
+    explicit PlotDataBuffer(const arma::uword& max) :
+        N(max),
+        Data(std::make_shared<arma::Mat<T>>(NumPlots + 1, max, arma::fill::zeros))
+    { }
+
+    explicit PlotDataBuffer(std::shared_ptr<arma::Mat<T>> data) :
+        N(data->n_rows), Data(data)
+    { }
+
+    arma::Col<T> operator[](const arma::uword& i) {
+        if (not Data) {
+            return arma::Col<T>{};
+        }
+
+        arma::uword index = (i + _start) % _size;
+        return Data->unsafe_col(index);
+    }
+
+    template<typename... OtherTypes>
+    void operator()(const OtherTypes&... vals) {
+        static_assert(sizeof...(vals) == NumPlots + 1,
+            "Passed number of parameters"
+            "must be equal to the number of plots plus one.");
+
+        if (not Data) {
+            return;
+        }
+
+        Data->col(_current_index) = {static_cast<T>(vals)...};
 
         if (_size < N) {
             _size++;
@@ -250,13 +297,17 @@ class PlotDataBuffer {
     // Resizes the internal data buffer with new_size. Clears the data (faster)
     // if clear_data is true, otherwise, it keeps the data (slower)
     void resize(const arma::uword& new_size, const bool& clear_data = false) {
+        if (not Data) {
+            return;
+        }
+
     	N = new_size;
     	if (clear_data) {
-    		Data.set_size(NumPlots + 1, N);
+    		Data->set_size(NumPlots + 1, N);
 		    _size = 0;
         	_current_index = 0;
     	} else {
-    		Data.resize(NumPlots + 1, N);
+    		Data->resize(NumPlots + 1, N);
     	}
     }
 

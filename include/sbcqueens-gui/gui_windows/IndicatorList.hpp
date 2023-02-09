@@ -1,5 +1,6 @@
 #ifndef INDICATORLIST_H
 #define INDICATORLIST_H
+#include <implot.h>
 #pragma once
 
 // C STD includes
@@ -35,13 +36,19 @@ constexpr static auto SiPMGUIIndicators = std::make_tuple(
 );
 
 constexpr static auto GUIPlots = std::make_tuple(
-	PlotIndicator<"I-V", 2, 2>(PlotOptions<2, 2>{
+	PlotIndicator<"I-V", 2, 2>(
+		PlotOptions<2, 2>{
 		.PlotType = PlotTypeEnum::Line,
 		.PlotLabels = {"Current", "Voltage"},
 		.PlotGroupings = {PlotGroupingsEnum::One, PlotGroupingsEnum::Two},
-		.XAxisLabel = "time [s]",
-		.YAxisLabels = {"[uA]", "[V]"}
-	})
+		.XAxisLabel = "time ",
+		.XAxisUnit = "[Local Time]",
+		.YAxisLabels = {"Current ", "Voltage "},
+		.YAxisUnits = {"[uA]", "[V]"},
+		.YAxisScales = {ImPlotScale_Linear, ImPlotScale_Linear},
+		.YAxisFlags = {ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_Opposite | ImPlotAxisFlags_AutoFit}
+	}, DrawingOptions{
+		.Size = Size_t{-1, -1}})
 	// PlotIndicator<"Pulses", 64, 1>(PlotOptions<64, 1>{
 	// 	.PlotType = PlotTypeEnum::Line,
 	// 	.PlotLabels = {"Current", "Voltage"},

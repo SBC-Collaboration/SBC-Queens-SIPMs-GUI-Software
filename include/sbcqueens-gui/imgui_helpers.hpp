@@ -183,7 +183,7 @@ struct PlotOptions {
     const std::string_view XAxisLabel = "x";
     std::string_view XAxisUnit = "[arb.]";
     ImPlotScale XAxisScale = ImPlotScale_Linear;
-    ImPlotAxisFlags XAxisFlags = ImPlotAxisFlags_None;
+    ImPlotAxisFlags XAxisFlags = ImPlotAxisFlags_AutoFit;
 
     const std::array<std::string_view, NYAxis> YAxisLabels = {"y"};
     std::array<std::string_view, NYAxis> YAxisUnits = {"[arb.]"};
@@ -490,42 +490,52 @@ void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
     LED<Label>(indicator, condition(in_value));
 }
 
+
 template<StringLiteral Label, size_t NPlots, size_t NYAxis>
 void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
-    const PlotDataBuffer<NPlots>& plot_data) {
+    PlotDataBuffer<NPlots>& plot_data) {
     if (ImPlot::BeginPlot(Label.value, plot.DrawOptions.Size)) {
         ImPlot::SetupAxisScale(ImAxis_X1, plot.PlotDrawOptions.XAxisScale);
         ImPlot::SetupAxes(
-            std::string(plot.PlotDrawOptions.XAxisLabel
-                        + plot.PlotDrawOptions.XAxisUnit).c_str(),
-            std::string(plot.PlotDrawOptions.YAxisLabels[0]
-                        + plot.PlotDrawOptions.YAxisUnits[0]).c_str(),
+            (std::string(plot.PlotDrawOptions.XAxisLabel) +
+             std::string(plot.PlotDrawOptions.XAxisUnit)).c_str(),
+            (std::string(plot.PlotDrawOptions.YAxisLabels[0]) +
+             std::string(plot.PlotDrawOptions.YAxisUnits[0])).c_str(),
             plot.PlotDrawOptions.XAxisFlags,
             plot.PlotDrawOptions.YAxisFlags[0]);
 
         if constexpr (NYAxis == 2) {
             ImPlot::SetupAxis(ImAxis_Y2,
-                              plot.PlotDrawOptions.YAxisLabels[1],
+                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
+                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
                               plot.PlotDrawOptions.YAxisFlags[1]);
         } else if constexpr (NYAxis == 3) {
             ImPlot::SetupAxis(ImAxis_Y2,
-                              plot.PlotDrawOptions.YAxisLabels[1],
+                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
+                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
                               plot.PlotDrawOptions.YAxisFlags[1]);
             ImPlot::SetupAxis(ImAxis_Y3,
-                              plot.PlotDrawOptions.YAxisLabels[1],
+                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
+                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
                               plot.PlotDrawOptions.YAxisFlags[2]);
         }
 
-        static auto transform = [](std::size_t i)
-        {
-            return [_i = i](int idx, void* data) {
-                auto myData = static_cast<PlotDataBuffer<NPlots>*>(data);
-                auto data_column = (*myData)[idx];
-                return ImPlotPoint(data_column(0), data_column(_i));
-            };
+        // static auto transform = [](std::size_t i)
+        // {
+        //     return Lambda::ptr<ImPlotPoint>([_i = i](int idx, void* data) {
+        //         auto myData = static_cast<PlotDataBuffer<NPlots>*>(data);
+        //         auto data_column = (*myData)[idx];
+        //         return ImPlotPoint(data_column(0), data_column(_i));
+        //     });
+        // };
+
+        ImPlotPoint(*f)(int, void*) = [](int idx, void* data) {
+            auto myData = static_cast<PlotDataBuffer<NPlots>*>(data);
+            auto data_column = (*myData)[idx];
+            return ImPlotPoint(data_column(0), data_column(0));
         };
 
-        for (std::size_t i = 1; i < NPlots; i++) {
+        for (std::size_t i = 0; i < NPlots; i++) {
             switch (plot.PlotDrawOptions.PlotGroupings[i]) {
             case PlotGroupingsEnum::Two:
                 ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
@@ -539,15 +549,17 @@ void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
 
             switch (plot.PlotDrawOptions.PlotType) {
             case PlotTypeEnum::Scatter:
-                ImPlot::PlotScatterG(plot.PlotDrawOptions.PlotLabels[i],
-                                     transform(i),
+                ImPlot::PlotScatterG(
+                    std::string(plot.PlotDrawOptions.PlotLabels[i]).c_str(),
+                                     PlotDataBuffer<NPlots>::TranformFunctions[i],
                                      &plot_data,
                                      plot_data.size());
             break;
             case PlotTypeEnum::Line:
             default:
-                ImPlot::PlotLineG(plot.PlotDrawOptions.PlotLabels[i],
-                                  transform(i),
+                ImPlot::PlotLineG(
+                    std::string(plot.PlotDrawOptions.PlotLabels[i]).c_str(),
+                                  PlotDataBuffer<NPlots>::TranformFunctions[i],
                                   &plot_data,
                                   plot_data.size());
             break;
@@ -573,7 +585,7 @@ template<StringLiteral Label,
          size_t NYAxis = 1,
          typename... Types>
 constexpr static auto get_plot(const std::tuple<Types...>& list) {
-    return std::get<PlotIndicator<Label>>(list);
+    return std::get<PlotIndicator<Label, NPlots, NYAxis>>(list);
 }
 
 template<ControlTypes T, StringLiteral Label,

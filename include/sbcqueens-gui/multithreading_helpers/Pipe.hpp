@@ -11,6 +11,7 @@
 #include <concepts>
 
 // C++ 3rd party includes
+#include <spdlog/spdlog.h>
 // my includes
 
 namespace SBCQueens {
@@ -64,13 +65,17 @@ struct PipeEnd {
         Data{}, Pipe{pipe}
     { }
 
+    void send() {
+        if constexpr (type == PipeEndType::GUI) {
+            Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
+        } else {
+            Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
+        }
+    }
+
     void send_if_changed() {
         if (Data.Changed) {
-            if constexpr (type == PipeEndType::GUI) {
-                Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
-            } else {
-                Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
-            }
+            send();
         }
     }
 
