@@ -113,14 +113,31 @@ class GUIManager : public ThreadManager<Pipes> {
                 sipm_names.emplace_back(elem.value_or(""));
             }
         }
+
+        // If they changed on this GUI, update the threads so they can
+        // modify whatever they want based on the data we sent
+        // We do it in the init so we can let them know what is their initial
+        // state
+        _teensy_doe.Changed = true;
+        _teensy_doe.Callback = [&](TeensyControllerData& twin) {
+            twin = _teensy_doe;
+        };
+        _teensy_pipe_end.send_if_changed();
+
+        _sipm_doe.Changed = true;
+        _sipm_doe.Callback = [&](SiPMAcquisitionData& twin) {
+            twin = _sipm_doe;
+        };
+        _sipm_pipe_end.send_if_changed();
+
+        _slowdaq_doe.Changed = true;
+        _slowdaq_doe.Callback = [&](SlowDAQData& twin){
+            twin = _slowdaq_doe;
+        };
+        _slowdaq_pipe_end.send_if_changed();
     }
 
     ~GUIManager() {
-        // Make sure to send anything before closing the gui.
-        _teensy_pipe_end.send_if_changed();
-        _sipm_pipe_end.send_if_changed();
-        _slowdaq_pipe_end.send_if_changed();
-
         _teensy_doe.Callback = [](TeensyControllerData& state) {
             state.CurrentState = TeensyControllerStates::Closing;
         };
@@ -134,6 +151,11 @@ class GUIManager : public ThreadManager<Pipes> {
         _slowdaq_doe.Callback = [](SlowDAQData& state) {
             state.PFEIFFERState = PFEIFFERSSGState::Closing;
         };
+
+        // Make sure to send anything before closing the gui.
+        _teensy_pipe_end.send_if_changed();
+        _sipm_pipe_end.send_if_changed();
+        _slowdaq_pipe_end.send_if_changed();
     }
 
     void operator()() {
@@ -183,6 +205,15 @@ class GUIManager : public ThreadManager<Pipes> {
         if (ImGui::BeginTabBar("Other Plots")) {
             constexpr auto test_plot = get_plot<"I-V", 2, 2>(GUIPlots);
             Plot(test_plot, _sipm_doe.IVData);
+
+            ImGui::EndTabBar();
+        }
+        ImGui::End();
+
+        ImGui::Begin("Plot Graphs");
+        if (ImGui::BeginTabBar("Other Plots")) {
+            constexpr auto group_one_plot = get_plot<"Group 1", 8, 1>(GUIPlots);
+            Plot(group_one_plot, _sipm_doe.GroupData[0]);
 
             ImGui::EndTabBar();
         }

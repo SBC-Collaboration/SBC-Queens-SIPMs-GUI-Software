@@ -355,6 +355,9 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             spdlog::info("S: {0}", _doe.SiPMVoltageSysPort);
         }
 
+        // Send the current state to the GUI to update him
+        _sipm_pipe_end.send();
+
         return false;
     }
 
@@ -372,7 +375,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         _doe.IVData(i, cos(i/30.0), sin(i/30.0));
         i += 1.0;
 
-        _sipm_pipe_end.send();
         change_state();
         return true;
     }
@@ -411,6 +413,10 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         spdlog::info("Connected to CAEN Digitizer!");
 
         setup(_caen_port, _doe.GlobalConfig, _doe.GroupConfigs);
+
+        std::generate(_doe.GroupData.begin(), _doe.GroupData.end(), [&](){
+            return PlotDataBuffer<8>(_doe.GlobalConfig.RecordLength);
+        });
 
         _num_chs = _caen_port->ModelConstants.NumChannels;
         _acq_rate = _caen_port->ModelConstants.AcquisitionRate;

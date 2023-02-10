@@ -252,7 +252,7 @@ bool Button(const Control<ControlTypes::Button, Label>& control,
 }
 
 template<StringLiteral Label>
-bool Checkbox(const Control<ControlTypes::Checkbox, Label>& control,
+bool Checkbox(const Control<ControlTypes::Checkbox, Label>&,
               bool& out) {
     return ImGui::Checkbox(Label.value, &out);
 }
@@ -360,9 +360,10 @@ bool InputUINT64(const Control<ControlTypes::InputUINT64, Label>& control,
     return InputScalar<ControlTypes::InputUINT64, Label, uint64_t>(control, out);
 }
 
-template<StringLiteral Label, typename T> requires std::is_enum_v<T>
-bool ComboBox(const Control<ControlTypes::ComboBox, Label>& control, T& state,
+template<StringLiteral Label, typename T>
+bool ComboBox(const Control<ControlTypes::ComboBox, Label>&, T& state,
     const std::unordered_map<T, std::string>& map) {
+    bool did_change = false;
     static size_t index = 0;
     size_t i = 0;
 
@@ -383,10 +384,11 @@ bool ComboBox(const Control<ControlTypes::ComboBox, Label>& control, T& state,
     }
 
     // bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
-    if (ImGui::BeginCombo(Label, s_states[index].c_str())) {
+    if (ImGui::BeginCombo(Label.value, s_states[index].c_str())) {
         for (i = 0; i < map.size(); i++) {
             const bool is_selected = (index == i);
             if (ImGui::Selectable(s_states[i].c_str(), is_selected)) {
+                did_change = true;
                 index = i;
             }
             // Set the initial focus when opening the combo
@@ -401,7 +403,53 @@ bool ComboBox(const Control<ControlTypes::ComboBox, Label>& control, T& state,
 
     state = states[index];
 
-    return true;
+    return did_change;
+}
+
+template<StringLiteral Label, typename T>
+bool ComboBox(const Control<ControlTypes::ComboBox, Label>&, T& state,
+    const std::unordered_map<std::string, T>& map) {
+    bool did_change = false;
+    static size_t index = 0;
+    size_t i = 0;
+
+    std::vector<T> states;
+    std::vector<std::string> s_states;
+
+    for (auto pair : map) {
+        states.push_back(pair.second);
+        s_states.push_back(pair.first);
+
+        // This is to make sure the current selected item is the one
+        // that is already saved in state
+        if (state == pair.second) {
+            index = i;
+        }
+
+        i++;
+    }
+
+    // bool u = ImGui::Combo(label.c_str(), &index, list.c_str());
+    if (ImGui::BeginCombo(Label.value, s_states[index].c_str())) {
+        for (i = 0; i < map.size(); i++) {
+            const bool is_selected = (index == i);
+            if (ImGui::Selectable(s_states[i].c_str(), is_selected)) {
+                did_change = true;
+                index = i;
+            }
+            // Set the initial focus when opening the combo
+            // (scrolling + keyboard navigation focus)
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+
+        ImGui::EndCombo();
+    }
+
+    state = states[index];
+
+    return did_change;
 }
 
 // Indicators
@@ -520,21 +568,6 @@ void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
                               plot.PlotDrawOptions.YAxisFlags[2]);
         }
 
-        // static auto transform = [](std::size_t i)
-        // {
-        //     return Lambda::ptr<ImPlotPoint>([_i = i](int idx, void* data) {
-        //         auto myData = static_cast<PlotDataBuffer<NPlots>*>(data);
-        //         auto data_column = (*myData)[idx];
-        //         return ImPlotPoint(data_column(0), data_column(_i));
-        //     });
-        // };
-
-        ImPlotPoint(*f)(int, void*) = [](int idx, void* data) {
-            auto myData = static_cast<PlotDataBuffer<NPlots>*>(data);
-            auto data_column = (*myData)[idx];
-            return ImPlotPoint(data_column(0), data_column(0));
-        };
-
         for (std::size_t i = 0; i < NPlots; i++) {
             switch (plot.PlotDrawOptions.PlotGroupings[i]) {
             case PlotGroupingsEnum::Two:
@@ -594,33 +627,33 @@ constexpr bool get_draw_function(const Control<T, Label>& control,
                                  OutType& out, Args&&... args) {
     if constexpr (T == ControlTypes::Button) {
         return Button<Label>(control, out);
-    } else if constexpr(T == ControlTypes::Checkbox) {
+    } else if constexpr (T == ControlTypes::Checkbox) {
         return Checkbox<Label>(control, out);
-    } else if constexpr(T  == ControlTypes::InputInt) {
+    } else if constexpr (T  == ControlTypes::InputInt) {
         return InputInt<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputFloat) {
+    } else if constexpr (T  ==  ControlTypes::InputFloat) {
         return InputFloat<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputDouble) {
+    } else if constexpr (T  ==  ControlTypes::InputDouble) {
         return InputDouble<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::ComboBox) {
-        return ComboBox<Label>(control, out, args...);
-    } else if constexpr(T  ==  ControlTypes::InputINT8) {
+    } else if constexpr (T  ==  ControlTypes::ComboBox) {
+        return ComboBox<Label, OutType>(control, out, std::forward<Args>(args)...);
+    } else if constexpr (T  ==  ControlTypes::InputINT8) {
         return InputINT8<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputUINT8) {
+    } else if constexpr (T  ==  ControlTypes::InputUINT8) {
         return InputUINT8<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputINT16) {
+    } else if constexpr (T  ==  ControlTypes::InputINT16) {
         return InputINT16<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputUINT16) {
+    } else if constexpr (T  ==  ControlTypes::InputUINT16) {
         return InputUINT16<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputINT32) {
+    } else if constexpr (T  ==  ControlTypes::InputINT32) {
         return InputINT32<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputUINT32) {
+    } else if constexpr (T  ==  ControlTypes::InputUINT32) {
         return InputUINT32<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputINT64) {
+    } else if constexpr (T  ==  ControlTypes::InputINT64) {
         return InputINT64<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputUINT64) {
+    } else if constexpr (T  ==  ControlTypes::InputUINT64) {
         return InputUINT64<Label>(control, out);
-    } else if constexpr(T  ==  ControlTypes::InputText) {
+    } else if constexpr (T  ==  ControlTypes::InputText) {
         return InputText<Label>(control, out);
     }
 
@@ -630,7 +663,7 @@ constexpr bool get_draw_function(const Control<T, Label>& control,
 template<IndicatorTypes T, StringLiteral Label,
          typename InType, typename... Args>
 constexpr void get_draw_function(const Indicator<T, Label>& indicator,
-                                 InType& in, Args&&... args) {
+                                 InType& in, const Args&... args) {
     if constexpr (T == IndicatorTypes::Numerical) {
         Numerical(indicator, in);
     } else if constexpr (T == IndicatorTypes::String) {
@@ -696,18 +729,25 @@ template<ControlTypes T, StringLiteral Label,
 bool draw_control(const Control<T, Label>& control,
     DataType& doe, OutType& out,
     std::function<bool(void)>&& condition,
-    Callback&& callback, const Args&... args) {
-    bool imgui_out_state = false;
-
+    Callback&& callback, Args&&... args) {
     __draw_imgui_begin(control);
-    imgui_out_state = get_draw_function<T>(control, out, args...);
+    bool imgui_out_state = get_draw_function<T>(control, out, std::forward<Args>(args)...);
     __draw_imgui_end(control);
 
-    if (condition()) {
-        spdlog::info("I");
-        doe.Callback = callback;
-        doe.Changed = true;
+    if constexpr (T == ControlTypes::ComboBox) {
+        if (imgui_out_state) {
+            spdlog::info("CC");
+            doe.Callback = callback;
+            doe.Changed = true;
+        }
+    } else {
+        if (condition()) {
+            spdlog::info("I");
+            doe.Callback = callback;
+            doe.Changed = true;
+        }
     }
+
 
     return imgui_out_state;
 }
@@ -720,7 +760,7 @@ void draw_indicator(const Indicator<T, Label>& indicator,
     __draw_imgui_begin(indicator);
     get_draw_function(indicator, in, args...);
 
-    if constexpr(T == IndicatorTypes::Numerical){
+    if constexpr (T == IndicatorTypes::Numerical) {
         ImGui::SameLine();
         ImGui::Text("%s", std::string(indicator.UnitText).c_str());
     }

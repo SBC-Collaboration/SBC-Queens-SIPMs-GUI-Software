@@ -35,6 +35,23 @@ constexpr static auto SiPMGUIIndicators = std::make_tuple(
 	NumericalIndicator<"1SPE Gain Mean">("[arb.]", "")
 );
 
+
+template<std::size_t Index, typename Value>
+constexpr auto t(Value value) {
+	return value;
+}
+
+template<typename Value, std::size_t... Indices>
+constexpr auto fill_same_helper(Value value, std::index_sequence<Indices...>) ->
+std::array<Value, sizeof...(Indices)> {
+	return {{t<Indices, Value>(value)...}};
+}
+
+template<size_t N, typename Value>
+constexpr auto fill_same(Value value) {
+	return fill_same_helper(value, std::make_index_sequence<N>{});
+}
+
 constexpr static auto GUIPlots = std::make_tuple(
 	PlotIndicator<"I-V", 2, 2>(
 		PlotOptions<2, 2>{
@@ -48,14 +65,19 @@ constexpr static auto GUIPlots = std::make_tuple(
 		.YAxisScales = {ImPlotScale_Linear, ImPlotScale_Linear},
 		.YAxisFlags = {ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_Opposite | ImPlotAxisFlags_AutoFit}
 	}, DrawingOptions{
-		.Size = Size_t{-1, -1}})
-	// PlotIndicator<"Pulses", 64, 1>(PlotOptions<64, 1>{
-	// 	.PlotType = PlotTypeEnum::Line,
-	// 	.PlotLabels = {"Current", "Voltage"},
-	// 	.PlotGroupings = {PlotGroupingsEnum::One},
-	// 	.XAxisLabel = "time [sp]",
-	// 	.YAxisLabels = {"[Counts]"}
-	// })
+		.Size = Size_t{-1, -1}}),
+
+	PlotIndicator<"Group 1", 8, 1>(PlotOptions<8, 1>{
+		.PlotType = PlotTypeEnum::Line,
+		.PlotLabels = {"1", "2", "3", "4", "5", "6", "7", "8"},
+		.PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
+		.XAxisLabel = "time ",
+		.XAxisUnit = "[sp]",
+		.YAxisLabels = {"Counts"},
+		.YAxisUnits = {""},
+		.YAxisScales = {ImPlotScale_Linear},
+		.YAxisFlags = {ImPlotAxisFlags_AutoFit}
+	})
 );
 
 } // namespace SBCQueens

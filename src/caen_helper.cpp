@@ -3,6 +3,7 @@
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
+#include <CAENDigitizer.h>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -158,6 +159,7 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
         if (latest_err >= 0) {
             auto err = f(args...);
             if (err < 0) {
+                spdlog::error("caen error {}", err);
                 latest_err = err;
                 err_msg += msg;
             }
@@ -181,16 +183,19 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
                          CAEN_DGTZ_SetRecordLength, handle,
                          res->GlobalConfig.RecordLength);
 
+    // We get the actual record length
+    CAEN_DGTZ_GetRecordLength(handle, &res->GlobalConfig.RecordLength);
+
     // This will calculate what is the max current max buffers
     res->CurrentMaxBuffers = calculate_max_buffers(res);
 
     // This will get the ACTUAL record length as calculated by
     // CAEN_DGTZ_SetRecordLength
-    uint32_t nloc = 0;
-    error_wrap("Failed to read NLOC. ", CAEN_DGTZ_ReadRegister, handle,
-                         0x8020, &nloc);
-    res->GlobalConfig.RecordLength
-        = res->ModelConstants.NLOCToRecordLength * nloc;
+    // uint32_t nloc = 0;
+    // error_wrap("Failed to read NLOC. ", CAEN_DGTZ_ReadRegister, handle,
+    //                      0x8020, &nloc);
+    // res->GlobalConfig.RecordLength
+    //     = res->ModelConstants.NLOCToRecordLength * nloc;
 
     error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
                          CAEN_DGTZ_SetPostTriggerSize, handle,
@@ -745,7 +750,7 @@ uint32_t calculate_max_buffers(CAEN& res) noexcept {
     // Instead of using the stored RecordLength
     // We will let CAEN functions do all the hard work for us
     // uint32_t rl = res->GlobalConfig.RecordLength;
-    uint32_t rl = 0;
+    uint32_t rl = res->GlobalConfig.RecordLength;
 
     // Cannot be higher than the memory per channel
     auto mem_per_ch = res->ModelConstants.MemoryPerChannel;
@@ -753,14 +758,9 @@ uint32_t calculate_max_buffers(CAEN& res) noexcept {
 
     // This contains nloc which if multiplied by the correct
     // constant, will give us the record length exactly
-    read_register(res, 0x8020, nloc);
-
-    try {
-        rl =  res->ModelConstants.NLOCToRecordLength*nloc;
-    } catch (...) {
-        return 0;
-    }
-
+    // read_register(res, 0x8020, nloc);
+    // spdlog::info("read an nloc = {0}", nloc);
+    // rl =  res->ModelConstants.NLOCToRecordLength*nloc;
     // Then we calculate the actual num buffs but...
     auto max_num_buffs = mem_per_ch / rl;
 

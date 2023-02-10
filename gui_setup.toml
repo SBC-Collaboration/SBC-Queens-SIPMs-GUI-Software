@@ -22,15 +22,15 @@ PeltierTTd = 0.0
 
 [CAEN]
 # DT5730B or DT5740D
-Model = "DT5730B"
+Model = "DT5740D"
 Port = 23473
 # USB if using a direct USB connection
 # A4818 for the USB 3.0 to CONET adapter
 ConnectionType = "A4818"
 # if applicable
-VMEAddress = 0
+VMEAddress = 0x0
 # 0 = not allowed
-RecordLength = 5000
+RecordLength = 100
 MaxEventsPerRead = 500
 PostBufferPorcentage = 90
 OverlappingRejection = false

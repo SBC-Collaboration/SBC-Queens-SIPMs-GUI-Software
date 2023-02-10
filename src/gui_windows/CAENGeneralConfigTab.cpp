@@ -28,18 +28,15 @@ void CAENGeneralConfigTab::init_tab(const toml::table& tb) {
 void CAENGeneralConfigTab::draw() {
     ImGui::PushItemWidth(120);
 
-    // constexpr Control caen_model = get_control(SiPMGUIControls, "Model");
-    // draw_control(_sipm_doe, caen_model, ComboBox,
-    //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
-    //     // Callback when IsItemEdited !
-    //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-    //         caen_twin.Model = doe.Model;
-    //     },
-    //     CAENDigitizerModelsMap);
-
-    // CAENControlFac.ComboBox("Model", _sipm_doe.Model,
-    //     CAENDigitizerModelsMap, [](){ return false; },
-    //     [](){ return true; });
+    constexpr auto caen_model_cb =
+        get_control<ControlTypes::ComboBox, "CAEN Model">(SiPMGUIControls);
+    draw_control(caen_model_cb, _sipm_doe,
+        _sipm_doe.Model, ImGui::IsItemDeactivatedAfterEdit,
+        // Callback when IsItemEdited !
+        [&](SiPMAcquisitionData& caen_twin) {
+          caen_twin.Model = _sipm_doe.Model;
+        }, CAENDigitizerModelsMap
+    );
 
     ImGui::InputScalar("Max Events Per Read", ImGuiDataType_U32,
         &_sipm_doe.GlobalConfig.MaxEventsPerRead);
@@ -56,69 +53,61 @@ void CAENGeneralConfigTab::draw() {
     //         "HIGHLY UNSTABLE FEATURE, DO NOT ENABLE.");
     // }
 
-    ImGui::Checkbox("TRG-IN as Gate",
-        &_sipm_doe.GlobalConfig.EXTasGate);
+    ImGui::Checkbox("TRG-IN as Gate", &_sipm_doe.GlobalConfig.EXTasGate);
 
-    // const std::unordered_map<CAEN_DGTZ_TriggerMode_t, std::string> tgg_mode_map = {
-    //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_DISABLED, "Disabled"},
-    //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY, "Acq Only"},
-    //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_EXTOUT_ONLY, "Ext Only"},
-    //     {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT, "Both"}};
+    const std::unordered_map<CAEN_DGTZ_TriggerMode_t, std::string> tgg_mode_map = {
+        {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_DISABLED, "Disabled"},
+        {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY, "Acq Only"},
+        {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_EXTOUT_ONLY, "Ext Only"},
+        {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT, "Both"}};
 
-    // constexpr Control ext_trig_mode = get_control(SiPMGUIControls, "External Trigger Mode");
-    // draw_control(_sipm_doe, ext_trig_mode, ComboBox,
-    //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
-    //     // Callback when IsItemEdited !
-    //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-    //         caen_twin.GlobalConfig.EXTTriggerMode = doe.GlobalConfig.EXTTriggerMode;
-    //     },
-    //     tgg_mode_map);
-    // CAENControlFac.ComboBox("External Trigger Mode",
-    //     _sipm_doe.GlobalConfig.EXTTriggerMode,
-    //     tgg_mode_map,
-    //     []() {return false;}, [](){});
+    constexpr auto extt_mode_cb =
+        get_control<ControlTypes::ComboBox, "External Trigger Mode">(SiPMGUIControls);
+    draw_control(extt_mode_cb, _sipm_doe,
+        _sipm_doe.GlobalConfig.EXTTriggerMode, ImGui::IsItemDeactivatedAfterEdit,
+        // Callback when IsItemEdited !
+        [&](SiPMAcquisitionData& caen_twin) {
+          caen_twin.GlobalConfig.EXTTriggerMode = _sipm_doe.GlobalConfig.EXTTriggerMode;
+        }, tgg_mode_map
+    );
 
-    // constexpr Control soft_trig_mode = get_control(SiPMGUIControls, "Software Trigger Mode");
-    // draw_control(_sipm_doe, soft_trig_mode, ComboBox,
-    //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
-    //     // Callback when IsItemEdited !
-    //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-    //         caen_twin.GlobalConfig.SWTriggerMode = doe.GlobalConfig.SWTriggerMode;
-    //     },
-    //     tgg_mode_map);
-    // CAENControlFac.ComboBox("Software Trigger Mode",
-    //     _sipm_doe.GlobalConfig.SWTriggerMode,
-    //     tgg_mode_map,
-    //     []() {return false;}, [](){});
-    // constexpr Control trig_polarity = get_control(SiPMGUIControls, "Trigger Polarity");
-    // draw_control(_sipm_doe, trig_polarity, ComboBox,
-    //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
-    //     // Callback when IsItemEdited !
-    //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-    //         caen_twin.GlobalConfig.TriggerPolarity = doe.GlobalConfig.TriggerPolarity;
-    //     },
-    //     {{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge, "Falling Edge"},
-    //     {CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge, "Rising Edge"}});
-    // CAENControlFac.ComboBox("Trigger Polarity",
-    //     _sipm_doe.GlobalConfig.TriggerPolarity,
-    //     {{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge, "Falling Edge"},
-    //     {CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge, "Rising Edge"}},
-    //     []() {return false;}, [](){});
+    constexpr auto st_mode_cb =
+        get_control<ControlTypes::ComboBox, "Software Trigger Mode">(SiPMGUIControls);
+    draw_control(st_mode_cb, _sipm_doe,
+        _sipm_doe.GlobalConfig.SWTriggerMode, ImGui::IsItemDeactivatedAfterEdit,
+        // Callback when IsItemEdited !
+        [&](SiPMAcquisitionData& caen_twin) {
+          caen_twin.GlobalConfig.SWTriggerMode = _sipm_doe.GlobalConfig.SWTriggerMode;
+        }, tgg_mode_map
+    );
 
-    // constexpr Control io_level = get_control(SiPMGUIControls, "I/O Level");
-    // draw_control(_sipm_doe, io_level, ComboBox,
-    //     _sipm_doe.ConnectionType, ImGui::IsItemEdited,
-    //     // Callback when IsItemEdited !
-    //     [doe = _sipm_doe](SiPMAcquisitionData& caen_twin) {
-    //         caen_twin.GlobalConfig.IOLevel = doe.GlobalConfig.IOLevel;
-    //     },
-    //     {{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM, "NIM"},
-    //     {CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_TTL, "TTL"}});
-    // CAENControlFac.ComboBox("IO Level",
-    //     _sipm_doe.GlobalConfig.IOLevel,
-    //     {{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM, "NIM"},
-    //     {CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_TTL, "TTL"}},
-    //     []() {return false;}, [](){});
+    const std::unordered_map<CAEN_DGTZ_TriggerPolarity_t, std::string> trigger_polarity_map
+        = {{CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge, "Falling Edge"},
+        {CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge, "Rising Edge"}};
+
+    constexpr auto trigger_polarity_cb =
+        get_control<ControlTypes::ComboBox, "Trigger Polarity">(SiPMGUIControls);
+    draw_control(trigger_polarity_cb, _sipm_doe,
+        _sipm_doe.GlobalConfig.TriggerPolarity, ImGui::IsItemDeactivatedAfterEdit,
+        // Callback when IsItemEdited !
+        [&](SiPMAcquisitionData& caen_twin) {
+          caen_twin.GlobalConfig.TriggerPolarity = _sipm_doe.GlobalConfig.TriggerPolarity;
+        }, trigger_polarity_map
+    );
+
+    const std::unordered_map<CAEN_DGTZ_IOLevel_t, std::string> io_level_map =
+            {{CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM, "NIM"},
+            {CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_TTL, "TTL"}};
+
+    constexpr auto io_level_cb =
+            get_control<ControlTypes::ComboBox, "Trigger Polarity">(SiPMGUIControls);
+    draw_control(io_level_cb, _sipm_doe,
+        _sipm_doe.GlobalConfig.IOLevel, ImGui::IsItemDeactivatedAfterEdit,
+        // Callback when IsItemEdited !
+        [&](SiPMAcquisitionData& caen_twin) {
+          caen_twin.GlobalConfig.IOLevel = _sipm_doe.GlobalConfig.IOLevel;
+        }, io_level_map
+    );
 
     bool tmp;
     constexpr auto soft_trigg = get_control<ControlTypes::Button,
@@ -136,11 +125,6 @@ void CAENGeneralConfigTab::draw() {
     //         // software_trigger(state.);
     //         return true;
     //     });
-
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Forces a trigger in the digitizer if "
-            "the feature is enabled");
-    }
 
     ImGui::PopItemWidth();
 }

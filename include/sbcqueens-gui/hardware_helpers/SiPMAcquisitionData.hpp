@@ -94,6 +94,7 @@ struct SiPMAcquisitionData {
 
     // Shared plot data
     PlotDataBuffer<2> IVData;
+    std::array<PlotDataBuffer<8>, 4> GroupData;
 
     // This API required items.
     bool Changed = false;

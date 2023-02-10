@@ -24,8 +24,8 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
             "the port increases as they were connected to the "
             "computer."},
     SiPMAcquisitionControl<ControlTypes::ComboBox, "Connection Type">{""},
-    SiPMAcquisitionControl<ControlTypes::ComboBox, "Model">{""},
-    SiPMAcquisitionControl<ControlTypes::InputUINT32, "VME Address">{""},
+    SiPMAcquisitionControl<ControlTypes::ComboBox, "CAEN Model">{""},
+    SiPMAcquisitionControl<ControlTypes::InputUINT32, "VME Address">{"", "", DrawingOptions{.StepSize = 1, .Format = "%d"}},
     SiPMAcquisitionControl<ControlTypes::InputText, "Keithley COM Port">{""},
     SiPMAcquisitionControl<ControlTypes::Button, "Connect##CAEN">{""},
     SiPMAcquisitionControl<ControlTypes::Button, "Disconnect##CAEN">{""},
