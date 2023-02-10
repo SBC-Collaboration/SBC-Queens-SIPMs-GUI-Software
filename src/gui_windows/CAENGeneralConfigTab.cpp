@@ -43,7 +43,8 @@ void CAENGeneralConfigTab::draw() {
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& caen_twin) {
           caen_twin.Model = _sipm_doe.Model;
-        }, CAENDigitizerModelsMap
+        },
+        CAENDigitizerModelsMap
     );
 
     ImGui::InputScalar("Max Events Per Read", ImGuiDataType_U32,
@@ -72,21 +73,26 @@ void CAENGeneralConfigTab::draw() {
     constexpr auto extt_mode_cb =
         get_control<ControlTypes::ComboBox, "External Trigger Mode">(SiPMGUIControls);
     draw_control(extt_mode_cb, _sipm_doe,
-        _sipm_doe.GlobalConfig.EXTTriggerMode, ImGui::IsItemDeactivatedAfterEdit,
+        _sipm_doe.GlobalConfig.EXTTriggerMode,
+        ImGui::IsItemDeactivatedAfterEdit,
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& caen_twin) {
-          caen_twin.GlobalConfig.EXTTriggerMode = _sipm_doe.GlobalConfig.EXTTriggerMode;
-        }, tgg_mode_map
+          caen_twin.GlobalConfig.EXTTriggerMode
+            = _sipm_doe.GlobalConfig.EXTTriggerMode;
+        },
+        tgg_mode_map
     );
 
     constexpr auto st_mode_cb =
         get_control<ControlTypes::ComboBox, "Software Trigger Mode">(SiPMGUIControls);
     draw_control(st_mode_cb, _sipm_doe,
-        _sipm_doe.GlobalConfig.SWTriggerMode, ImGui::IsItemDeactivatedAfterEdit,
+        _sipm_doe.GlobalConfig.SWTriggerMode,
+        ImGui::IsItemDeactivatedAfterEdit,
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& caen_twin) {
           caen_twin.GlobalConfig.SWTriggerMode = _sipm_doe.GlobalConfig.SWTriggerMode;
-        }, tgg_mode_map
+        },
+        tgg_mode_map
     );
 
     const std::unordered_map<CAEN_DGTZ_TriggerPolarity_t, std::string> trigger_polarity_map
@@ -96,11 +102,13 @@ void CAENGeneralConfigTab::draw() {
     constexpr auto trigger_polarity_cb =
         get_control<ControlTypes::ComboBox, "Trigger Polarity">(SiPMGUIControls);
     draw_control(trigger_polarity_cb, _sipm_doe,
-        _sipm_doe.GlobalConfig.TriggerPolarity, ImGui::IsItemDeactivatedAfterEdit,
+        _sipm_doe.GlobalConfig.TriggerPolarity,
+        ImGui::IsItemDeactivatedAfterEdit,
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& caen_twin) {
           caen_twin.GlobalConfig.TriggerPolarity = _sipm_doe.GlobalConfig.TriggerPolarity;
-        }, trigger_polarity_map
+        },
+        trigger_polarity_map
     );
 
     const std::unordered_map<CAEN_DGTZ_IOLevel_t, std::string> io_level_map =
@@ -110,11 +118,13 @@ void CAENGeneralConfigTab::draw() {
     constexpr auto io_level_cb =
             get_control<ControlTypes::ComboBox, "Trigger Polarity">(SiPMGUIControls);
     draw_control(io_level_cb, _sipm_doe,
-        _sipm_doe.GlobalConfig.IOLevel, ImGui::IsItemDeactivatedAfterEdit,
+        _sipm_doe.GlobalConfig.IOLevel,
+        ImGui::IsItemDeactivatedAfterEdit,
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& caen_twin) {
           caen_twin.GlobalConfig.IOLevel = _sipm_doe.GlobalConfig.IOLevel;
-        }, io_level_map
+        },
+        io_level_map
     );
 
     bool tmp;
@@ -123,16 +133,9 @@ void CAENGeneralConfigTab::draw() {
     draw_control(soft_trigg, _sipm_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
-        [doe = _sipm_doe]
-        (SiPMAcquisitionData& caen_twin) {
+        [](SiPMAcquisitionData& caen_twin) {
             caen_twin.SoftwareTrigger = true;
     });
-    // CAENControlFac.Button("Software Trigger",
-    //     [](CAENInterfaceData& state) {
-    //         state.SoftwareTrigger = true;
-    //         // software_trigger(state.);
-    //         return true;
-    //     });
 
     ImGui::PopItemWidth();
 }

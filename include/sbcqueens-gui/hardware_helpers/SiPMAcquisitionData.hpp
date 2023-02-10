@@ -61,7 +61,7 @@ struct SiPMAcquisitionData {
 
     CAENDigitizerModel Model;
     CAENGlobalConfig GlobalConfig;
-    std::vector<CAENGroupConfig> GroupConfigs;
+    std::array<CAENGroupConfig, 8> GroupConfigs;
 
     int PortNum = 0;
     uint32_t VMEAddress = 0;
@@ -91,6 +91,7 @@ struct SiPMAcquisitionData {
 
     // Indicator/"Out" data members
     uint32_t FileStatistics = 0;
+    CAEN_DGTZ_BoardInfo_t CAENBoardInfo;
 
     // Shared plot data
     PlotDataBuffer<2> IVData;

@@ -14,6 +14,7 @@
 #include "sbcqueens-gui/gui_windows/TeensyTab.hpp"
 #include "sbcqueens-gui/gui_windows/CAENGeneralConfigTab.hpp"
 #include "sbcqueens-gui/gui_windows/OtherSmallTabs.hpp"
+#include "sbcqueens-gui/gui_windows/CAENPerGroupConfigTab.hpp"
 
 #include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"
 #include "sbcqueens-gui/hardware_helpers/SlowDAQData.hpp"
@@ -44,6 +45,7 @@ public Window<SiPMAcquisitionData, TeensyControllerData, SlowDAQData> {
         this->_tabs.push_back(make_run_tab(sipm_data, teensy_data, slow_data));
         this->_tabs.push_back(make_teensy_tab(teensy_data));
         this->_tabs.push_back(make_caen_general_config_tab(_sipm_doe));
+        this->_tabs.push_back(make_caen_group_config_tab(_sipm_doe));
         this->_tabs.push_back(make_gui_config_tab());
     }
 

@@ -21,8 +21,8 @@ PeltierTTi = 1000000.0
 PeltierTTd = 0.0
 
 [CAEN]
-# DT5730B or DT5740D
-Model = "DT5740D"
+# DT5730B, DT5740D or V1740D
+Model = "V1740D"
 Port = 23473
 # USB if using a direct USB connection
 # A4818 for the USB 3.0 to CONET adapter
@@ -36,8 +36,8 @@ PostBufferPorcentage = 90
 OverlappingRejection = false
 TRGINasGate = false
 # 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
-ExternalTrigger = 0
-SoftwareTrigger = 1
+ExternalTrigger = 3
+SoftwareTrigger = 3
 # 0 = rising edge, 1 = falling edge
 Polarity = 1
 # 0 = NIM, 1 = TTL
@@ -47,18 +47,19 @@ IOLevel = 0
 # The number after group represents
 # the # of the group (or channel)
 [CAEN.group0]
-Enabled = 1
+Enabled = true
 # Trigger Enable Mask
-TrgMask = 7
+# TrgMask = 7
+TrgMask = 0b11111111
 # Acquisition Enable Mask
-AcqMask = 7
+AcqMask = 0b11111111
 # Group offset
 Offset = 0x8000
 # Individual corrections to offset
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
 Range = 1
-Threshold = 7850
+Threshold = 0
 
 # [CAEN.group1]
 # Enabled = 0

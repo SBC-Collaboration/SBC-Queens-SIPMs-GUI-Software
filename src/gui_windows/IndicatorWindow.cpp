@@ -18,6 +18,46 @@ void IndicatorWindow::draw() {
     constexpr auto file_stats = get_indicator<IndicatorTypes::Numerical,
                                         "File Statistics">(SiPMGUIIndicators);
     draw_indicator(file_stats, _sipm_doe.FileStatistics);
+
+    constexpr auto model_str = get_indicator<IndicatorTypes::String,
+                                        "Model Name">(SiPMGUIIndicators);
+    draw_indicator(model_str, _sipm_doe.CAENBoardInfo.ModelName);
+
+    constexpr auto fam_code = get_indicator<IndicatorTypes::Numerical,
+                                        "Family Code">(SiPMGUIIndicators);
+    draw_indicator(fam_code, _sipm_doe.CAENBoardInfo.FamilyCode);
+
+    constexpr auto ch_ind = get_indicator<IndicatorTypes::Numerical,
+                                        "Channels">(SiPMGUIIndicators);
+    draw_indicator(ch_ind, _sipm_doe.CAENBoardInfo.Channels);
+
+    constexpr auto serial_ind = get_indicator<IndicatorTypes::Numerical,
+                                        "Serial Number">(SiPMGUIIndicators);
+    draw_indicator(serial_ind, _sipm_doe.CAENBoardInfo.SerialNumber);
+
+    constexpr auto adc_bits_ind = get_indicator<IndicatorTypes::Numerical,
+                                        "ADC Bits">(SiPMGUIIndicators);
+    draw_indicator(adc_bits_ind, _sipm_doe.CAENBoardInfo.ADC_NBits);
+
+    constexpr auto roc_form_str = get_indicator<IndicatorTypes::String,
+                                        "ROC Firmware">(SiPMGUIIndicators);
+    draw_indicator(roc_form_str, _sipm_doe.CAENBoardInfo.ROC_FirmwareRel);
+
+    constexpr auto amc_form_str = get_indicator<IndicatorTypes::String,
+                                        "AMC Firmware">(SiPMGUIIndicators);
+    draw_indicator(amc_form_str, _sipm_doe.CAENBoardInfo.AMC_FirmwareRel);
+
+    constexpr auto license_str = get_indicator<IndicatorTypes::String,
+                                        "License">(SiPMGUIIndicators);
+    draw_indicator(license_str, _sipm_doe.CAENBoardInfo.License);
+    //     StringIndicator<"Model Name">("", ""),
+    // NumericalIndicator<"Family Code">("", ""),
+    // NumericalIndicator<"Channels">(" chs", ""),
+    // NumericalIndicator<"Serial Number">("", ""),
+    // NumericalIndicator<"ADC Bits">("bits", ""),
+    // StringIndicator<"ROC Firmware">("", ""),
+    // StringIndicator<"AMC Firmware">("", ""),
+    // StringIndicator<"License">("", "")
     // ImGui::Text("File Statistics");
     // _indicator_receiver.indicator(
     //     IndicatorNames::SAVED_WAVEFORMS, "Saved SiPM Pulses", 200);

@@ -134,7 +134,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             std::bind(&SiPMAcquisitionManager::attempt_connection, this));
 
         oscilloscopeMode_state = std::make_shared<SiPMAcquisitioneState>(
-            std::chrono::milliseconds(150),
+            std::chrono::milliseconds(500),
             std::bind(&SiPMAcquisitionManager::oscilloscope, this));
 
         measurementRoutineMode_state = std::make_shared<SiPMAcquisitioneState>(
@@ -165,117 +165,117 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         main_loop_state = standby_state;
 
-        _sipm_volt_sys.build(
-            [=] (serial_ptr& port) -> bool {
-                static auto send_msg_slow = make_blocking_total_timed_event(
-                    std::chrono::milliseconds(200),
-                    [&](const std::string& msg){
-                        spdlog::info("Sending msg to Keithely: {0}", msg);
-                        send_msg(port, msg + "\n", "");
-                    }
-                );
+        // _sipm_volt_sys.build(
+        //     [=] (serial_ptr& port) -> bool {
+        //         static auto send_msg_slow = make_blocking_total_timed_event(
+        //             std::chrono::milliseconds(200),
+        //             [&](const std::string& msg){
+        //                 spdlog::info("Sending msg to Keithely: {0}", msg);
+        //                 send_msg(port, msg + "\n", "");
+        //             }
+        //         );
 
-                SerialParams ssp;
-                ssp.Timeout = serial::Timeout::simpleTimeout(5000);
-                ssp.Baudrate = 115200;
-                connect_par(port, _doe.SiPMVoltageSysPort, ssp);
+        //         SerialParams ssp;
+        //         ssp.Timeout = serial::Timeout::simpleTimeout(5000);
+        //         ssp.Baudrate = 115200;
+        //         connect_par(port, _doe.SiPMVoltageSysPort, ssp);
 
-                if (!port) {
-                    spdlog::error("Port with port name {0} was not open",
-                        _doe.SiPMVoltageSysPort);
-                    return false;
-                }
+        //         if (!port) {
+        //             spdlog::error("Port with port name {0} was not open",
+        //                 _doe.SiPMVoltageSysPort);
+        //             return false;
+        //         }
 
-                if (!port->isOpen()) {
-                    spdlog::error("Port with port name {0} was not open",
-                        _doe.SiPMVoltageSysPort);
-                    return false;
-                }
+        //         if (!port->isOpen()) {
+        //             spdlog::error("Port with port name {0} was not open",
+        //                 _doe.SiPMVoltageSysPort);
+        //             return false;
+        //         }
 
-                spdlog::info("Connected to Keithley 2000! "
-                    "Initializing...");
+        //         spdlog::info("Connected to Keithley 2000! "
+        //             "Initializing...");
 
-                // Setup GPIB interface
-                // send_msg_slow("++rst");
-                // This should be not run if we are in debug mode.
-            #ifdef NDEBUG
-                send_msg_slow("++eos 0");
-                send_msg_slow("++addr 10");
-                send_msg_slow("++auto 0");
+        //         // Setup GPIB interface
+        //         // send_msg_slow("++rst");
+        //         // This should be not run if we are in debug mode.
+        //     #ifdef NDEBUG
+        //         send_msg_slow("++eos 0");
+        //         send_msg_slow("++addr 10");
+        //         send_msg_slow("++auto 0");
 
-                //// if tired of waiting for keithley comment starting here:
-                // Now Keithley
-                // These parameters are constant for now
-                // but later they can become a parameter or the voltage
-                // system can be optional at all
-                send_msg_slow("*rst");
-                send_msg_slow(":init:cont on");
-                send_msg_slow(":volt:dc:nplc 10");
-                send_msg_slow(":volt:dc:rang:auto 0");
-                send_msg_slow(":volt:dc:rang 100");
-                send_msg_slow(":volt:dc:aver:stat 0");
-                // send_msg_slow(":volt:dc:aver:tcon mov");
-                // send_msg_slow(":volt:dc:aver:coun 100");
+        //         //// if tired of waiting for keithley comment starting here:
+        //         // Now Keithley
+        //         // These parameters are constant for now
+        //         // but later they can become a parameter or the voltage
+        //         // system can be optional at all
+        //         send_msg_slow("*rst");
+        //         send_msg_slow(":init:cont on");
+        //         send_msg_slow(":volt:dc:nplc 10");
+        //         send_msg_slow(":volt:dc:rang:auto 0");
+        //         send_msg_slow(":volt:dc:rang 100");
+        //         send_msg_slow(":volt:dc:aver:stat 0");
+        //         // send_msg_slow(":volt:dc:aver:tcon mov");
+        //         // send_msg_slow(":volt:dc:aver:coun 100");
 
-                send_msg_slow(":form ascii");
+        //         send_msg_slow(":form ascii");
 
-                // Keithley 6487
-                send_msg_slow("++addr 22");
-                send_msg_slow("*rst");
-                send_msg_slow(":form:elem read");
+        //         // Keithley 6487
+        //         send_msg_slow("++addr 22");
+        //         send_msg_slow("*rst");
+        //         send_msg_slow(":form:elem read");
 
-                // Volt supply side
-                send_msg_slow(":sour:volt:rang 55");
-                send_msg_slow(":sour:volt:ilim 250e-6");
-                send_msg_slow(":sour:volt "
-                    + std::to_string(_doe.SiPMVoltageSysVoltage));
-                send_msg_slow(":sour:volt:stat OFF");
+        //         // Volt supply side
+        //         send_msg_slow(":sour:volt:rang 55");
+        //         send_msg_slow(":sour:volt:ilim 250e-6");
+        //         send_msg_slow(":sour:volt "
+        //             + std::to_string(_doe.SiPMVoltageSysVoltage));
+        //         send_msg_slow(":sour:volt:stat OFF");
 
-                // Ammeter side
-                send_msg_slow(":sens:curr:dc:nplc 6");
-                send_msg_slow(":sens:aver:stat off");
+        //         // Ammeter side
+        //         send_msg_slow(":sens:curr:dc:nplc 6");
+        //         send_msg_slow(":sens:aver:stat off");
 
-                // Zero check
-                send_msg_slow(":syst:zch ON");
-                send_msg_slow(":curr:rang 2E-7");
-                send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1000));
-                send_msg_slow(":init");
-                send_msg_slow(":syst:zcor:stat OFF");
-                send_msg_slow(":syst:zcor:acq");
-                send_msg_slow(":syst:zch OFF");
-                send_msg_slow(":syst:zcor ON");
-                send_msg_slow(":syst:azer ON");
+        //         // Zero check
+        //         send_msg_slow(":syst:zch ON");
+        //         send_msg_slow(":curr:rang 2E-7");
+        //         send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1000));
+        //         send_msg_slow(":init");
+        //         send_msg_slow(":syst:zcor:stat OFF");
+        //         send_msg_slow(":syst:zcor:acq");
+        //         send_msg_slow(":syst:zch OFF");
+        //         send_msg_slow(":syst:zcor ON");
+        //         send_msg_slow(":syst:azer ON");
 
-                send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(200));
-                send_msg_slow(":arm:coun 1");
-                send_msg_slow(":arm:sour imm");
-                send_msg_slow(":arm:timer 0");
-                send_msg_slow(":trig:coun 1");
-                send_msg_slow(":trig:sour imm");
+        //         send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(200));
+        //         send_msg_slow(":arm:coun 1");
+        //         send_msg_slow(":arm:sour imm");
+        //         send_msg_slow(":arm:timer 0");
+        //         send_msg_slow(":trig:coun 1");
+        //         send_msg_slow(":trig:sour imm");
 
-                send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1100));
-                send_msg_slow(":init");
-            #endif
+        //         send_msg_slow.ChangeWaitTime(std::chrono::milliseconds(1100));
+        //         send_msg_slow(":init");
+        //     #endif
 
-                return true;
-            },
-            [=](serial_ptr& port) -> bool {
-                if (port) {
-                    send_msg(port, "++addr 22\n", "");
-                    send_msg(port, ":sour:volt:stat OFF\n", "");
-                    send_msg(port, ":sour:volt 0.0\n", "");
+        //         return true;
+        //     },
+        //     [=](serial_ptr& port) -> bool {
+        //         if (port) {
+        //             send_msg(port, "++addr 22\n", "");
+        //             send_msg(port, ":sour:volt:stat OFF\n", "");
+        //             send_msg(port, ":sour:volt 0.0\n", "");
 
-                    if (port->isOpen()) {
-                        disconnect(port);
-                    }
-                }
+        //             if (port->isOpen()) {
+        //                 disconnect(port);
+        //             }
+        //         }
 
-                return false;
-        });
+        //         return false;
+        // });
 
         // Actual loop!
         while (main_loop_state->operator()()) {
-            sipm_voltage_system_update();
+            // sipm_voltage_system_update();
         }
     }
 
@@ -418,8 +418,13 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             return PlotDataBuffer<8>(_doe.GlobalConfig.RecordLength);
         });
 
+        for(auto& data : _doe.GroupData) {
+            data.fill();
+        }
+
         _num_chs = _caen_port->ModelConstants.NumChannels;
         _acq_rate = _caen_port->ModelConstants.AcquisitionRate;
+        _doe.CAENBoardInfo = _caen_port->CAENBoardInfo;
 
         // Enable acquisition HAS to be called AFTER setup
         enable_acquisition(_caen_port);
@@ -499,9 +504,11 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         auto events = get_events_in_buffer(_caen_port);
         // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
 
+        spdlog::info("events = {}", events);
         retrieve_data(_caen_port);
 
         if (_doe.SoftwareTrigger) {
+            spdlog::info("Sending a software trigger");
             software_trigger(_caen_port);
             _doe.SoftwareTrigger = false;
         }
@@ -513,16 +520,16 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // to approximate the actual number of waveforms acquired.
             // Specially because the buffer is cleared.
             TriggeredWaveforms += events;
-            // spdlog::info("Total size buffer: {0}",  Port->Data.TotalSizeBuffer);
-            // spdlog::info("Data size: {0}", Port->Data.DataSize);
-            // spdlog::info("Num events: {0}", Port->Data.NumEvents);
+            spdlog::info("Total size buffer: {0}",  _caen_port->Data.TotalSizeBuffer);
+            spdlog::info("Data size: {0}", _caen_port->Data.DataSize);
+            spdlog::info("Num events: {0}", _caen_port->Data.NumEvents);
 
             extract_event(_caen_port, 0, _osc_event);
 
-            // spdlog::info("Event size: {0}", osc_event->Info.EventSize);
-            // spdlog::info("Event counter: {0}", osc_event->Info.EventCounter);
-            // spdlog::info("Trigger Time Tag: {0}",
-            //     osc_event->Info.TriggerTimeTag);
+            spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
+            spdlog::info("Event counter: {0}", _osc_event->Info.EventCounter);
+            spdlog::info("Trigger Time Tag: {0}",
+                _osc_event->Info.TriggerTimeTag);
 
             process_data_for_gui();
 
@@ -723,26 +730,32 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             return;
         }
 
-        for (std::size_t j = 0; j < _num_chs; j++) {
+        auto size = _osc_event->Data->ChSize[0];
+        auto all_chs = _osc_event->Data->DataChannel;
+
+        spdlog::info("size {}", size);
+
+        if (size <= 0) {
+            return;
+        }
+
+        for (std::size_t i = 0; i < size; i++) {
             // auto& ch_num = ch.second.Number;
-            auto buf = _osc_event->Data->DataChannel[j];
-            auto size = _osc_event->Data->ChSize[j];
 
-            if (size <= 0) {
-                continue;
-            }
+            _doe.GroupData[0].add_at(i, i*(1e9/_acq_rate),
+                all_chs[0][i], 0, 0, 0, 0, 0, 0, 0);
+                // all_chs[1][i],
+                // all_chs[2][i],
+                // all_chs[3][i],
+                // all_chs[4][i],
+                // all_chs[5][i],
+                // all_chs[6][i],
+                // all_chs[7][i]);
 
-            _x_values.resize(size);
-            _y_values.resize(size);
-
-            for (uint32_t i = 0; i < size; i++) {
-                _x_values[i] = i*(1e9/_acq_rate);
-                _y_values[i] = static_cast<double>(buf[i]);
-            }
-
-            // _plot_sender(static_cast<uint8_t>(j),
-            //     _x_values,
-            //     _y_values);
+            // for (uint32_t i = 0; i < size; i++) {
+            //     _x_values[i] = i*(1e9/_acq_rate);
+            //     _y_values[i] = static_cast<double>(buf[i]);
+            // }
         }
     }
 

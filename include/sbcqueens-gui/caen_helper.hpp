@@ -1,5 +1,6 @@
 #ifndef CAENHELPER_H
 #define CAENHELPER_H
+#include <numeric>
 #pragma once
 
 // C STD includes
@@ -15,6 +16,8 @@
 #include <map>
 #include <cmath>
 #include <chrono>
+#include <array>
+#include <variant>
 
 // C++ 3rd party includes
 #include <CAENComm.h>
@@ -24,6 +27,10 @@
 
 namespace SBCQueens {
 
+enum class CAENDigitizerFamilies {
+    x725, x730, x740, x742, x743, x751
+};
+
 enum class CAENConnectionType {
     USB,
     A4818
@@ -31,7 +38,8 @@ enum class CAENConnectionType {
 
 enum class CAENDigitizerModel {
     DT5730B = 0,
-    DT5740D = 1
+    DT5740D = 1,
+    V1740D = 2
 };
 
 // All the constants that never change for a given digitizer
@@ -81,7 +89,8 @@ struct CAENDigitizerModelConstants {
 const static inline std::unordered_map<std::string, CAENDigitizerModel>
     CAENDigitizerModelsMap {
         {"DT5730B", CAENDigitizerModel::DT5730B},
-        {"DT5740D", CAENDigitizerModel::DT5740D}
+        {"DT5740D", CAENDigitizerModel::DT5740D},
+        {"V1740D", CAENDigitizerModel::V1740D}
 };
 
 // These links all the enums with their constants or properties that
@@ -93,7 +102,7 @@ const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelCon
             500e6,  //  AcquisitionRate
             static_cast<uint32_t>(5.12e6),  // MemoryPerChannel
             8,  // NumChannels
-            0,  // NumberOfGroups
+            0,  // NumberOfGroups, 0 -> no groups
             8,  // NumChannelsPerGroup
             1024,  // MaxNumBuffers
             10.0f,  // NLOCToRecordLength
@@ -104,11 +113,22 @@ const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelCon
             62.5e6,  //  AcquisitionRate
             static_cast<uint32_t>(192e3),  // MemoryPerChannel
             32,  // NumChannels
-            4,  // NumChannels
+            4,  // NumChannelsPerGroup
             8,  // NumberOfGroups
             1024,  // MaxNumBuffers
             1.5f,  // NLOCToRecordLength
             {2.0, 10.0}  // VoltageRanges
+        }},
+        {CAENDigitizerModel::V1740D, CAENDigitizerModelConstants {
+            12,  // ADCResolution
+            62.5e6,  //  AcquisitionRate
+            static_cast<uint32_t>(192e3),  // MemoryPerChannel
+            64,  // NumChannels
+            8,  // NumChannelsPerGroup
+            8,  // NumberOfGroups
+            1024,  // MaxNumBuffers
+            1.5f,  // NLOCToRecordLength
+            {2.0}  // VoltageRanges
         }}
     // This is a C++20 higher feature so lets keep everything 17 compliant
     // CAENDigitizerModelsConstants_map {
@@ -147,7 +167,7 @@ struct CAENGlobalConfig {
     uint32_t MaxEventsPerRead = 512;
 
     // Record length in samples
-    uint32_t RecordLength = 400;
+    uint32_t RecordLength = 100;
 
     // In %
     uint32_t PostTriggerPorcentage = 50;
@@ -171,7 +191,7 @@ struct CAENGlobalConfig {
     CAEN_DGTZ_IOLevel_t IOLevel
         = CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM;
 
-    // This feature is for X730
+    // This feature is for x730, x740
     // True = disabled, False = enabled
     bool TriggerOverlappingEn = false;
 
@@ -186,26 +206,43 @@ struct CAENGlobalConfig {
         CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge;
 };
 
+struct ChannelsMask {
+    std::array<bool, 8> CH
+        = {false, false, false, false, false, false, false, false};
+
+    uint8_t get() noexcept {
+        uint8_t out = 0u;
+        for(std::size_t i = 0; i < CH.size(); i++) {
+            out |= static_cast<uint8_t>(CH[i]) << i;
+        }
+        return out;
+    }
+
+    bool& operator[](const std::size_t& iter) noexcept {
+        return CH[iter];
+    }
+};
+
 // As a general case, this holds all the configuration values for a channel
 // if a digitizer does not support groups, i.e x730, group = channel
 struct CAENGroupConfig {
-    // channel # or channel group
-    uint8_t Number = 0;
+    // Channel or group number
+    bool Enabled = 0;
 
     // Mask of channels within the group enabled to trigger
     // If Channel, if its != 0 then its enabled
-    uint8_t TriggerMask = 0;
+    ChannelsMask TriggerMask;
 
     // Mask of enabled channels within the group
     // Ignored for single channels.
-    uint8_t AcquisitionMask = 0;
+    ChannelsMask AcquisitionMask;
 
     // 0x8000 no offset if 16 bit DAC
     // 0x1000 no offset if 14 bit DAC
     // 0x400 no offset if 14 bit DAC
     // DC offsets of each channel in the group
-    uint16_t DCOffset;
-    std::vector<uint8_t> DCCorrections;
+    uint32_t DCOffset = 0x8000;
+    std::array<uint8_t, 8> DCCorrections = {0, 0, 0, 0, 0, 0, 0, 0};
 
     // For DT5730
     // 0 = 2Vpp, 1 = 0.5Vpp
@@ -213,7 +250,7 @@ struct CAENGroupConfig {
     uint8_t DCRange = 0;
 
     // In ADC counts
-    uint16_t TriggerThreshold = 0;
+    uint32_t TriggerThreshold = 0;
 };
 
 // Holds the CAEN raw data, the size of the buffer, the size
@@ -285,6 +322,14 @@ struct caen {
         ConnectionType(ct), LinkNum(ln), ConetNode(cn),
         VMEBaseAddress(addr), Handle(h), LatestError(err),
         ModelConstants(CAENDigitizerModelsConstantsMap.at(model)) {
+
+        if (model == CAENDigitizerModel::DT5730B) {
+            Family = CAENDigitizerFamilies::x730;
+        } else if (model == CAENDigitizerModel::DT5740D ||
+            model == CAENDigitizerModel::V1740D) {
+            Family = CAENDigitizerFamilies::x740;
+        }
+
     }
 
     ~caen() {
@@ -298,9 +343,11 @@ struct caen {
     caen(const caen&) = delete;
 
     // Public members
+    CAENDigitizerFamilies Family;
     CAENDigitizerModel Model;
+    CAEN_DGTZ_BoardInfo_t CAENBoardInfo;
     CAENGlobalConfig GlobalConfig;
-    std::map<uint8_t, CAENGroupConfig> GroupConfigs;
+    std::array<CAENGroupConfig, 8> GroupConfigs;
     uint32_t CurrentMaxBuffers;
 
     CAENConnectionType ConnectionType;
@@ -332,9 +379,9 @@ struct caen {
 
     // Returns the channel voltage range. If channel does not exist
     // returns 0
-    double GetVoltageRange(const uint8_t& ch) const {
+    double GetVoltageRange(const uint8_t& gr_n) const {
         try {
-            auto config = GroupConfigs.at(ch);
+            auto config = GroupConfigs[gr_n];
             return ModelConstants.VoltageRanges[config.DCRange];
         } catch(...) {
             return 0.0;
@@ -427,7 +474,8 @@ void calibrate(CAEN&) noexcept;
 // Calls a bunch of setup functions for each channel configuration
 // found under the vector<CAENChannelConfigs> in res
 // Does not setup if resource is null or there are errors.
-void setup(CAEN&, CAENGlobalConfig, std::vector<CAENGroupConfig>) noexcept;
+void setup(CAEN&, CAENGlobalConfig,
+           const std::array<CAENGroupConfig, 8>&) noexcept;
 
 // Enables the acquisition and allocates the memory for the acquired data.
 // Does not enable acquisitoin if resource is null or there are errors.

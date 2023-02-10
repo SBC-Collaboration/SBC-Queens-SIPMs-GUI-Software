@@ -138,7 +138,7 @@ void calibrate(CAEN& res) noexcept {
 }
 
 void setup(CAEN &res, CAENGlobalConfig g_config,
-    std::vector<CAENGroupConfig> gr_configs) noexcept {
+           const std::array<CAENGroupConfig, 8>& gr_configs) noexcept {
     if (!res) {
         return;
     }
@@ -159,12 +159,16 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
         if (latest_err >= 0) {
             auto err = f(args...);
             if (err < 0) {
-                spdlog::error("caen error {}", err);
+                spdlog::error("caen error {}, {}", err, msg);
                 latest_err = err;
                 err_msg += msg;
             }
         }
     };
+
+    error_wrap("CAEN_DGTZ_GetInfo Failed. ",
+                         CAEN_DGTZ_GetInfo, handle,
+                         &res->CAENBoardInfo);
 
     // Global config
     res->GlobalConfig = g_config;
@@ -197,9 +201,10 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     // res->GlobalConfig.RecordLength
     //     = res->ModelConstants.NLOCToRecordLength * nloc;
 
-    error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
-                         CAEN_DGTZ_SetPostTriggerSize, handle,
-                         res->GlobalConfig.PostTriggerPorcentage);
+    // Failing on x1740
+    // error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
+    //                      CAEN_DGTZ_SetPostTriggerSize, handle,
+    //                      res->GlobalConfig.PostTriggerPorcentage);
 
     // Trigger Mode comes in four flavors:
     // CAEN_DGTZ_TRGMODE_DISABLED
@@ -238,9 +243,23 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     // Trigger polarity
     // These digitizers do not support channel-by-channel trigger pol
     // so we treat it like a global config, and use 0 as a placeholder.
-    error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
-                         CAEN_DGTZ_SetTriggerPolarity, handle, 0,
-                         res->GlobalConfig.TriggerPolarity);
+    /// For the for V1740D, we have to change register 0x8000 to set
+    // polarity and it seems to be a global setting.
+    if (res->Model == CAENDigitizerModel::V1740D) {
+        switch (res->GlobalConfig.TriggerPolarity) {
+        case CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge:
+            write_bits(res, 0x8000, res->GlobalConfig.TriggerPolarity, 6);
+            break;
+        default:
+            write_bits(res, 0x8000, 0, 6);
+        }
+        write_bits(res, 0x8000, res->GlobalConfig.TriggerPolarity, 6);
+    } else {
+        // Otherwise, it is a conventional function call.
+        error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
+                             CAEN_DGTZ_SetTriggerPolarity, handle, 0,
+                             res->GlobalConfig.TriggerPolarity);
+    }
 
     error_wrap("CAEN_DGTZ_SetIOLevel Failed. ",
                          CAEN_DGTZ_SetIOLevel, handle,
@@ -254,19 +273,21 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     write_bits(res, 0x8100, res->GlobalConfig.MemoryFullModeSelection, 5);
 
     // Channel stuff
-    if (res->Model == CAENDigitizerModel::DT5730B) {
+    res->GroupConfigs = gr_configs;
+    if (res->Family == CAENDigitizerFamilies::x730) {
         // For DT5730B, there are no groups only channels so we take
         // each configuration as a channel
-
         // First, we make the channel mask
         uint32_t channel_mask = 0;
-        for (auto ch_config : gr_configs) {
-            channel_mask |= 1 << ch_config.Number;
+        for (std::size_t ch = 0; ch < gr_configs.size(); ch++) {
+            channel_mask |= res->GroupConfigs[ch].Enabled << ch;
         }
 
         uint32_t trg_mask = 0;
-        for (auto ch_config : gr_configs) {
-            trg_mask |= (ch_config.TriggerMask > 0) << ch_config.Number;
+        for (std::size_t ch = 0; ch < gr_configs.size(); ch++) {
+            trg_mask = res->GroupConfigs[ch].TriggerMask.get();
+            bool has_trig_mask = trg_mask > 0;
+            trg_mask |=  has_trig_mask << ch;
         }
 
         // Then enable those channels
@@ -279,87 +300,74 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
                              CAEN_DGTZ_SetChannelSelfTrigger, handle,
                              res->GlobalConfig.CHTriggerMode, trg_mask);
 
-        // Let's clear the channel map to allow for new channels properties
-        res->GroupConfigs.clear();
-        for (auto ch_config : gr_configs) {
-            // Before we set any parameters for each channel, we add the
-            // new channel to the map. try_emplace(...) will make sure we do
-            // not add duplicates
-            auto ins =
-                    res->GroupConfigs.try_emplace(ch_config.Number, ch_config);
-
-            // if false, it was already inserted and we move to the next
-            // channel
-            if (!ins.second) {
-                continue;
-            }
+        for (std::size_t ch = 0; ch < gr_configs.size(); ch++) {
+            auto ch_config = gr_configs[ch];
 
             // Trigger stuff
             // Self Channel trigger
             error_wrap("CAEN_DGTZ_SetChannelTriggerThreshold Failed. ",
-                 CAEN_DGTZ_SetChannelTriggerThreshold, handle,
-                 ch_config.Number, ch_config.TriggerThreshold);
+                CAEN_DGTZ_SetChannelTriggerThreshold, handle,
+                ch, ch_config.TriggerThreshold);
 
             error_wrap("CAEN_DGTZ_SetChannelDCOffset Failed. ",
-                CAEN_DGTZ_SetChannelDCOffset, handle, ch_config.Number,
+                CAEN_DGTZ_SetChannelDCOffset, handle, ch,
                 ch_config.DCOffset);
 
             // Writes to the registers that holds the DC range
             // For 5730 it is the register 0x1n28
             error_wrap("write_register to reg 0x1n28 Failed (DC Range). ",
                                  CAEN_DGTZ_WriteRegister, handle,
-                                 0x1028 | (ch_config.Number & 0x0F) << 8,
+                                 0x1028 | (ch & 0x0F) << 8,
                                  ch_config.DCRange & 0x0001);
         }
 
-    } else if (res->Model == CAENDigitizerModel::DT5740D) {
-        // For DT5740D
-
+    } else if (res->Family == CAENDigitizerFamilies::x740) {
         uint32_t group_mask = 0;
-        for (auto gr_config : gr_configs) {
-            group_mask |= 1 << gr_config.Number;
+        for (std::size_t grp_n = 0; grp_n < gr_configs.size(); grp_n++) {
+            group_mask |= gr_configs[grp_n].Enabled << grp_n;
         }
 
+        spdlog::info("{:x}", group_mask);
+
         error_wrap("CAEN_DGTZ_SetGroupEnableMask Failed. ",
-                             CAEN_DGTZ_SetGroupEnableMask, handle, group_mask);
+                   CAEN_DGTZ_SetGroupEnableMask, handle, group_mask);
 
         error_wrap("CAEN_DGTZ_SetGroupSelfTrigger Failed. ",
                              CAEN_DGTZ_SetGroupSelfTrigger, handle,
                              res->GlobalConfig.CHTriggerMode, group_mask);
 
-        res->GroupConfigs.clear();
-        for (auto gr_config : gr_configs) {
-            // Before we set any parameters for each channel, we add the
-            // new channel to the map. try_emplace(...) will make sure we do
-            // not add duplicates
-            auto ins =
-                    res->GroupConfigs.try_emplace(gr_config.Number, gr_config);
-
-            // if false, it was already inserted and we move to the next
-            // channel
-            if (!ins.second) {
-                continue;
-            }
-
+        for (std::size_t grp_n = 0; grp_n < gr_configs.size(); grp_n++) {
+            auto gr_config = gr_configs[grp_n];
             // Trigger stuff
-            error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
-                                 CAEN_DGTZ_SetGroupTriggerThreshold, handle,
-                                 gr_config.Number, gr_config.TriggerThreshold);
+            spdlog::info("Group {} has trigger threshold = {:X} and is it enabled? {}",
+                grp_n, gr_config.TriggerThreshold, gr_config.Enabled);
+
+            // This guy is not working...
+            // error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
+            //            CAEN_DGTZ_SetGroupTriggerThreshold, handle,
+            //            grp_n, gr_config.TriggerThreshold);
+            // Writing to the register seems the way to go.
+            // write_register(res, 0x1080 | (grp_n << 8), gr_config.TriggerThreshold);
 
             error_wrap("CAEN_DGTZ_SetGroupDCOffset Failed. ",
-                                 CAEN_DGTZ_SetGroupDCOffset,
-                                 handle, gr_config.Number,
-                                 gr_config.DCOffset);
+                       CAEN_DGTZ_SetGroupDCOffset,
+                       handle, grp_n,
+                       gr_config.DCOffset);
 
             // Set the mask for channels enabled for self-triggering
+            auto trig_mask = gr_config.TriggerMask.get();
             error_wrap("CAEN_DGTZ_SetChannelGroupMask Failed. ",
                 CAEN_DGTZ_SetChannelGroupMask,
-                handle, gr_config.Number, gr_config.TriggerMask);
+                handle, grp_n, trig_mask);
+
+            spdlog::info("trigg mask {:X}", trig_mask);
 
             // Set acquisition mask
-            write_bits(res, 0x10A8 | (gr_config.Number << 8),
-                gr_config.AcquisitionMask, 0, 8);
+            auto acq_mask = gr_config.AcquisitionMask.get();
+            write_bits(res, 0x10A8 | (grp_n << 8),
+                acq_mask, 0, 8);
 
+            spdlog::info("acq mask {:X}", acq_mask);
             // DCCorrections should be of length
             // NumberofChannels / NumberofGroups.
             // set individual channel 8-bitDC offset
@@ -368,12 +376,12 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
             for (int ch = 0; ch < 4; ch++) {
                 word += gr_config.DCCorrections[ch] << (ch * 8);
             }
-            write_register(res, 0x10C0 | (gr_config.Number << 8), word);
+            write_register(res, 0x10C0 | (grp_n << 8), word);
             word = 0;
             for (int ch = 4; ch < 8; ch++) {
                 word += gr_config.DCCorrections[ch] << ((ch - 4) * 8);
             }
-            write_register(res, 0x10C4 | (gr_config.Number << 8), word);
+            write_register(res, 0x10C4 | (grp_n << 8), word);
         }
 
 
@@ -468,7 +476,7 @@ void write_register(CAEN& res, uint32_t&& addr,
     auto err = CAEN_DGTZ_WriteRegister(res->Handle, addr, value);
     if (err < 0) {
         res->LatestError = CAENError {
-            "There was en error while trying to write"
+            "There was en error while trying to write "
             "to register.",  // ErrorMessage
             err,  // ErrorCode
             true  // isError
@@ -839,7 +847,8 @@ std::string sbc_init_file(CAEN& res) noexcept {
         // This bool will make sure nothing will be added if it does not
         // have groups
         if (has_groups) {
-            num_ch += has_groups*n_channels_acq(gr_pair.second.AcquisitionMask);
+            auto acq_mask = gr_pair.AcquisitionMask.get();
+            num_ch += has_groups*n_channels_acq(acq_mask);
         } else {
             num_ch = static_cast<uint32_t>(res->GroupConfigs.size());
         }
@@ -963,15 +972,17 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     // This will switch between Zhiheng code and mine if it has groups
     auto wrap_if_group = [=, grp_conf = res->GroupConfigs]
         (uint64_t& offset, char* str, auto f) {
-        for (auto gr_pair : grp_conf) {
+        for (std::size_t gr_n = 0; gr_n < grp_conf.size(); gr_n++) {
+            auto gr_pair = grp_conf[gr_n];
             if (has_groups) {
                 for (int ch = 0; ch < ch_per_group; ch++) {
-                    if (gr_pair.second.AcquisitionMask & (1 << ch)) {
-                        f(gr_pair.second, offset, str, ch);
+                    auto acq_mask = gr_pair.AcquisitionMask.get();
+                    if (acq_mask & (1 << ch)) {
+                        f(gr_n, gr_pair, offset, str, ch);
                     }
                 }
             } else {
-                f(gr_pair.second, offset, str, 0);
+                f(gr_n, gr_pair, offset, str, 0);
             }
         }
     };
@@ -979,7 +990,8 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     uint32_t num_ch = 0;
     for (auto gr_pair : res->GroupConfigs) {
         if (has_groups) {
-            num_ch += has_groups*n_channels_acq(gr_pair.second.AcquisitionMask);
+            auto acq_mask = gr_pair.AcquisitionMask.get();
+            num_ch += has_groups*n_channels_acq(acq_mask);
         } else {
             num_ch = res->GroupConfigs.size();
         }
@@ -1003,17 +1015,20 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     // }
 
     wrap_if_group(file_offset, &out_str[0],
-        [=](auto group, uint64_t& offset, char* str, uint8_t ch) {
-            uint8_t channel = group.Number * ch_per_group + ch;
+        [=](std::size_t grp_n, auto, uint64_t& offset, char* str, uint8_t ch) {
+            uint8_t channel = grp_n * ch_per_group + ch;
             append_cstr(channel, offset, str);
         });
 
     // trg_mask
     uint32_t trg_mask = 0;
-    for (auto gr_pair : res->GroupConfigs) {
-        uint32_t pos = has_groups ? gr_pair.second.Number * ch_per_group
-        : gr_pair.second.Number;
-        trg_mask |= (gr_pair.second.TriggerMask << pos);
+    for (std::size_t ch = 0; ch < res->GroupConfigs.size(); ch++) {
+        auto gr_pair = res->GroupConfigs[ch];
+        uint32_t pos = has_groups ? ch * ch_per_group
+        : ch;
+
+        auto trig_mask = gr_pair.TriggerMask.get();
+        trg_mask |= (trig_mask << pos);
     }
 
     append_cstr(trg_mask, file_offset, &out_str[0]);
@@ -1032,7 +1047,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     // }
 
     wrap_if_group(file_offset, &out_str[0],
-        [=](auto group, uint64_t& offset, char* str, uint8_t) {
+        [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t) {
             append_cstr(group.TriggerThreshold, offset, str);
         });
 
@@ -1045,7 +1060,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     //  }
     // }
     wrap_if_group(file_offset, &out_str[0],
-        [=](auto group, uint64_t& offset, char* str, uint8_t) {
+        [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t) {
             append_cstr(group.DCOffset, offset, str);
         });
 
@@ -1058,7 +1073,7 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     //  }
     // }
     wrap_if_group(file_offset, &out_str[0],
-        [=](auto group, uint64_t& offset, char* str, uint8_t ch) {
+        [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t ch) {
             if (group.DCCorrections.size() == 8) {
                 append_cstr(group.DCCorrections[ch], offset, str);
             } else {
@@ -1078,8 +1093,8 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     // }
 
     wrap_if_group(file_offset, &out_str[0],
-        [&](auto group, uint64_t& off, char* str, uint8_t) {
-            float val = res->GetVoltageRange(group.Number);
+        [&](std::size_t gr_n, auto, uint64_t& off, char* str, uint8_t) {
+            float val = res->GetVoltageRange(gr_n);
             append_cstr(val, off, str);
         });
 
@@ -1094,12 +1109,12 @@ std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
     // where the x-axis is the record length and the y-axis are the
     // number of channels that are activated
     auto& evtdata = evt->Data;
-    for (auto gr_pair : res->GroupConfigs) {
-        auto gr = gr_pair.second.Number;
-
+    for (std::size_t gr = 0; gr < res->GroupConfigs.size(); gr++) {
+        auto gr_pair = res->GroupConfigs[gr];
         if (has_groups){
             for (int ch = 0; ch < ch_per_group; ch++) {
-                if (gr_pair.second.AcquisitionMask & (1<<ch)) {
+                auto acq_mask = gr_pair.AcquisitionMask.get();
+                if (acq_mask & (1<<ch)) {
                     for(uint32_t xp = 0; xp < evtdata->ChSize[gr*ch_per_group+ch]; xp++) {
                         append_cstr(evtdata->DataChannel[ch][xp],
                             file_offset, &out_str[0]);

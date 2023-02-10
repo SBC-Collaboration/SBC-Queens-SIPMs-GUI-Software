@@ -91,13 +91,13 @@ class PlotDataBuffer {
     // or replaces the values of the current index if full.
     template<typename... OtherTypes>
     void operator()(const OtherTypes&... vals) {
-        static_assert(sizeof...(vals) == NumPlots + 1,
-            "Passed number of parameters"
-            "must be equal to the number of plots plus one.");
-
         if (not Data) {
             return;
         }
+
+        static_assert(sizeof...(vals) == NumPlots + 1,
+            "Passed number of parameters"
+            "must be equal to the number of plots plus one.");
 
         Data->col(_current_index) = {static_cast<T>(vals)...};
 
@@ -110,7 +110,24 @@ class PlotDataBuffer {
         }
     }
 
-    // Adds vals at specific index i. It ignored the circular buffer
+    template<typename OtherType, size_t N>
+    void operator()(const std::array<OtherType, N> vals) {
+        static_assert(N == NumPlots + 1,
+            "Passed number of parameters"
+            "must be equal to the number of plots plus one.");
+
+        Data->col(_current_index) = vals;
+
+        if (_size < N) {
+            _size++;
+            _current_index = _size == N ? 0 : _current_index + 1;
+        } else {
+            _start = (_start + 1) % _size;
+            _current_index = _start;
+        }
+    }
+
+    // Adds vals at specific index i. It ignores the circular buffer
     // conditions and does not advance them. To use this data structure
     // as a circular buffer use the operator()
     template<typename... OtherTypes>
@@ -124,6 +141,22 @@ class PlotDataBuffer {
         }
 
         Data->col(i) = {static_cast<T>(vals)...};
+    }
+
+    // Adds array at specific index i. It ignores the circular buffer
+    // conditions and does not advance them. To use this data structure
+    // as a circular buffer use the operator()
+    template<typename OtherType, size_t N>
+    void add_at(const arma::uword& i, const std::array<OtherType, N> vals) {
+        static_assert(N == NumPlots + 1,
+            "Passed number of parameters"
+            "must be equal to the number of plots plus one.");
+
+        if (not Data) {
+            return;
+        }
+
+        Data->col(i) = vals;
     }
 
     // Resizes the internal data buffer with new_size. Clears the data (faster)
@@ -151,6 +184,12 @@ class PlotDataBuffer {
 
     auto size() const {
     	return _size;
+    }
+
+    void fill() const {
+        for(arma::uword i = 0; i < N; i++) {
+            this->operator()(vals);
+        }
     }
 };
 

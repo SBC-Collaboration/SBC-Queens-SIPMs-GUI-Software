@@ -118,11 +118,10 @@ struct Indicator {
 
     constexpr Indicator() = default;
     constexpr Indicator(
-        std::string_view text,
         std::string_view units,
         std::string_view help_text,
         const DrawingOptions& draw_opts = DrawingOptions{}) :
-        Text{text},
+        Text{Label.value},
         UnitText{units},
         HelpText{help_text},
         DrawOptions{draw_opts}
@@ -131,13 +130,9 @@ struct Indicator {
     // Sets the Text equal to the Label, and sets drawing options to the
     // defaults.
     explicit constexpr Indicator(std::string_view help_text) :
-        Indicator{Label.value, "", help_text}
+        Indicator{"", help_text}
     { }
 
-    explicit constexpr Indicator(std::string_view units,
-        std::string_view help_text) :
-        Indicator{Label.value, units, help_text}
-    { }
  private:
     const std::string_view _full_format_string;
 };

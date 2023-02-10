@@ -33,9 +33,26 @@ constexpr static auto SiPMGUIIndicators = std::make_tuple(
 	NumericalIndicator<"DMM Current">("[A]", ""),
 	NumericalIndicator<"Events in buffer">("[Events]", ""),
 	NumericalIndicator<"Trigger Rate">("[Waveforms / s]", ""),
-	NumericalIndicator<"1SPE Gain Mean">("[arb.]", "")
-);
+	NumericalIndicator<"1SPE Gain Mean">("[arb.]", ""),
 
+	// CAEN model indicators
+	StringIndicator<"Model Name">("", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left}),
+	NumericalIndicator<"Family Code">("", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left}),
+	NumericalIndicator<"Channels">(" chs", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left}),
+	NumericalIndicator<"Serial Number">("", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left}),
+	NumericalIndicator<"ADC Bits">("bits", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left}),
+	StringIndicator<"ROC Firmware">("", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left}),
+	StringIndicator<"AMC Firmware">("", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left}),
+	StringIndicator<"License">("", "",
+		DrawingOptions{.TextPosition = TextPositionEnum::Left})
+);
 
 template<std::size_t Index, typename Value>
 constexpr auto t(Value value) {
