@@ -1,9 +1,15 @@
 #include "sbcqueens-gui/gui_windows/IndicatorWindow.hpp"
 
-#include "sbcqueens-gui/gui_windows/IndicatorList.hpp"
+// C STD includes
+// C 3rd party includes
+// C++ STD includes
+// C++ 3rd party includes
+// my includes
 #include "sbcqueens-gui/imgui_helpers.hpp"
+#include "sbcqueens-gui/gui_windows/IndicatorList.hpp"
 
 namespace SBCQueens {
+
 void IndicatorWindow::init_window(const toml::table&) {
     // Nothing to do here for this window :)
 }

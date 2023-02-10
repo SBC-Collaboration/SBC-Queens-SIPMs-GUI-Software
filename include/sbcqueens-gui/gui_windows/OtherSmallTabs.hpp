@@ -1,14 +1,12 @@
 #ifndef OTHERSMALLTABS_H
 #define OTHERSMALLTABS_H
-#include <toml.hpp>
 #pragma once
 
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
 // C++ 3rd party includes
-#include <imgui.h>
-#include <implot.h>
+#include <toml.hpp>
 
 // my includes
 #include "sbcqueens-gui/gui_windows/Window.hpp"

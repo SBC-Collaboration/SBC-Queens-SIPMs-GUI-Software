@@ -1,5 +1,11 @@
 #include "sbcqueens-gui/gui_windows/ControlWindow.hpp"
 
+// C STD includes
+// C 3rd party includes
+// C++ STD includes
+// C++ 3rd party includes
+// my includes
+
 namespace SBCQueens {
 
 void ControlWindow::init_window(const toml::table& tb) {

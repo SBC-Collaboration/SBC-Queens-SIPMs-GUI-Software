@@ -5,20 +5,10 @@
 // C STD includes
 // C 3rd party includes
 // C++ STD includes
-#include <string>
-#include <unordered_map>
-
 // C++ 3rd party includes
-#include <imgui.h>
 #include <toml.hpp>
-#include <misc/cpp/imgui_stdlib.h>
-
 
 // my includes
-#include "sbcqueens-gui/multithreading_helpers/Pipe.hpp"
-
-#include "sbcqueens-gui/imgui_helpers.hpp"
-
 #include "sbcqueens-gui/gui_windows/Window.hpp"
 #include "sbcqueens-gui/gui_windows/RunTab.hpp"
 #include "sbcqueens-gui/gui_windows/TeensyTab.hpp"

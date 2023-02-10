@@ -6,12 +6,8 @@
 // C 3rd party includes
 // C++ STD includes
 // C++ 3rd party includes
-#include <imgui.h>
-#include <implot.h>
-
 // my includes
 #include "sbcqueens-gui/gui_windows/Window.hpp"
-#include "sbcqueens-gui/gui_windows/ControlList.hpp"
 
 #include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
 #include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"

@@ -1,5 +1,14 @@
 #include "sbcqueens-gui/gui_windows/OtherSmallTabs.hpp"
 
+// C STD includes
+// C 3rd party includes
+#include <imgui.h>
+#include <implot.h>
+
+// C++ STD includes
+// C++ 3rd party includes
+// my includes
+
 namespace SBCQueens {
 
 void GuiConfigTab::init_tab(const toml::table&) {}

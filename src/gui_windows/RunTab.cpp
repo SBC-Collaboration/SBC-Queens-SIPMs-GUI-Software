@@ -1,8 +1,22 @@
 #include "sbcqueens-gui/gui_windows/RunTab.hpp"
+
+// C STD includes
+// C 3rd party includes
+// C++ STD includes
+#include <unordered_map>
+
+// C++ 3rd party includes
+#include <imgui.h>
+#include <implot.h>
+
+// my includes
 #include "sbcqueens-gui/imgui_helpers.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <unordered_map>
+
+#include "sbcqueens-gui/gui_windows/ControlList.hpp"
+
 
 namespace SBCQueens {
 

@@ -10,7 +10,8 @@
 
 // C++ 3rd party includes
 // My includes
-#include <sbcqueens-gui/imgui_helpers.hpp>
+#include "sbcqueens-gui/imgui_helpers.hpp"
+#include "sbcqueens-gui/implot_helpers.hpp"
 
 namespace SBCQueens {
 

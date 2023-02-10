@@ -9,10 +9,7 @@
 #include <toml.hpp>
 
 // my includes
-#include "sbcqueens-gui/imgui_helpers.hpp"
-
 #include "sbcqueens-gui/gui_windows/Window.hpp"
-#include "sbcqueens-gui/gui_windows/ControlList.hpp"
 
 #include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"
 #include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"

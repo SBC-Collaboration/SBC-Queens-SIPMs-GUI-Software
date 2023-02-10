@@ -11,7 +11,7 @@
 #include "sbcqueens-gui/multithreading_helpers/Pipe.hpp"
 
 #include "sbcqueens-gui/caen_helper.hpp"
-#include "sbcqueens-gui/imgui_helpers.hpp"
+#include "sbcqueens-gui/implot_helpers.hpp"
 
 namespace SBCQueens {
 

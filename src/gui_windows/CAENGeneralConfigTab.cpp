@@ -1,5 +1,13 @@
 #include "sbcqueens-gui/gui_windows/CAENGeneralConfigTab.hpp"
+
+// C STD includes
+// C 3rd party includes
+// C++ STD includes
+// C++ 3rd party includes
+#include <imgui.h>
+// my includes
 #include "sbcqueens-gui/imgui_helpers.hpp"
+#include "sbcqueens-gui/gui_windows/ControlList.hpp"
 
 namespace SBCQueens {
 void CAENGeneralConfigTab::init_tab(const toml::table& tb) {

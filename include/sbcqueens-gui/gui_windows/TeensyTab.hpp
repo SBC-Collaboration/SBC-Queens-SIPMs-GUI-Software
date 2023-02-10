@@ -9,10 +9,7 @@
 #include <imgui.h>
 
 // my includes
-#include "sbcqueens-gui/imgui_helpers.hpp"
-
 #include "sbcqueens-gui/gui_windows/Window.hpp"
-#include "sbcqueens-gui/gui_windows/ControlList.hpp"
 
 #include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
 

@@ -1,6 +1,5 @@
 #ifndef IMGUIHELPERS_H
 #define IMGUIHELPERS_H
-#include "sbcqueens-gui/implot_helpers.hpp"
 #pragma once
 
 // C STD includes
@@ -23,8 +22,9 @@
 
 namespace SBCQueens {
 
-// stolen from https://ctrpeach.io/posts/cpp20-string-literal-template-parameters/
-// it is a great idea!
+// not my idea:
+// from https://ctrpeach.io/posts/cpp20-string-literal-template-parameters/
+// it is a great idea to treat strings as template parameters.
 template<size_t N>
 struct StringLiteral {
     constexpr StringLiteral(const char (&str)[N]) {
@@ -47,9 +47,6 @@ constexpr static Color_t Black{0.0, 0.0, 0.0, 0.0};
 using TextPosition_t = enum class TextPositionEnum {
     None, Top, Bottom, Left, Right
 };
-using NumericFormat_t = enum class NumericFormatEnum {
-    Default, Scientific, HexFloat, Fixed
-};
 using PlotType_t = enum class PlotTypeEnum{ Line, Scatter };
 
 struct DrawingOptions {
@@ -70,13 +67,13 @@ struct DrawingOptions {
 
     // Numeric indicator/controls specific
     double StepSize = 0.0;
-    // Numeric indicator/controls specific - Follow printf conventions
+    // Numeric indicator/controls specific - Follows printf conventions
     std::string_view Format = "%.3f";
 };
 
 enum class ControlTypes { InputText, Button, Checkbox, InputInt, InputFloat,
     InputDouble, ComboBox, InputINT8, InputUINT8, InputINT16, InputUINT16,
-    InputINT32, InputUINT32, InputINT64, InputUINT64 };
+    InputINT32, InputUINT32, InputINT64, InputUINT64, Switch };
 
 template<ControlTypes ControlType, StringLiteral list>
 struct Control {
@@ -95,10 +92,7 @@ struct Control {
         Text{text},
         HelpText{help_text},
         DrawOptions{draw_opts}
-    {
-        // static_assert(DrawOptions.Format.starts_with("%"), "format string must"
-        //     "start with %");
-    }
+    { }
 
     explicit constexpr Control(const std::string_view& text) :
         Control{text, ""}
@@ -132,24 +126,18 @@ struct Indicator {
         UnitText{units},
         HelpText{help_text},
         DrawOptions{draw_opts}
-    {
-        // static_assert(DrawOptions.Format.starts_with("%"), "format string must"
-        //     "start with %");
-        // Remove the % from the format string, as we will not need it for
-        // all the indicators.
-        // DrawOptions.Format.remove_prefix(1);
-    }
+    { }
 
     // Sets the Text equal to the Label, and sets drawing options to the
     // defaults.
     explicit constexpr Indicator(std::string_view help_text) :
         Indicator{Label.value, "", help_text}
-    {}
+    { }
 
     explicit constexpr Indicator(std::string_view units,
         std::string_view help_text) :
         Indicator{Label.value, units, help_text}
-    {}
+    { }
  private:
     const std::string_view _full_format_string;
 };
@@ -160,73 +148,6 @@ template<StringLiteral ConstLabel>
 using StringIndicator = Indicator<IndicatorTypes::String, ConstLabel>;
 template<StringLiteral ConstLabel>
 using LEDIndicator = Indicator<IndicatorTypes::LED, ConstLabel>;
-
-using PlotGroupings_t = enum class PlotGroupingsEnum { One, Two, Three };
-
-template<size_t NPlots = 1, size_t NYAxis = 1>
-struct PlotOptions {
-    static_assert(NYAxis < 4, "More than 4 axes not allowed.");
-    static_assert(NPlots >= NYAxis, "Number of graphs has to be equal or higher"
-        " than the number of y-axes");
-    static_assert(NPlots > 0, "There must be a least one plot!");
-
-    // Type of plot drawn
-    PlotType_t PlotType = PlotTypeEnum::Line;
-    //
-    bool ShowAllOptions = false;
-
-    // Labels of each plot
-    std::array<std::string_view, NPlots> PlotLabels;
-    // Group (in term of axes) where each plot belongs. Max 3
-    std::array<PlotGroupings_t, NPlots> PlotGroupings;
-
-    const std::string_view XAxisLabel = "x";
-    std::string_view XAxisUnit = "[arb.]";
-    ImPlotScale XAxisScale = ImPlotScale_Linear;
-    ImPlotAxisFlags XAxisFlags = ImPlotAxisFlags_AutoFit;
-
-    const std::array<std::string_view, NYAxis> YAxisLabels = {"y"};
-    std::array<std::string_view, NYAxis> YAxisUnits = {"[arb.]"};
-    std::array<ImPlotScale, NYAxis> YAxisScales;
-    std::array<ImPlotAxisFlags, NYAxis> YAxisFlags;
-};
-
-template<StringLiteral list, size_t NPlots = 1, size_t NYAxis = 1>
-struct PlotIndicator {
-    static_assert(NYAxis < 4, "More than 4 axes not allowed.");
-    static_assert(NPlots >= NYAxis, "Number of graphs has to be equal or higher"
-        " than the number of y-axes");
-    static_assert(NPlots > 0, "There must be a least one plot!");
-
-    const std::string_view Label = "";
-    // const std::string_view Text = "";
-    // const std::string_view HelpText = "";
-
-    // Information about the plots, their axes, and names
-    PlotOptions<NPlots, NYAxis> PlotDrawOptions;
-    const DrawingOptions DrawOptions;
-
-    constexpr ~PlotIndicator() {}
-
-    constexpr PlotIndicator() = default;
-    explicit constexpr PlotIndicator(
-        // const std::string_view& text, const std::string_view& help_text,
-        const PlotOptions<NPlots, NYAxis>& plot_draw_opts = PlotOptions<NYAxis>{},
-        const DrawingOptions& draw_opts = DrawingOptions{}) :
-        Label{list.value},
-        // Text{text},
-        // HelpText{help_text},
-        PlotDrawOptions{plot_draw_opts},
-        DrawOptions{draw_opts}
-    {
-        // static_assert(, );
-
-    }
-
-    explicit constexpr PlotIndicator(const std::string_view& text) :
-        PlotIndicator{text, ""}
-    {}
-};
 
 // Controls
 template<StringLiteral Label>
@@ -332,7 +253,7 @@ bool InputINT16(const Control<ControlTypes::InputINT16, Label>& control,
 
 template<StringLiteral Label>
 bool InputUINT16(const Control<ControlTypes::InputUINT16, Label>& control,
-                uint16_t& out) {
+                 uint16_t& out) {
     return InputScalar<ControlTypes::InputUINT16, Label, uint16_t>(control, out);
 }
 
@@ -344,7 +265,7 @@ bool InputINT32(const Control<ControlTypes::InputINT32, Label>& control,
 
 template<StringLiteral Label>
 bool InputUINT32(const Control<ControlTypes::InputUINT32, Label>& control,
-                uint32_t& out) {
+                 uint32_t& out) {
     return InputScalar<ControlTypes::InputUINT32, Label, uint32_t>(control, out);
 }
 
@@ -356,13 +277,13 @@ bool InputINT64(const Control<ControlTypes::InputINT64, Label>& control,
 
 template<StringLiteral Label>
 bool InputUINT64(const Control<ControlTypes::InputUINT64, Label>& control,
-                uint64_t& out) {
+                 uint64_t& out) {
     return InputScalar<ControlTypes::InputUINT64, Label, uint64_t>(control, out);
 }
 
 template<StringLiteral Label, typename T>
 bool ComboBox(const Control<ControlTypes::ComboBox, Label>&, T& state,
-    const std::unordered_map<T, std::string>& map) {
+              const std::unordered_map<T, std::string>& map) {
     bool did_change = false;
     static size_t index = 0;
     size_t i = 0;
@@ -408,7 +329,7 @@ bool ComboBox(const Control<ControlTypes::ComboBox, Label>&, T& state,
 
 template<StringLiteral Label, typename T>
 bool ComboBox(const Control<ControlTypes::ComboBox, Label>&, T& state,
-    const std::unordered_map<std::string, T>& map) {
+              const std::unordered_map<std::string, T>& map) {
     bool did_change = false;
     static size_t index = 0;
     size_t i = 0;
@@ -457,7 +378,7 @@ bool ComboBox(const Control<ControlTypes::ComboBox, Label>&, T& state,
 template<StringLiteral Label, typename InputType>
 requires std::is_floating_point_v<InputType> || std::is_integral_v<InputType>
 void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
-    const InputType& in_value) {
+               const InputType& in_value) {
     const auto& label_name = Label.value;
     const auto& format = indicator.DrawOptions.Format;
     ImGui::PushStyleColor(ImGuiCol_Button,
@@ -486,7 +407,7 @@ void Numerical(const Indicator<IndicatorTypes::Numerical, Label>& indicator,
 
 template<StringLiteral Label>
 void String(const Indicator<IndicatorTypes::String, Label>& indicator,
-    std::string_view in_value) {
+            std::string_view in_value) {
     const auto& label_name = Label.value;
     ImGui::PushStyleColor(ImGuiCol_Button,
         indicator.DrawOptions.Color);
@@ -505,7 +426,7 @@ void String(const Indicator<IndicatorTypes::String, Label>& indicator,
 // reflects if its on or off. OFF for now is always red. HSV = 0, 0.6, 0.6
 template<StringLiteral Label>
 void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
-    const bool& in_value) {
+         const bool& in_value) {
     const auto& label_name = Label.value;
 
     if (in_value) {
@@ -538,71 +459,6 @@ void LED(const Indicator<IndicatorTypes::LED, Label>& indicator,
     LED<Label>(indicator, condition(in_value));
 }
 
-
-template<StringLiteral Label, size_t NPlots, size_t NYAxis>
-void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
-    PlotDataBuffer<NPlots>& plot_data) {
-    if (ImPlot::BeginPlot(Label.value, plot.DrawOptions.Size)) {
-        ImPlot::SetupAxisScale(ImAxis_X1, plot.PlotDrawOptions.XAxisScale);
-        ImPlot::SetupAxes(
-            (std::string(plot.PlotDrawOptions.XAxisLabel) +
-             std::string(plot.PlotDrawOptions.XAxisUnit)).c_str(),
-            (std::string(plot.PlotDrawOptions.YAxisLabels[0]) +
-             std::string(plot.PlotDrawOptions.YAxisUnits[0])).c_str(),
-            plot.PlotDrawOptions.XAxisFlags,
-            plot.PlotDrawOptions.YAxisFlags[0]);
-
-        if constexpr (NYAxis == 2) {
-            ImPlot::SetupAxis(ImAxis_Y2,
-                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
-                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
-                              plot.PlotDrawOptions.YAxisFlags[1]);
-        } else if constexpr (NYAxis == 3) {
-            ImPlot::SetupAxis(ImAxis_Y2,
-                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
-                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
-                              plot.PlotDrawOptions.YAxisFlags[1]);
-            ImPlot::SetupAxis(ImAxis_Y3,
-                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
-                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
-                              plot.PlotDrawOptions.YAxisFlags[2]);
-        }
-
-        for (std::size_t i = 0; i < NPlots; i++) {
-            switch (plot.PlotDrawOptions.PlotGroupings[i]) {
-            case PlotGroupingsEnum::Two:
-                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-            break;
-            case PlotGroupingsEnum::Three:
-                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
-            break;
-            default:
-                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
-            }
-
-            switch (plot.PlotDrawOptions.PlotType) {
-            case PlotTypeEnum::Scatter:
-                ImPlot::PlotScatterG(
-                    std::string(plot.PlotDrawOptions.PlotLabels[i]).c_str(),
-                                     PlotDataBuffer<NPlots>::TranformFunctions[i],
-                                     &plot_data,
-                                     plot_data.size());
-            break;
-            case PlotTypeEnum::Line:
-            default:
-                ImPlot::PlotLineG(
-                    std::string(plot.PlotDrawOptions.PlotLabels[i]).c_str(),
-                                  PlotDataBuffer<NPlots>::TranformFunctions[i],
-                                  &plot_data,
-                                  plot_data.size());
-            break;
-            }
-        }
-
-        ImPlot::EndPlot();
-    }
-}
-
 template<ControlTypes T, StringLiteral Label, typename... Types>
 constexpr static auto get_control(const std::tuple<Types...>& list) {
     return std::get<Control<T, Label>>(list);
@@ -611,14 +467,6 @@ constexpr static auto get_control(const std::tuple<Types...>& list) {
 template<IndicatorTypes T, StringLiteral Label, typename... Types>
 constexpr static auto get_indicator(const std::tuple<Types...>& list) {
     return std::get<Indicator<T, Label>>(list);
-}
-
-template<StringLiteral Label,
-         size_t NPlots = 1,
-         size_t NYAxis = 1,
-         typename... Types>
-constexpr static auto get_plot(const std::tuple<Types...>& list) {
-    return std::get<PlotIndicator<Label, NPlots, NYAxis>>(list);
 }
 
 template<ControlTypes T, StringLiteral Label,
@@ -736,18 +584,15 @@ bool draw_control(const Control<T, Label>& control,
 
     if constexpr (T == ControlTypes::ComboBox) {
         if (imgui_out_state) {
-            spdlog::info("CC");
             doe.Callback = callback;
             doe.Changed = true;
         }
     } else {
         if (condition()) {
-            spdlog::info("I");
             doe.Callback = callback;
             doe.Changed = true;
         }
     }
-
 
     return imgui_out_state;
 }

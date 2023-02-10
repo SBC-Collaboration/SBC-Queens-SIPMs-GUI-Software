@@ -1,6 +1,5 @@
 #ifndef GUIMANAGER_H
 #define GUIMANAGER_H
-#include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionManager.hpp"
 #pragma once
 
 // C STD includes

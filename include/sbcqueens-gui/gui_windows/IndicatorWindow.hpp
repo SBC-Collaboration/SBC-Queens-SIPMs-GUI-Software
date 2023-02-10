@@ -4,8 +4,6 @@
 
 // C STD includes
 // C 3rd party includes
-#include <imgui.h>
-
 // C++ STD includes
 // C++ 3rd party includes
 #include <toml.hpp>
