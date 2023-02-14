@@ -352,7 +352,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         if (_sipm_pipe_end.retrieve(task)) {
             task.Callback(_doe);
             switch_state(_doe.CurrentState);
-            spdlog::info("S: {0}", _doe.SiPMVoltageSysPort);
         }
 
         // Send the current state to the GUI to update him
@@ -414,8 +413,14 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         setup(_caen_port, _doe.GlobalConfig, _doe.GroupConfigs);
 
+        // The setup functions does change and make calculations
+        // about some parameters we pass, we read them back to get a
+        // more accurate value of them.
+        _doe.GlobalConfig = _caen_port->GlobalConfig;
+        _doe.GroupConfigs = _caen_port->GroupConfigs;
+
         std::generate(_doe.GroupData.begin(), _doe.GroupData.end(), [&](){
-            return PlotDataBuffer<8>(_doe.GlobalConfig.RecordLength);
+            return PlotDataBuffer<8>(_caen_port->GlobalConfig.RecordLength);
         });
 
         for(auto& data : _doe.GroupData) {
@@ -504,7 +509,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         auto events = get_events_in_buffer(_caen_port);
         // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
 
-        spdlog::info("events = {}", events);
         retrieve_data(_caen_port);
 
         if (_doe.SoftwareTrigger) {
@@ -520,16 +524,17 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // to approximate the actual number of waveforms acquired.
             // Specially because the buffer is cleared.
             TriggeredWaveforms += events;
-            spdlog::info("Total size buffer: {0}",  _caen_port->Data.TotalSizeBuffer);
-            spdlog::info("Data size: {0}", _caen_port->Data.DataSize);
-            spdlog::info("Num events: {0}", _caen_port->Data.NumEvents);
+            // spdlog::info("Total size buffer: {0}",  _caen_port->Data.TotalSizeBuffer);
+            // spdlog::info("Data size: {0}", _caen_port->Data.DataSize);
+            // spdlog::info("Num events: {0}", _caen_port->Data.NumEvents);
 
             extract_event(_caen_port, 0, _osc_event);
+            auto m = caen_event_to_armadillo(_osc_event, 64);
 
-            spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
-            spdlog::info("Event counter: {0}", _osc_event->Info.EventCounter);
-            spdlog::info("Trigger Time Tag: {0}",
-                _osc_event->Info.TriggerTimeTag);
+            // spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
+            // spdlog::info("Event counter: {0}", _osc_event->Info.EventCounter);
+            // spdlog::info("Trigger Time Tag: {0}",
+            //     _osc_event->Info.TriggerTimeTag);
 
             process_data_for_gui();
 
@@ -592,7 +597,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         case BreakdownRoutineState::CalculateBreakdownVoltage:
             if (_vbd_routine->hasNewGainMeasurement())
             {
-                auto pars = _vbd_routine->getAnalysisLatestValues();
+                // auto pars = _vbd_routine->getAnalysisLatestValues();
                 // _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
                 //     _doe.LatestMeasure.Volt, pars.SPEParameters(1));
                 // _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
@@ -616,7 +621,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         case BreakdownRoutineState::Acquisition:
             // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING, true);
             if (_vbd_routine->hasNewBreakdownVoltage()) {
-               auto values = _vbd_routine->getBreakdownVoltage();
+               // auto values = _vbd_routine->getBreakdownVoltage();
 
                 // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
                 //     values.BreakdownVoltage);
@@ -733,29 +738,33 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         auto size = _osc_event->Data->ChSize[0];
         auto all_chs = _osc_event->Data->DataChannel;
 
-        spdlog::info("size {}", size);
-
         if (size <= 0) {
             return;
         }
 
+        spdlog::info("size {}", size);
         for (std::size_t i = 0; i < size; i++) {
             // auto& ch_num = ch.second.Number;
+// *(1e9/_acq_rate)
+            _doe.GroupData[0].add_at(i, i,
+                all_chs[0][i],
+                all_chs[1][i],
+                all_chs[2][i],
+                all_chs[3][i],
+                all_chs[4][i],
+                all_chs[5][i],
+                all_chs[6][i],
+                all_chs[7][i]);
 
-            _doe.GroupData[0].add_at(i, i*(1e9/_acq_rate),
-                all_chs[0][i], 0, 0, 0, 0, 0, 0, 0);
-                // all_chs[1][i],
-                // all_chs[2][i],
-                // all_chs[3][i],
-                // all_chs[4][i],
-                // all_chs[5][i],
-                // all_chs[6][i],
-                // all_chs[7][i]);
-
-            // for (uint32_t i = 0; i < size; i++) {
-            //     _x_values[i] = i*(1e9/_acq_rate);
-            //     _y_values[i] = static_cast<double>(buf[i]);
-            // }
+            _doe.GroupData[1].add_at(i, i,
+                all_chs[8][i],
+                all_chs[9][i],
+                all_chs[10][i],
+                all_chs[11][i],
+                all_chs[12][i],
+                all_chs[13][i],
+                all_chs[14][i],
+                all_chs[15][i]);
         }
     }
 

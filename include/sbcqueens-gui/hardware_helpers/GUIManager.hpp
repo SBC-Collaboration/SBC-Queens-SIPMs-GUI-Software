@@ -211,8 +211,11 @@ class GUIManager : public ThreadManager<Pipes> {
 
         ImGui::Begin("Plot Graphs");
         if (ImGui::BeginTabBar("Other Plots")) {
+            constexpr auto group_zero_plot = get_plot<"Group 0", 8, 1>(GUIPlots);
+            Plot(group_zero_plot, _sipm_doe.GroupData[0]);
+
             constexpr auto group_one_plot = get_plot<"Group 1", 8, 1>(GUIPlots);
-            Plot(group_one_plot, _sipm_doe.GroupData[0]);
+            Plot(group_one_plot, _sipm_doe.GroupData[1]);
 
             ImGui::EndTabBar();
         }

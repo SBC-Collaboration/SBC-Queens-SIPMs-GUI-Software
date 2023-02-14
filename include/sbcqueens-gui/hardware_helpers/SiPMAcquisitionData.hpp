@@ -60,6 +60,7 @@ struct SiPMAcquisitionData {
     CAENConnectionType ConnectionType;
 
     CAENDigitizerModel Model;
+    CAENDigitizerModelConstants ModelConstants;
     CAENGlobalConfig GlobalConfig;
     std::array<CAENGroupConfig, 8> GroupConfigs;
 

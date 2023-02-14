@@ -110,23 +110,6 @@ class PlotDataBuffer {
         }
     }
 
-    template<typename OtherType, size_t N>
-    void operator()(const std::array<OtherType, N> vals) {
-        static_assert(N == NumPlots + 1,
-            "Passed number of parameters"
-            "must be equal to the number of plots plus one.");
-
-        Data->col(_current_index) = vals;
-
-        if (_size < N) {
-            _size++;
-            _current_index = _size == N ? 0 : _current_index + 1;
-        } else {
-            _start = (_start + 1) % _size;
-            _current_index = _start;
-        }
-    }
-
     // Adds vals at specific index i. It ignores the circular buffer
     // conditions and does not advance them. To use this data structure
     // as a circular buffer use the operator()
@@ -146,18 +129,18 @@ class PlotDataBuffer {
     // Adds array at specific index i. It ignores the circular buffer
     // conditions and does not advance them. To use this data structure
     // as a circular buffer use the operator()
-    template<typename OtherType, size_t N>
-    void add_at(const arma::uword& i, const std::array<OtherType, N> vals) {
-        static_assert(N == NumPlots + 1,
-            "Passed number of parameters"
-            "must be equal to the number of plots plus one.");
+    // template<typename OtherType, size_t N>
+    // void add_at(const arma::uword& i, const arma::Mat<T>& vals) {
+    //     static_assert(N == NumPlots + 1,
+    //         "Passed number of parameters"
+    //         "must be equal to the number of plots plus one.");
 
-        if (not Data) {
-            return;
-        }
+    //     if (not Data) {
+    //         return;
+    //     }
 
-        Data->col(i) = vals;
-    }
+    //     Data->col(i) = vals;
+    // }
 
     // Resizes the internal data buffer with new_size. Clears the data (faster)
     // if clear_data is true, otherwise, it keeps the data (slower)
@@ -189,7 +172,9 @@ class PlotDataBuffer {
     // Fills the circular buffer with values and sets the si
     void fill(const T& value = 0) {
         for(arma::uword i = 0; i < N; i++) {
-            Data->col(i) = arma::Mat<T>(NumPlots + 1, 1, arma::fill::value(value));
+            Data->col(i) = arma::Mat<T>(NumPlots + 1,
+                                        1,
+                                        arma::fill::value(value));
         }
         _start = 0;
         _current_index = 0;

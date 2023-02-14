@@ -191,20 +191,19 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     CAEN_DGTZ_GetRecordLength(handle, &res->GlobalConfig.RecordLength);
 
     // This will calculate what is the max current max buffers
-    res->CurrentMaxBuffers = calculate_max_buffers(res);
+    // res->CurrentMaxBuffers = calculate_max_buffers(res);
+    read_register(res, 0x800C, res->CurrentMaxBuffers);
+    res->CurrentMaxBuffers = std::exp2(res->CurrentMaxBuffers);
 
-    // This will get the ACTUAL record length as calculated by
-    // CAEN_DGTZ_SetRecordLength
-    // uint32_t nloc = 0;
-    // error_wrap("Failed to read NLOC. ", CAEN_DGTZ_ReadRegister, handle,
-    //                      0x8020, &nloc);
-    // res->GlobalConfig.RecordLength
-    //     = res->ModelConstants.NLOCToRecordLength * nloc;
+    spdlog::info("Record length = {}, and buffers = {}",
+        res->GlobalConfig.RecordLength,
+        res->CurrentMaxBuffers);
 
     // Failing on x1740
-    // error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
-    //                      CAEN_DGTZ_SetPostTriggerSize, handle,
-    //                      res->GlobalConfig.PostTriggerPorcentage);
+    // Worked after updating firmware to 4.17
+    error_wrap("CAEN_DGTZ_SetPostTriggerSize Failed. ",
+                         CAEN_DGTZ_SetPostTriggerSize, handle,
+                         res->GlobalConfig.PostTriggerPorcentage);
 
     // Trigger Mode comes in four flavors:
     // CAEN_DGTZ_TRGMODE_DISABLED
@@ -241,26 +240,11 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
                          res->GlobalConfig.AcqMode);
 
     // Trigger polarity
-    // These digitizers do not support channel-by-channel trigger pol
-    // so we treat it like a global config, and use 0 as a placeholder.
-    /// For the for V1740D, we have to change register 0x8000 to set
-    // polarity and it seems to be a global setting.
-    if (res->Model == CAENDigitizerModel::V1740D) {
-        switch (res->GlobalConfig.TriggerPolarity) {
-        case CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnFallingEdge:
-            write_bits(res, 0x8000, res->GlobalConfig.TriggerPolarity, 6);
-            break;
-        default:
-            write_bits(res, 0x8000, 0, 6);
-        }
-        write_bits(res, 0x8000, res->GlobalConfig.TriggerPolarity, 6);
-    } else {
-        // Otherwise, it is a conventional function call.
-        error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
-                             CAEN_DGTZ_SetTriggerPolarity, handle, 0,
-                             res->GlobalConfig.TriggerPolarity);
-    }
+    error_wrap("CAEN_DGTZ_SetTriggerPolarity Failed. ",
+                         CAEN_DGTZ_SetTriggerPolarity, handle, 0,
+                         res->GlobalConfig.TriggerPolarity);
 
+    // IO Level
     error_wrap("CAEN_DGTZ_SetIOLevel Failed. ",
                          CAEN_DGTZ_SetIOLevel, handle,
                          res->GlobalConfig.IOLevel);
@@ -327,8 +311,6 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
             group_mask |= gr_configs[grp_n].Enabled << grp_n;
         }
 
-        spdlog::info("{:x}", group_mask);
-
         error_wrap("CAEN_DGTZ_SetGroupEnableMask Failed. ",
                    CAEN_DGTZ_SetGroupEnableMask, handle, group_mask);
 
@@ -339,15 +321,12 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
         for (std::size_t grp_n = 0; grp_n < gr_configs.size(); grp_n++) {
             auto gr_config = gr_configs[grp_n];
             // Trigger stuff
-            spdlog::info("Group {} has trigger threshold = {:X} and is it enabled? {}",
-                grp_n, gr_config.TriggerThreshold, gr_config.Enabled);
 
-            // This guy is not working...
-            // error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
-            //            CAEN_DGTZ_SetGroupTriggerThreshold, handle,
-            //            grp_n, gr_config.TriggerThreshold);
-            // Writing to the register seems the way to go.
-            // write_register(res, 0x1080 | (grp_n << 8), gr_config.TriggerThreshold);
+            // This guy is does not work under V1740D unless in firmware
+            // version 4.17
+            error_wrap("CAEN_DGTZ_SetGroupTriggerThreshold Failed. ",
+                       CAEN_DGTZ_SetGroupTriggerThreshold, handle,
+                       grp_n, gr_config.TriggerThreshold);
 
             error_wrap("CAEN_DGTZ_SetGroupDCOffset Failed. ",
                        CAEN_DGTZ_SetGroupDCOffset,
@@ -360,14 +339,11 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
                 CAEN_DGTZ_SetChannelGroupMask,
                 handle, grp_n, trig_mask);
 
-            spdlog::info("trigg mask {:X}", trig_mask);
-
             // Set acquisition mask
             auto acq_mask = gr_config.AcquisitionMask.get();
             write_bits(res, 0x10A8 | (grp_n << 8),
                 acq_mask, 0, 8);
 
-            spdlog::info("acq mask {:X}", acq_mask);
             // DCCorrections should be of length
             // NumberofChannels / NumberofGroups.
             // set individual channel 8-bitDC offset
@@ -408,7 +384,7 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     } else {
         // custom error message if not above models
         latest_err = -1;
-        err_msg += "Model not supported.";
+        err_msg += "Model family not supported.";
     }
 
     if (latest_err < 0) {
@@ -546,15 +522,17 @@ void software_trigger(CAEN& res) noexcept {
         return;
     }
 
-    auto err = CAEN_DGTZ_SendSWtrigger(res->Handle);
 
-    if (err < 0) {
-        res->LatestError = CAENError {
-            "Failed to send a software trigger",  // ErrorMessage
-            err,  // ErrorCode
-            true  // isError
-        };
-    }
+    // auto err = CAEN_DGTZ_SendSWtrigger(res->Handle);
+    write_register(res, 0x8108, 420);
+
+    // if (err < 0) {
+    //     res->LatestError = CAENError {
+    //         "Failed to send a software trigger",  // ErrorMessage
+    //         err,  // ErrorCode
+    //         true  // isError
+    //     };
+    // }
 }
 
 uint32_t get_events_in_buffer(CAEN& res) noexcept {

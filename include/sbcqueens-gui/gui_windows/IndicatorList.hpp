@@ -85,6 +85,17 @@ constexpr static auto GUIPlots = std::make_tuple(
 	}, DrawingOptions{
 		.Size = Size_t{-1, -1}}),
 
+	PlotIndicator<"Group 0", 8, 1>(PlotOptions<8, 1>{
+		.PlotType = PlotTypeEnum::Line,
+		.PlotLabels = {"1", "2", "3", "4", "5", "6", "7", "8"},
+		.PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
+		.XAxisLabel = "time ",
+		.XAxisUnit = "[sp]",
+		.YAxisLabels = {"Counts"},
+		.YAxisUnits = {""},
+		.YAxisScales = {ImPlotScale_Linear},
+		.YAxisFlags = {ImPlotAxisFlags_AutoFit}
+	}),
 	PlotIndicator<"Group 1", 8, 1>(PlotOptions<8, 1>{
 		.PlotType = PlotTypeEnum::Line,
 		.PlotLabels = {"1", "2", "3", "4", "5", "6", "7", "8"},

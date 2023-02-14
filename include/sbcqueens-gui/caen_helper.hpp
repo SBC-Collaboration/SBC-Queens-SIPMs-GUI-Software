@@ -37,9 +37,10 @@ enum class CAENConnectionType {
 };
 
 enum class CAENDigitizerModel {
-    DT5730B = 0,
-    DT5740D = 1,
-    V1740D = 2
+    DEBUG = 0,
+    DT5730B,
+    DT5740D,
+    V1740D
 };
 
 // All the constants that never change for a given digitizer
@@ -64,21 +65,21 @@ struct CAENDigitizerModelConstants {
     std::vector<double> VoltageRanges = {};
 
     // CAENDigitizerModelConstants() {}
-    CAENDigitizerModelConstants(const uint32_t& res,
-        const double& acqRate, const uint32_t& memPerCh, const uint8_t& numChs,
-        const uint8_t& numGrps, const uint8_t& numChsPerGrp,
-        const uint32_t maxNumBuffs, const float& nloctorl,
-        std::initializer_list<double> voltRanges) :
-        ADCResolution{res},
-        AcquisitionRate{acqRate},
-        MemoryPerChannel{memPerCh},
-        NumChannels{numChs},
-        NumberOfGroups{numGrps},
-        NumChannelsPerGroup{numChsPerGrp},
-        MaxNumBuffers{maxNumBuffs},
-        NLOCToRecordLength{nloctorl},
-        VoltageRanges{voltRanges}
-        {}
+    // CAENDigitizerModelConstants(const uint32_t& res,
+    //     const double& acqRate, const uint32_t& memPerCh, const uint8_t& numChs,
+    //     const uint8_t& numGrps, const uint8_t& numChsPerGrp,
+    //     const uint32_t maxNumBuffs, const float& nloctorl,
+    //     std::initializer_list<double> voltRanges) :
+    //     ADCResolution{res},
+    //     AcquisitionRate{acqRate},
+    //     MemoryPerChannel{memPerCh},
+    //     NumChannels{numChs},
+    //     NumberOfGroups{numGrps},
+    //     NumChannelsPerGroup{numChsPerGrp},
+    //     MaxNumBuffers{maxNumBuffs},
+    //     NLOCToRecordLength{nloctorl},
+    //     VoltageRanges{voltRanges}
+    //     {}
 
     // CAENDigitizerModelConstants(const CAENDigitizerModelConstants&) = default;
     // CAENDigitizerModelConstants&
@@ -88,6 +89,7 @@ struct CAENDigitizerModelConstants {
 // This is here so we can transform string to enums
 const static inline std::unordered_map<std::string, CAENDigitizerModel>
     CAENDigitizerModelsMap {
+        {"DEBUG", CAENDigitizerModel::DEBUG},
         {"DT5730B", CAENDigitizerModel::DT5730B},
         {"DT5740D", CAENDigitizerModel::DT5740D},
         {"V1740D", CAENDigitizerModel::V1740D}
@@ -97,6 +99,17 @@ const static inline std::unordered_map<std::string, CAENDigitizerModel>
 // are fixed per digitizer
 const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
     CAENDigitizerModelsConstantsMap {
+        {CAENDigitizerModel::DEBUG, CAENDigitizerModelConstants {
+            8,  // ADCResolution
+            100e3,  //  AcquisitionRate
+            1024ul,  // MemoryPerChannel
+            1,  // NumChannels
+            0,  // NumberOfGroups, 0 -> no groups
+            1,  // NumChannelsPerGroup
+            1024,  // MaxNumBuffers
+            10.0f,  // NLOCToRecordLength
+            {1.0}  // VoltageRanges
+        }},
         {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants {
             14,  // ADCResolution
             500e6,  //  AcquisitionRate

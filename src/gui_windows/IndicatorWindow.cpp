@@ -7,6 +7,7 @@
 // my includes
 #include "sbcqueens-gui/imgui_helpers.hpp"
 #include "sbcqueens-gui/gui_windows/IndicatorList.hpp"
+#include <imgui.h>
 
 namespace SBCQueens {
 
@@ -18,6 +19,12 @@ void IndicatorWindow::draw() {
     constexpr auto file_stats = get_indicator<IndicatorTypes::Numerical,
                                         "File Statistics">(SiPMGUIIndicators);
     draw_indicator(file_stats, _sipm_doe.FileStatistics);
+
+    ImGui::Separator();
+
+    ImGui::Text("CAEN Digitizer Board info");
+
+    ImGui::Separator();
 
     constexpr auto model_str = get_indicator<IndicatorTypes::String,
                                         "Model Name">(SiPMGUIIndicators);
@@ -50,6 +57,8 @@ void IndicatorWindow::draw() {
     constexpr auto license_str = get_indicator<IndicatorTypes::String,
                                         "License">(SiPMGUIIndicators);
     draw_indicator(license_str, _sipm_doe.CAENBoardInfo.License);
+
+    ImGui::Separator();
     //     StringIndicator<"Model Name">("", ""),
     // NumericalIndicator<"Family Code">("", ""),
     // NumericalIndicator<"Channels">(" chs", ""),

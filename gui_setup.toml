@@ -59,14 +59,22 @@ Offset = 0x8000
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
 Range = 1
-Threshold = 0
+Threshold = 0x0800
 
-# [CAEN.group1]
-# Enabled = 0
-# Offset = 0x8000
-# Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
-# Range = 1
-# Threshold = 2075
+[CAEN.group1]
+Enabled = true
+# Trigger Enable Mask
+# TrgMask = 7
+TrgMask = 0b11111111
+# Acquisition Enable Mask
+AcqMask = 0b11111111
+# Group offset
+Offset = 0x8000
+# Individual corrections to offset
+Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
+
+Range = 1
+Threshold = 0x0800
 
 [Other]
 [Other.SiPMVoltageSystem]
