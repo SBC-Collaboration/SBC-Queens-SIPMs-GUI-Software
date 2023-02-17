@@ -28,5 +28,3 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20 OUTPUT_NAME
   "SBCQueensGUI")
 target_link_libraries(${PROJECT_NAME} PUBLIC SBCQueensGUIHelpers)
-
-target_compile_options(${PROJECT_NAME} PUBLIC -fno-stack-protector)

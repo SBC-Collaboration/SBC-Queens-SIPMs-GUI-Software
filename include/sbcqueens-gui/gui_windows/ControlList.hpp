@@ -19,7 +19,8 @@ namespace SBCQueens {
 
 // Here you find all the compile available controls.
 constexpr static auto SiPMGUIControls = std::make_tuple(
-    SiPMAcquisitionControl<ControlTypes::InputInt, "CAEN Port">{"", "Usually 0 as long as there is no "
+    SiPMAcquisitionControl<ControlTypes::InputInt, "CAEN Port">{"",
+            "Usually 0 as long as there is no "
             "other CAEN digitizers connected. If there are more, "
             "the port increases as they were connected to the "
             "computer."},
@@ -28,8 +29,18 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
     SiPMAcquisitionControl<ControlTypes::InputUINT32, "VME Address">{"", "",
         DrawingOptions{.StepSize = 1, .Format = "%X"}},
     SiPMAcquisitionControl<ControlTypes::InputText, "Keithley COM Port">{""},
-    SiPMAcquisitionControl<ControlTypes::Button, "Connect##CAEN">{""},
-    SiPMAcquisitionControl<ControlTypes::Button, "Disconnect##CAEN">{""},
+    SiPMAcquisitionControl<ControlTypes::Button, "Connect##CAEN">{"", "",
+        DrawingOptions{
+            .Color = HSV(118.f, 0.4f, 0.5f),
+            .HoveredColor = HSV(118.f, 0.4, 0.7f),
+            .ActiveColor = HSV(118.f, 0.4f, 0.2f)
+        }},
+    SiPMAcquisitionControl<ControlTypes::Button, "Disconnect##CAEN">{"", "",
+        DrawingOptions{
+            .Color = HSV(0.f, 0.8f, 0.5f),
+            .HoveredColor = HSV(0.f, 0.4, 0.7f),
+            .ActiveColor = HSV(0.f, 0.8f, 0.2f)
+        }},
     SiPMAcquisitionControl<ControlTypes::InputUINT32, "Max Events Per Read">{""},
     SiPMAcquisitionControl<ControlTypes::InputUINT32, "Record Length [sp]">{""},
     SiPMAcquisitionControl<ControlTypes::InputUINT32, "Post-Trigger Buffer [%]">{""},
@@ -77,7 +88,6 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
         "",
         DrawingOptions{.StepSize = 1, .Format = "%X"}},
 
-
     SiPMAcquisitionControl<ControlTypes::Checkbox, "TRG0">{""},
     SiPMAcquisitionControl<ControlTypes::Checkbox, "TRG1">{""},
     SiPMAcquisitionControl<ControlTypes::Checkbox, "TRG2">{""},
@@ -97,8 +107,18 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
     SiPMAcquisitionControl<ControlTypes::Checkbox, "ACQ7">{""},
 
     TeensyControllerControl<ControlTypes::InputText, "Teensy COM Port">{""},
-    TeensyControllerControl<ControlTypes::Button, "Connect##Teensy">{""},
-    TeensyControllerControl<ControlTypes::Button, "Disconnect##Teensy">{""},
+    TeensyControllerControl<ControlTypes::Button, "Connect##Teensy">{"", "",
+        DrawingOptions{
+            .Color = HSV(118.f, 0.4f, 0.5f),
+            .HoveredColor = HSV(118.f, 0.4, 0.7f),
+            .ActiveColor = HSV(118.f, 0.4f, 0.2f)
+        }},
+    TeensyControllerControl<ControlTypes::Button, "Disconnect##Teensy">{"", "",
+        DrawingOptions{
+            .Color = HSV(0.f, 0.8f, 0.5f),
+            .HoveredColor = HSV(0.f, 0.4, 0.7f),
+            .ActiveColor = HSV(0.f, 0.8f, 0.2f)
+        }},
     TeensyControllerControl<ControlTypes::Checkbox, "Peltier ON/OFF">{""},
     TeensyControllerControl<ControlTypes::InputUINT16, "PID RTD">{""},
     TeensyControllerControl<ControlTypes::InputUINT32, "Update Period (ms)">{""},
@@ -110,8 +130,18 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
     TeensyControllerControl<ControlTypes::Button, "Reset PPID">{""},
 
     SlowDAQControl<ControlTypes::InputText, "PFEIFFER Port">{""},
-    SlowDAQControl<ControlTypes::Button, "Connect##SLOWDAQ">{""},
-    SlowDAQControl<ControlTypes::Button, "Disconnect##SLOWDAQ">{""}
+    SlowDAQControl<ControlTypes::Button, "Connect##SLOWDAQ">{"", "",
+        DrawingOptions{
+            .Color = HSV(118.f, 0.4f, 0.5f),
+            .HoveredColor = HSV(118.f, 0.4, 0.7f),
+            .ActiveColor = HSV(118.f, 0.4f, 0.2f)
+        }},
+    SlowDAQControl<ControlTypes::Button, "Disconnect##SLOWDAQ">{"", "",
+        DrawingOptions{
+            .Color = HSV(0.f, 0.8f, 0.5f),
+            .HoveredColor = HSV(0.f, 0.4, 0.7f),
+            .ActiveColor = HSV(0.f, 0.8f, 0.2f)
+        }}
 );
 
 } // namespace SBCQueens

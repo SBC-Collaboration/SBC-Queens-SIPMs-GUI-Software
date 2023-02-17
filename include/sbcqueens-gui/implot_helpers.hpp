@@ -169,16 +169,24 @@ class PlotDataBuffer {
     	return _size;
     }
 
-    // Fills the circular buffer with values and sets the si
-    void fill(const T& value = 0) {
+    // Sets the circular buffer indexes to a full state without modifying
+    // the internal values.
+    void fill() {
+        _start = 0;
+        _current_index = 0;
+        _size = N;
+    }
+
+    // Fills the circular buffer and sets the start index to 0
+    // and size to N
+    void fill(const T& value) {
         for(arma::uword i = 0; i < N; i++) {
             Data->col(i) = arma::Mat<T>(NumPlots + 1,
                                         1,
                                         arma::fill::value(value));
         }
-        _start = 0;
-        _current_index = 0;
-        _size = N;
+
+        fill();
     }
 };
 

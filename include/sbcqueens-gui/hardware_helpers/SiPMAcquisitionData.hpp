@@ -22,7 +22,6 @@ struct SiPMVoltageMeasure {
 };
 
 enum class SiPMAcquisitionStates {
-    NullState = 0,
     Standby,
     AttemptConnection,
     OscilloscopeMode,
@@ -67,7 +66,7 @@ struct SiPMAcquisitionData {
     int PortNum = 0;
     uint32_t VMEAddress = 0;
 
-    SiPMAcquisitionStates CurrentState = SiPMAcquisitionStates::NullState;
+    SiPMAcquisitionStates CurrentState = SiPMAcquisitionStates::Standby;
 
     bool SoftwareTrigger = false;
     bool ResetCaen = false;
@@ -92,6 +91,7 @@ struct SiPMAcquisitionData {
 
     // Indicator/"Out" data members
     uint32_t FileStatistics = 0;
+    double TriggeredRate = 0;
     CAEN_DGTZ_BoardInfo_t CAENBoardInfo;
 
     // Shared plot data

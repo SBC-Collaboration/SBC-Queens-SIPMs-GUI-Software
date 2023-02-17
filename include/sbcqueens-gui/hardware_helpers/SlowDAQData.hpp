@@ -27,7 +27,6 @@ struct PFEIFFERSingleGaugeData {
 };
 
 enum class PFEIFFERSSGState {
-    NullState = 0,
     Standby,
     AttemptConnection,
     Connected,
@@ -57,7 +56,7 @@ struct SlowDAQData {
 
     std::string PFEIFFERPort = "";
 
-    PFEIFFERSSGState PFEIFFERState = PFEIFFERSSGState::NullState;
+    PFEIFFERSSGState PFEIFFERState = PFEIFFERSSGState::Standby;
     bool PFEIFFERSingleGaugeEnable = false;
     PFEIFFERSingleGaugeSP PFEIFFERSingleGaugeUpdateSpeed
         = PFEIFFERSingleGaugeSP::SLOW;

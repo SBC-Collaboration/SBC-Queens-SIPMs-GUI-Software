@@ -10,13 +10,16 @@
 #include <implot.h>
 
 // my includes
+#include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"
+#include "sbcqueens-gui/hardware_helpers/SlowDAQData.hpp"
+#include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
 #include "sbcqueens-gui/imgui_helpers.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <unordered_map>
 
 #include "sbcqueens-gui/gui_windows/ControlList.hpp"
-
+#include "sbcqueens-gui/gui_windows/IndicatorList.hpp"
 
 namespace SBCQueens {
 
@@ -62,10 +65,7 @@ void RunTab::draw() {
 
     ImGui::Separator();
     ImGui::PushItemWidth(100);
-    // 1.0 -> 0.5
-    // 0.5 -> 1.0
-    // (1.0 - 0.5) / (0.5 - 1.0) = -1
-    static float connected_mod = 1.5f;
+
     // Com port text input
     // We do not make this a GUI queue item because
     // we only need to let the client know when we click connnect
@@ -73,7 +73,7 @@ void RunTab::draw() {
 
     ImGui::SameLine(300);
 
-    bool tmp;
+    static bool tmp;
     constexpr auto connect_teensy = get_control<ControlTypes::Button,
                                     "Connect##Teensy">(SiPMGUIControls);
     draw_control(connect_teensy, _teensy_doe,
@@ -87,10 +87,7 @@ void RunTab::draw() {
                 = TeensyControllerStates::AttemptConnection;
     });
 
-    // ImGui::PopStyleColor(3);
-
     /// Disconnect button
-    float disconnected_mod = 1.5f - connected_mod;
     ImGui::SameLine();
 
     constexpr Control disconnect_teensy = get_control<ControlTypes::Button,
@@ -105,12 +102,18 @@ void RunTab::draw() {
             }
     });
 
+    ImGui::SameLine();
 
-    // ImGui::PopStyleColor(3);
+    constexpr auto teensy_connected_led = get_indicator<IndicatorTypes::LED,
+                                        "##Teensy Connected?">(SiPMGUIIndicators);
+    draw_indicator(teensy_connected_led, _teensy_doe.CurrentState,
+        [](const TeensyControllerStates& state) -> bool {
+            return state != TeensyControllerStates::Standby and
+                state != TeensyControllerStates::AttemptConnection;
+    });
+
     ImGui::Separator();
 
-    static float c_connected_mod = 1.5f;
-    //ImGui::InputInt("CAEN port", , cgui_state.PortNum);
     constexpr Control sipm_port = get_control<ControlTypes::InputInt,
                                         "CAEN Port">(SiPMGUIControls);
     draw_control(sipm_port, _sipm_doe,
@@ -150,8 +153,6 @@ void RunTab::draw() {
 
     }
 
-    // ImGui::InputText("Keithley COM Port",
-    //     &cgui_state.SiPMVoltageSysPort);
     constexpr auto keith_com = get_control<ControlTypes::InputText,
                                     "Keithley COM Port">(SiPMGUIControls);
     draw_control(keith_com, _sipm_doe,
@@ -161,7 +162,7 @@ void RunTab::draw() {
           caen_twin.SiPMVoltageSysPort = _sipm_doe.SiPMVoltageSysPort;
     });
 
-    // ImGui::SameLine(300);
+    ImGui::SameLine(300);
     // Colors to pop up or shadow it depending on the conditions
 
     // This button starts the CAEN communication and sends all
@@ -176,26 +177,8 @@ void RunTab::draw() {
             caen_twin = doe;
 
             caen_twin.RunDir = run_dir;
-            caen_twin.CurrentState =
-             SiPMAcquisitionStates::AttemptConnection;
+            caen_twin.CurrentState = SiPMAcquisitionStates::AttemptConnection;
     });
-    // if (CAENControlFac.Button("Connect##caen",
-    //     [=](SiPMAcquisitionData& state) {
-    //         state = cgui_state;
-    //         state.VBDData = cgui_state.VBDData;
-    //         state.RunDir = i_run_dir;
-    //         state.GlobalConfig = cgui_state.GlobalConfig;
-    //         state.GroupConfigs = cgui_state.GroupConfigs;
-    //         state.CurrentState =
-    //             SiPMAcquisitionStates::AttemptConnection;
-    //         return true;
-    //     }
-    // )) {
-    //     c_connected_mod = 0.5;
-    // }
-
-    /// Disconnect button
-    float c_disconnected_mod = 1.5f - c_connected_mod;
     ImGui::SameLine();
 
     constexpr auto disconnect_caen = get_control<ControlTypes::Button,
@@ -210,11 +193,17 @@ void RunTab::draw() {
             }
     });
 
-    ImGui::Separator();
+    ImGui::SameLine();
 
-    static float o_connected_mod = 1.5f;
-    static std::string other_port = _slowdaq_doe.PFEIFFERPort;
-    // ImGui::InputText("PFEIFFER port", &other_port);
+    constexpr auto caen_connected_led = get_indicator<IndicatorTypes::LED,
+                                        "##CAEN Connected?">(SiPMGUIIndicators);
+    draw_indicator(caen_connected_led, _sipm_doe.CurrentState,
+        [](const SiPMAcquisitionStates& state) -> bool {
+            return state != SiPMAcquisitionStates::Standby and
+                state != SiPMAcquisitionStates::AttemptConnection;
+    });
+
+    ImGui::Separator();
 
     constexpr auto pfeiffer_port = get_control<ControlTypes::InputText,
                                         "PFEIFFER Port">(SiPMGUIControls);
@@ -238,8 +227,7 @@ void RunTab::draw() {
 
     // ImGui::PopStyleColor(3);
 
-                    /// Disconnect button
-    float o_disconnected_mod = 1.5f - o_connected_mod;
+    /// Disconnect button
     ImGui::SameLine();
 
     constexpr auto disconnect_slowdaq = get_control<ControlTypes::Button,
@@ -254,6 +242,14 @@ void RunTab::draw() {
             }
     });
 
+    ImGui::SameLine();
+
+    constexpr auto slow_daq_led = get_indicator<IndicatorTypes::LED,
+                                        "##Other Connected?">(SiPMGUIIndicators);
+    draw_indicator(slow_daq_led, _slowdaq_doe.PFEIFFERState,
+        [](const PFEIFFERSSGState& state) -> bool {
+            return state != PFEIFFERSSGState::Standby;
+    });
     // ImGui::PopStyleColor(3);
 
     ImGui::PopItemWidth();

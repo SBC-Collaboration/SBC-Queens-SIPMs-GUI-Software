@@ -289,7 +289,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         last_waveforms = TriggeredWaveforms;
         last_time = current_time;
-        // _indicator_sender(IndicatorNames::TRIGGERRATE, dWaveforms / dt);
+        _doe.TriggeredRate = dWaveforms / dt;
     }
 
     // Local error checking. Checks if there was an error and prints it
@@ -303,10 +303,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     void switch_state(const SiPMAcquisitionStates& newState) {
         _doe.CurrentState = newState;
         switch (_doe.CurrentState) {
-            case SiPMAcquisitionStates::Standby:
-                main_loop_state = standby_state;
-            break;
-
             case SiPMAcquisitionStates::AttemptConnection:
                 main_loop_state = attemptConnection_state;
             break;
@@ -331,7 +327,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                 main_loop_state = closing_state;
             break;
 
-            case SiPMAcquisitionStates::NullState:
+            case SiPMAcquisitionStates::Standby:
             default:
                 // do nothing other than set to standby state
                 main_loop_state = standby_state;
@@ -929,7 +925,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             case SiPMAcquisitionStates::AttemptConnection:
             case SiPMAcquisitionStates::Disconnected:
             case SiPMAcquisitionStates::Closing:
-            case SiPMAcquisitionStates::NullState:
             default:
             break;
         }

@@ -14,7 +14,6 @@
 namespace SBCQueens {
 
 enum class TeensyControllerStates {
-    NullState = 0,
     Standby,
     AttemptConnection,
     Connected,
@@ -166,7 +165,7 @@ struct TeensyControllerData {
     std::string Port        = "COM4";
 
     TeensyControllerStates CurrentState
-        = TeensyControllerStates::NullState;
+        = TeensyControllerStates::Standby;
 
     TeensyCommands CommandToSend
         = TeensyCommands::None;

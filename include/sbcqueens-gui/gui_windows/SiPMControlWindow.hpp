@@ -24,7 +24,7 @@ public Window<SiPMAcquisitionData, TeensyControllerData> {
  public:
     SiPMControlWindow(
     SiPMAcquisitionData& sipm_data, TeensyControllerData& teensy_data) :
-        Window<SiPMAcquisitionData, TeensyControllerData>{"SiPM Controls"} ,
+        Window<SiPMAcquisitionData, TeensyControllerData>{"SiPM Acquisition Controls"} ,
         _sipm_data(sipm_data), _teensy_data(teensy_data)
     {}
 

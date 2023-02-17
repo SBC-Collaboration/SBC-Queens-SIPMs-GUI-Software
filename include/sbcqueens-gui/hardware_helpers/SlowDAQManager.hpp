@@ -166,7 +166,6 @@ class SlowDAQManager : public ThreadManager<Pipes> {
                         std::chrono::milliseconds(100));
                 break;
 
-                case PFEIFFERSSGState::NullState:
                 default:
                     _slowdaq_doe.PFEIFFERState = PFEIFFERSSGState::Standby;
             }

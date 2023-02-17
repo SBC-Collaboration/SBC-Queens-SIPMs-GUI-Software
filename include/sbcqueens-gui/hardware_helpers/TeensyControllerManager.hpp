@@ -336,7 +336,6 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                     disconnect(_port);
                     return false;
 
-                case TeensyControllerStates::NullState:
                 default:
                     // do nothing other than set to standby state
                     _doe.CurrentState
