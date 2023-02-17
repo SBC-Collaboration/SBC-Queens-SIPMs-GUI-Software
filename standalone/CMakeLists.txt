@@ -23,10 +23,8 @@ file(GLOB sources CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(${PROJECT_NAME} ${sources})
 
-set(CMAKE_CXX_STANDARD 17)
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17 OUTPUT_NAME
+set(CMAKE_CXX_STANDARD 20)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20 OUTPUT_NAME
   "SBCQueensGUI")
 target_link_libraries(${PROJECT_NAME} PUBLIC SBCQueensGUIHelpers)
-
-target_compile_options(${PROJECT_NAME} PUBLIC -fno-stack-protector)

@@ -1,5 +1,5 @@
-#ifndef SLOWDAQINTERFACE_H
-#define SLOWDAQINTERFACE_H
+#ifndef SlowDAQManager_H
+#define SlowDAQManager_H
 #pragma once
 
 /*
@@ -20,144 +20,92 @@
 
 // C++ 3rd party includes
 // my includes
+#include "sbcqueens-gui/multithreading_helpers/ThreadManager.hpp"
+
 #include "sbcqueens-gui/serial_helper.hpp"
 #include "sbcqueens-gui/file_helpers.hpp"
 #include "sbcqueens-gui/timing_events.hpp"
 
-#include "sbcqueens-gui/indicators.hpp"
+#include "sbcqueens-gui/hardware_helpers/SlowDAQData.hpp"
 
 namespace SBCQueens {
 
-enum class PFEIFFERSingleGaugeSP {
-    SLOW = 2,   // 1 min
-    FAST = 1,   // 1s
-    FASTER = 0  // 100ms
-};
-
-struct PFEIFFERSingleGaugeData {
-    double time;
-    double Pressure;
-};
-
-enum class PFEIFFERSSGState {
-    NullState = 0,
-    Standby,
-    AttemptConnection,
-    Connected,
-    Disconnected,
-    Closing
-};
-
-struct SlowDAQData {
-    std::string RunDir      = "";
-    std::string RunName     = "";
-
-    std::string PFEIFFERPort = "";
-
-    PFEIFFERSSGState PFEIFFERState = PFEIFFERSSGState::NullState;
-    bool PFEIFFERSingleGaugeEnable = false;
-    PFEIFFERSingleGaugeSP PFEIFFERSingleGaugeUpdateSpeed
-        = PFEIFFERSingleGaugeSP::SLOW;
-};
-
-
-using SlowDAQDataType
-    = std::function < bool(SlowDAQData&) >;
-
-using SlowDAQQueue
-    = moodycamel::ReaderWriterQueue< SlowDAQDataType >;
-
-template<typename... Queues>
-class SlowDAQInterface {
-    std::tuple<Queues&...> _queues;
-
-    // Data of everything (doe)
-    SlowDAQData doe;
+template<typename Pipes>
+class SlowDAQManager : public ThreadManager<Pipes> {
+    using SlowDAQ_type = typename Pipes::SlowDAQ_type;
+    SlowDAQPipeEnd<SlowDAQ_type, PipeEndType::Consumer> _slowdaq_pipe_end;
+    SlowDAQData& _slowdaq_doe;
 
     DataFile<PFEIFFERSingleGaugeData> _pfeiffer_file;
 
-    IndicatorSender<IndicatorNames> _plot_sender;
+    // IndicatorSender<IndicatorNames> _plot_sender;
 
     // PFEIFFER Single Gauge port
     serial_ptr _pfeiffers_port;
-
-    double _init_time;
+    double _init_time = 0;
 
  public:
-    explicit SlowDAQInterface(Queues&... queues) :
-        _queues(std::forward_as_tuple(queues...)),
-        _plot_sender(std::get<GeneralIndicatorQueue&>(_queues)) { }
+    explicit SlowDAQManager(const Pipes& p) :
+        ThreadManager<Pipes>{p},
+        _slowdaq_pipe_end(p.SlowDAQPipe), _slowdaq_doe{_slowdaq_pipe_end.Data}
+        // _plot_sender(std::get<GeneralIndicatorQueue&>(_queues))
+        { }
 
-    // No copying
-    SlowDAQInterface(const SlowDAQInterface&) = delete;
-
+    ~SlowDAQManager() { }
 
     void operator()() {
         spdlog::info("Initializing slow DAQ thread...");
         spdlog::info("Slow DAQ components: PFEIFFERSingleGauge");
 
-        // GUI -> Slow Daq
-        SlowDAQQueue& guiQueueOut = std::get<SlowDAQQueue&>(_queues);
-        auto guiQueueFunc = [&guiQueueOut]() -> SBCQueens::SlowDAQDataType {
-            SBCQueens::SlowDAQDataType new_task;
-            bool success = guiQueueOut.try_dequeue(new_task);
-
-            if (success) {
-                return new_task;
-            } else {
-                return [](SlowDAQData&) { return true; };
-            }
-        };
-
         auto main_loop = [&]() -> bool {
-            SlowDAQDataType task = guiQueueFunc();
 
-            // If the queue does not return a valid function, this call will
+            SlowDAQData new_task;
+            // If the queue does not return a valid callback, this call will
             // do nothing and should return true always.
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (!task(doe)) {
-                spdlog::warn("Something went wrong with a command!");
+            if (_slowdaq_pipe_end.retrieve(new_task)) {
+                new_task.Callback(_slowdaq_doe);
             }
             // End Communication with the GUI
 
-            if (!doe.PFEIFFERSingleGaugeEnable) {
-                if (doe.PFEIFFERState == PFEIFFERSSGState::Closing) {
+            if (!_slowdaq_doe.PFEIFFERSingleGaugeEnable) {
+                if (_slowdaq_doe.PFEIFFERState == PFEIFFERSSGState::Closing) {
                     return false;
                 }
 
                 return true;
             }
 
-            switch (doe.PFEIFFERState) {
+            switch (_slowdaq_doe.PFEIFFERState) {
                 case PFEIFFERSSGState::AttemptConnection:
                 {
                     SerialParams ssp;
                     ssp.Timeout = serial::Timeout::simpleTimeout(10);
-                    connect_par(_pfeiffers_port, doe.PFEIFFERPort, ssp);
+                    connect_par(_pfeiffers_port, _slowdaq_doe.PFEIFFERPort, ssp);
 
                     if (_pfeiffers_port) {
                         if (_pfeiffers_port->isOpen()) {
                             _init_time = get_current_time_epoch();
                             open(_pfeiffer_file,
-                                doe.RunDir
-                                + "/" + doe.RunName
+                                _slowdaq_doe.RunDir
+                                + "/" + _slowdaq_doe.RunName
                                 + "/PFEIFFERSSPressures.txt");
                             bool s = _pfeiffer_file > 0;
 
                             if (not s) {
                                     spdlog::error("Failed to open files.");
-                                    doe.PFEIFFERState =
+                                    _slowdaq_doe.PFEIFFERState =
                                         PFEIFFERSSGState::Standby;
                                 } else {
                                     spdlog::info(
                                         "Connected to PFEIFFERS with port {}",
-                                    doe.PFEIFFERPort);
+                                    _slowdaq_doe.PFEIFFERPort);
 
                                     send_msg(_pfeiffers_port, "COM," +
                                         std::to_string(static_cast<uint16_t> (
-                                            doe.PFEIFFERSingleGaugeUpdateSpeed)) + "\n",
+                                            _slowdaq_doe.PFEIFFERSingleGaugeUpdateSpeed)) + "\n",
                                         "");
 
 
@@ -165,22 +113,22 @@ class SlowDAQInterface {
 
                                     spdlog::info("Sent {0} ", "COM," +
                                         std::to_string(static_cast<uint16_t> (
-                                            doe.PFEIFFERSingleGaugeUpdateSpeed)));
+                                            _slowdaq_doe.PFEIFFERSingleGaugeUpdateSpeed)));
 
-                                    doe.PFEIFFERState =
+                                    _slowdaq_doe.PFEIFFERState =
                                         PFEIFFERSSGState::Connected;
                                 }
 
                         } else {
                             spdlog::error("Failed to connect to port {}",
-                                doe.PFEIFFERPort);
+                                _slowdaq_doe.PFEIFFERPort);
 
-                            doe.PFEIFFERState
+                            _slowdaq_doe.PFEIFFERState
                                 = PFEIFFERSSGState::Standby;
                         }
                     } else {
                         // No need for a message
-                        doe.PFEIFFERState
+                        _slowdaq_doe.PFEIFFERState
                             = PFEIFFERSSGState::Standby;
                     }
                 }
@@ -196,10 +144,10 @@ class SlowDAQInterface {
                 case PFEIFFERSSGState::Disconnected:
                     spdlog::warn("Manually losing connection to "
                         "PFEIFFER Pressure valve with port {}",
-                        doe.PFEIFFERPort);
+                        _slowdaq_doe.PFEIFFERPort);
                     disconnect(_pfeiffers_port);
                                             // Move to standby
-                    doe.PFEIFFERState
+                    _slowdaq_doe.PFEIFFERState
                         = PFEIFFERSSGState::Standby;
                 break;
 
@@ -218,9 +166,8 @@ class SlowDAQInterface {
                         std::chrono::milliseconds(100));
                 break;
 
-                case PFEIFFERSSGState::NullState:
                 default:
-                    doe.PFEIFFERState = PFEIFFERSSGState::Standby;
+                    _slowdaq_doe.PFEIFFERState = PFEIFFERSSGState::Standby;
             }
 
             return true;
@@ -238,8 +185,8 @@ class SlowDAQInterface {
     }
 
     void PFEIFFER_update() {
-        static auto retrieve_time = doe.PFEIFFERSingleGaugeUpdateSpeed ==
-        PFEIFFERSingleGaugeSP::SLOW ? 60*1000 : doe.PFEIFFERSingleGaugeUpdateSpeed ==
+        static auto retrieve_time = _slowdaq_doe.PFEIFFERSingleGaugeUpdateSpeed ==
+        PFEIFFERSingleGaugeSP::SLOW ? 60*1000 : _slowdaq_doe.PFEIFFERSingleGaugeUpdateSpeed ==
         PFEIFFERSingleGaugeSP::FAST ? 1000 : 100;
 
         static auto retrieve_press_nb = make_total_timed_event(
@@ -259,7 +206,7 @@ class SlowDAQInterface {
                             double pressure = std::stod(split_msg[1]) / 1000.0;
                             double dt = (get_current_time_epoch() - _init_time) / 1000.0;
 
-                            _plot_sender(IndicatorNames::PFEIFFER_PRESS, dt, pressure);
+                            // _plot_sender(IndicatorNames::PFEIFFER_PRESS, dt, pressure);
 
                             PFEIFFERSingleGaugeData d;
                             d.Pressure = pressure;
@@ -306,6 +253,11 @@ class SlowDAQInterface {
         return res;
     }
 };
+
+template<typename Pipes>
+auto make_slow_daq_manager(const Pipes& p) {
+    return std::make_unique<SlowDAQManager<Pipes>>(p);
+}
 
 }  // namespace SBCQueens
 #endif

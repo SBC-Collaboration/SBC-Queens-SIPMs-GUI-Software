@@ -37,8 +37,7 @@ namespace ImGUIWrappers {
 	  fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 	}
 
-	template<typename ImGUIDrawFunction>
-	int main_glfw_open3gl_wrapper(ImGUIDrawFunction& guiFunc)
+	inline int main_glfw_open3gl_wrapper(std::function<void(void)>&& guiFunc)
 	{
 		// Setup window
 		glfwSetErrorCallback(glfw_error_callback);
@@ -203,7 +202,6 @@ namespace ImGUIWrappers {
 
 		// Cleanup
 		spdlog::info("Entering GUI cleanup phase");
-		guiFunc.closing();
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImPlot::DestroyContext();

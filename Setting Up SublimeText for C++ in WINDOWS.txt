@@ -1,13 +1,6 @@
-You will need to install mingw64 using MSYS2 first and install the toolchain and extras (for clang-tidy and clangd)
+Install in Sublime Text:
 
-For MSYS2 follow:
-
-	https://www.msys2.org/
-
-To install everything for clang-tidy and clangd follow:
-
-	https://packages.msys2.org/package/mingw-w64-x86_64-clang-tools-extra
-
-Then follow this link to install LSP
-
-https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/sublime_ide.md#Setup
+- LSP
+- LSP-clangd
+- sublimelint
+- sublimelinter-cppcheck

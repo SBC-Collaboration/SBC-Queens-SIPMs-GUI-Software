@@ -1,7 +1,3 @@
-set(DEPENDENCY_DIR ${CMAKE_SOURCE_DIR}/deps
-  CACHE FILEPATH "Directory where all the dependencies are found.
-  Full path only.")
-
 include(cmake/CPM.cmake)
 
 # OpenGL
@@ -36,59 +32,7 @@ if(USE_VULKAN)
   include_directories(SYSTEM ${GLFW_DIR}/deps)
 endif()
 
-# Dear ImGui
-# https://github.com/ocornut/imgui
-CPMAddPackage(NAME imgui
-  VERSION 1.88
-  GITHUB_REPOSITORY ocornut/imgui
-  DOWNLOAD_ONLY YES)
-
-if(imgui_ADDED)
-  list(APPEND ImGUI_BACKENDS ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp)
-
-  if(USE_VULKAN)
-    list(APPEND ImGUI_BACKENDS ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp)
-  else()
-    list(APPEND ImGUI_BACKENDS ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
-  endif()
-
-  add_library(imgui STATIC
-    ${ImGUI_BACKENDS}
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_demo.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp)
-
-  target_include_directories(imgui
-    SYSTEM PUBLIC
-    $<BUILD_INTERFACE:${imgui_SOURCE_DIR}>/
-    $<BUILD_INTERFACE:${imgui_SOURCE_DIR}>/backends)
-  target_link_libraries(imgui PUBLIC glfw ${OPENGL_LIBRARIES} ${IMGUI_LIBRARIES})
-else()
-  message(FATAL_ERROR "ImGUI not found.")
-endif()
-
-# Implot
-CPMAddPackage(NAME implot
-  VERSION 0.14
-  GITHUB_REPOSITORY epezent/implot
-  DOWNLOAD_ONLY YES)
-
-if(implot_ADDED)
-  add_library(implot STATIC
-      ${implot_SOURCE_DIR}/implot_items.cpp
-      ${implot_SOURCE_DIR}/implot.cpp
-      ${implot_SOURCE_DIR}/implot_demo.cpp)
-
-  target_include_directories(implot SYSTEM PUBLIC
-    imgui $<BUILD_INTERFACE:${implot_SOURCE_DIR}>/)
-  target_link_libraries(implot PRIVATE imgui)
-else()
-  message(FATAL_ERROR "ImPlot not found.
-    Make sure to run git submodules init first")
-endif()
+include(cmake/ImGUIDependencies.cmake)
 
 # serial
 # https://github.com/wjwwood/serial
@@ -126,7 +70,7 @@ CPMAddPackage("gh:nlohmann/json@3.10.5")
 # https://github.com/gabime/spdlog
 CPMAddPackage(NAME spdlog
   GITHUB_REPOSITORY gabime/spdlog
-  VERSION 1.11.0)
+  VERSION 1.8.2)
 
 # readerwriterqueue
 CPMAddPackage("gh:cameron314/readerwriterqueue@1.0.6")
@@ -165,6 +109,6 @@ if(date_ADDED)
     $<BUILD_INTERFACE:${date_SOURCE_DIR}>/include)
 endif()
 
-CPMAddPackage(NAME Sipmanalysis SOURCE_DIR /home/sbc-queens-linux/Desktop/SiPMQharacterization++)
+CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacterization)
 
 # CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacteriazation)

@@ -1,5 +1,5 @@
-#ifndef TEENSYCONTROLLERINTERFACE_H
-#define TEENSYCONTROLLERINTERFACE_H
+#ifndef TEENSYCONTROLLERMANAGER_H
+#define TEENSYCONTROLLERMANAGER_H
 #pragma once
 
 /*
@@ -52,74 +52,18 @@ using json = nlohmann::json;
 // namespace sml = boost::sml;
 
 // my includes
+#include "sbcqueens-gui/multithreading_helpers/ThreadManager.hpp"
+
 #include "sbcqueens-gui/serial_helper.hpp"
 #include "sbcqueens-gui/imgui_helpers.hpp"
 #include "sbcqueens-gui/implot_helpers.hpp"
 #include "sbcqueens-gui/file_helpers.hpp"
 #include "sbcqueens-gui/timing_events.hpp"
-#include "sbcqueens-gui/indicators.hpp"
 #include "sbcqueens-gui/armadillo_helpers.hpp"
 
+#include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
+
 namespace SBCQueens {
-
-enum class TeensyControllerStates {
-    NullState = 0,
-    Standby,
-    AttemptConnection,
-    Connected,
-    Disconnected,
-    Closing
-};
-
-enum class PIDState {
-    Standby,
-    Running
-};
-
-struct PIDConfig {
-    float SetPoint = 0.0;
-    float Kp = 0.0;
-    float Ti = 0.0;
-    float Td = 0.0;
-};
-
-// Sensors structs
-struct PeltierValues {
-    double Current;
-};
-
-struct Peltiers {
-    double time;
-    PeltierValues PID;
-};
-
-struct RTDs {
-    double time;
-    std::vector<double> RTDS;
-};
-
-struct RawRTDs {
-    double time;
-    std::vector<uint16_t> RTDREGS;
-    std::vector<double> Resistances;
-    std::vector<double> Temps;
-};
-
-struct PressureValues {
-    double Pressure;
-};
-
-struct Pressures {
-    double time;
-    PressureValues Vacuum;
-};
-
-
-struct TeensySystemPars {
-    uint32_t NumRtdBoards = 0;
-    uint32_t NumRtdsPerBoard = 0;
-    bool InRTDOnlyMode = false;
-};
 
 // The BMEs return their values as registers
 // as the calculations required to turn them into
@@ -221,126 +165,16 @@ void from_json(const json& j, Pressures& p);
 void to_json(json& j, const BMEs& p);
 void from_json(const json& j, BMEs& p);
 
-
-// end Sensors structs
-
-enum class TeensyCommands {
-    CheckError,
-    GetError,
-    Reset,
-
-    SetPPIDUpdatePeriod,
-    SetPPIDRTD,
-    SetPPID,
-    SetPPIDTripPoint,
-    SetPPIDTempSetpoint,
-    SetPPIDTempKp,
-    SetPPIDTempTi,
-    SetPPIDTempTd,
-    ResetPPID,
-
-    SetRTDSamplingPeriod,
-    SetRTDMask,
-
-    SetPeltierRelay,
-
-    GetSystemParameters,
-    GetPeltiers,
-    GetRTDs,
-    GetRawRTDs,
-    GetPressures,
-    GetBMEs,
-
-    None = 0
-};
-
-// This map holds all the commands that the Teensy accepts, as str,
-// and maps them to an enum for easy access.
-const std::unordered_map<TeensyCommands, std::string> cTeensyCommands = {
-    /// General system commands
-    {TeensyCommands::CheckError,            "CHECKERR"},
-    {TeensyCommands::Reset,                 "RESET"},
-    /// !General system commands
-    ////
-    /// Hardware specific commands
-    {TeensyCommands::SetPPIDUpdatePeriod,   "SET_PPID_UP"},
-    {TeensyCommands::SetPPIDRTD,            "SET_PPID_RTD"},
-    {TeensyCommands::SetPPID,               "SET_PPID"},
-    {TeensyCommands::SetPPIDTripPoint,      "SET_PTRIPPOINT"},
-    {TeensyCommands::SetPPIDTempSetpoint,   "SET_PTEMP"},
-    {TeensyCommands::SetPPIDTempKp,         "SET_PTKP_PID"},
-    {TeensyCommands::SetPPIDTempTi,         "SET_PTTi_PID"},
-    {TeensyCommands::SetPPIDTempTd,         "SET_PTTd_PID"},
-    {TeensyCommands::ResetPPID,             "RESET_PPID"},
-
-    {TeensyCommands::SetRTDSamplingPeriod,  "SET_RTD_SP"},
-    {TeensyCommands::SetRTDMask,            "RTD_BANK_MASK"},
-
-    {TeensyCommands::SetPeltierRelay,       "SET_PELTIER_RELAY"},
-
-    //// Getters
-    {TeensyCommands::GetSystemParameters,   "GET_SYS_PARAMETERS"},
-    {TeensyCommands::GetError,              "GETERR"},
-    {TeensyCommands::GetPeltiers,           "GET_PELTIERS_CURRS"},
-    {TeensyCommands::GetRTDs,               "GET_RTDS"},
-    {TeensyCommands::GetRawRTDs,            "GET_RAW_RTDS"},
-    {TeensyCommands::GetPressures,          "GET_PRESSURES"},
-    {TeensyCommands::GetBMEs,               "GET_BMES"},
-    //// !Getters
-    /// !Hardware specific commands
-
-    {TeensyCommands::None, ""}
-};
-
-
-
-// It holds everything the outside world can modify or use.
-// So far, I do not like teensy_serial is here.
-struct TeensyControllerData {
-    std::string RunDir      = "";
-
-    std::string Port        = "COM4";
-
-    TeensyControllerStates CurrentState
-        = TeensyControllerStates::NullState;
-
-    TeensyCommands CommandToSend
-        = TeensyCommands::None;
-
-    TeensySystemPars SystemParameters;
-
-    uint32_t RTDSamplingPeriod = 100;
-    uint32_t RTDMask = 0xFFFF;
-
-    // Relay stuff
-    bool PeltierState       = false;
-
-    // PID Stuff
-    uint16_t PidRTD = 0;
-    uint32_t PeltierPidUpdatePeriod = 100;
-    bool PeltierPIDState    = false;
-
-    float PIDTempTripPoint = 5.0;
-    PIDConfig PIDTempValues;
-};
-
-using TeensyQueueType
-    = std::function < bool(TeensyControllerData&) >;
-
-// single consumer, single sender queue for Tasks of the type
-// bool(TeensyControllerState&) A.K.A TeensyQueueType
-using TeensyQueue
-    = moodycamel::ReaderWriterQueue< TeensyQueueType >;
-
-template<typename... Queues>
-class TeensyControllerInterface {
- private:
-    std::tuple<Queues&...> _queues;
+template<typename Pipes>
+class TeensyControllerManager : public ThreadManager<Pipes> {
     std::map<std::string, std::string> _crc_cmds;
 
-    TeensyControllerData _doe;
-    IndicatorSender<IndicatorNames> _indicator_sender;
-    IndicatorSender<uint16_t> _plot_sender;
+    using TeensyPipe_type = typename Pipes::TeensyPipe_type;
+    TeensyControllerPipeEnd<TeensyPipe_type, PipeEndType::Consumer> _teensy_pipe_end;
+    TeensyControllerData& _doe;
+
+    // IndicatorSender<IndicatorNames> _indicator_sender;
+    // IndicatorSender<uint16_t> _plot_sender;
 
     double _init_time;
 
@@ -353,15 +187,14 @@ class TeensyControllerInterface {
     serial_ptr _port;
 
  public:
-    explicit TeensyControllerInterface(Queues&... queues)
-        : _queues(std::forward_as_tuple(queues...)),
-        _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
-        _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
+    explicit TeensyControllerManager(const Pipes& pipes) :
+        ThreadManager<Pipes>{pipes},
+        _teensy_pipe_end(pipes.TeensyPipe), _doe{_teensy_pipe_end.Data}
+        // _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
+        // _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
+        { }
 
-    // No copying
-    TeensyControllerInterface(const TeensyControllerInterface&) = delete;
-
-    ~TeensyControllerInterface() {}
+    ~TeensyControllerManager() {}
 
     // Loop goes like this:
     // Initializes -> waits for action from GUI to connect
@@ -376,31 +209,16 @@ class TeensyControllerInterface {
 
         spdlog::info("Initializing teensy thread");
 
-        // GUI -> Teensy
-        TeensyQueue& guiQueueOut = std::get<TeensyQueue&>(_queues);
-        auto guiQueueFunc = [&guiQueueOut]() -> SBCQueens::TeensyQueueType {
-            SBCQueens::TeensyQueueType new_task;
-            bool success = guiQueueOut.try_dequeue(new_task);
-
-            if (success) {
-                spdlog::info("Received new teensy task");
-                return new_task;
-            } else {
-                return [](SBCQueens::TeensyControllerData&) { return true; };
-            }
-        };
-
         // Main loop lambda
         auto main_loop = [&]() -> bool {
-            TeensyQueueType task = guiQueueFunc();
-
-            // If the queue does not return a valid function, this call will
+            TeensyControllerData new_task;
+            // If the queue does not return a valid callback, this call will
             // do nothing and should return true always.
             // The tasks are essentially any GUI driven modification, example
             // setting the PID setpoints or constants
             // or an user driven reset
-            if (!task(_doe)) {
-                spdlog::warn("Something went wrong with a command!");
+            if (_teensy_pipe_end.retrieve(new_task)) {
+                new_task.Callback(_doe);
             }
             // End Communication with the GUI
 
@@ -518,7 +336,6 @@ class TeensyControllerInterface {
                     disconnect(_port);
                     return false;
 
-                case TeensyControllerStates::NullState:
                 default:
                     // do nothing other than set to standby state
                     _doe.CurrentState
@@ -600,14 +417,14 @@ class TeensyControllerInterface {
                 spdlog::info("{0}, {1}, {2}", system_pars.NumRtdBoards,
                     system_pars.NumRtdsPerBoard, system_pars.InRTDOnlyMode);
 
-                _indicator_sender(IndicatorNames::NUM_RTD_BOARDS,
-                    _doe.SystemParameters.NumRtdBoards);
+                // _indicator_sender(IndicatorNames::NUM_RTD_BOARDS,
+                //     _doe.SystemParameters.NumRtdBoards);
 
-                _indicator_sender(IndicatorNames::NUM_RTDS_PER_BOARD,
-                    _doe.SystemParameters.NumRtdsPerBoard);
+                // _indicator_sender(IndicatorNames::NUM_RTDS_PER_BOARD,
+                //     _doe.SystemParameters.NumRtdsPerBoard);
 
-                _indicator_sender(IndicatorNames::IS_RTD_ONLY,
-                    _doe.SystemParameters.InRTDOnlyMode);
+                // _indicator_sender(IndicatorNames::IS_RTD_ONLY,
+                //     _doe.SystemParameters.InRTDOnlyMode);
             } catch (... ) {
                 spdlog::warn("Failed to parse system data from {0}. "
                     "Message received from Teensy: {1}",
@@ -629,11 +446,11 @@ class TeensyControllerInterface {
                 auto pids = parse.get<Peltiers>();
 
                 // Send them to GUI to draw them
-                _indicator_sender(IndicatorNames::PELTIER_CURR,
-                    pids.time, pids.PID.Current);
+                // _indicator_sender(IndicatorNames::PELTIER_CURR,
+                //     pids.time, pids.PID.Current);
 
-                _indicator_sender(IndicatorNames::LATEST_PELTIER_CURR,
-                    pids.PID.Current);
+                // _indicator_sender(IndicatorNames::LATEST_PELTIER_CURR,
+                //     pids.PID.Current);
 
                 _peltiers_file->Add(pids);
             } catch (... ) {
@@ -656,30 +473,30 @@ class TeensyControllerInterface {
                 // Send them to GUI to draw them
                 for (uint16_t i = 0; i < rtds.Temps.size(); i++) {
                     const double temp = rtds.Temps[i];
-                    _plot_sender(i, rtds.time, temp);
+                    // _plot_sender(i, rtds.time, temp);
 
-                    switch (i) {
-                        case 0:
-                        _indicator_sender(IndicatorNames::LATEST_RTD1_TEMP,
-                            temp);
-                        break;
-                        case 1:
-                        _indicator_sender(IndicatorNames::LATEST_RTD2_TEMP,
-                            temp);
-                        break;
-                        case 2:
-                        _indicator_sender(IndicatorNames::LATEST_RTD3_TEMP,
-                            temp);
-                        break;
-                    }
+                    // switch (i) {
+                    //     case 0:
+                    //     _indicator_sender(IndicatorNames::LATEST_RTD1_TEMP,
+                    //         temp);
+                    //     break;
+                    //     case 1:
+                    //     _indicator_sender(IndicatorNames::LATEST_RTD2_TEMP,
+                    //         temp);
+                    //     break;
+                    //     case 2:
+                    //     _indicator_sender(IndicatorNames::LATEST_RTD3_TEMP,
+                    //         temp);
+                    //     break;
+                    // }
                 }
 
                 double err = rtds.Temps[_doe.PidRTD]
                     - static_cast<double>(_doe.PIDTempValues.SetPoint) - 273.15;
                 _error_temp_cf.Add(err);
 
-                _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
-                    arma::mean(_error_temp_cf.GetBuffer()));
+                // _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
+                //     arma::mean(_error_temp_cf.GetBuffer()));
 
                 _RTDs_file->Add(rtds);
             } catch (... ) {
@@ -699,10 +516,10 @@ class TeensyControllerInterface {
                 auto press = parse.get<Pressures>();
 
                 // Send them to GUI to draw them
-                _indicator_sender(IndicatorNames::VACUUM_PRESS,
-                    press.time , press.Vacuum.Pressure);
-                _indicator_sender(IndicatorNames::LATEST_VACUUM_PRESS,
-                    press.Vacuum.Pressure);
+                // _indicator_sender(IndicatorNames::VACUUM_PRESS,
+                //     press.time , press.Vacuum.Pressure);
+                // _indicator_sender(IndicatorNames::LATEST_VACUUM_PRESS,
+                //     press.Vacuum.Pressure);
 
                 _pressures_file->Add(press);
             } catch (... ) {
@@ -722,12 +539,12 @@ class TeensyControllerInterface {
             try {
                 auto bmes = parse.get<BMEs>();
 
-                _indicator_sender(IndicatorNames::LOCAL_BME_TEMPS,
-                    bmes.time , bmes.LocalBME.Temperature);
-                _indicator_sender(IndicatorNames::LOCAL_BME_PRESS,
-                    bmes.time , bmes.LocalBME.Pressure);
-                _indicator_sender(IndicatorNames::LOCAL_BME_HUMD,
-                    bmes.time , bmes.LocalBME.Humidity);
+                // _indicator_sender(IndicatorNames::LOCAL_BME_TEMPS,
+                //     bmes.time , bmes.LocalBME.Temperature);
+                // _indicator_sender(IndicatorNames::LOCAL_BME_PRESS,
+                //     bmes.time , bmes.LocalBME.Pressure);
+                // _indicator_sender(IndicatorNames::LOCAL_BME_HUMD,
+                //     bmes.time , bmes.LocalBME.Humidity);
 
                 _BMEs_file->Add(bmes);
             } catch (... ) {
@@ -935,5 +752,11 @@ class TeensyControllerInterface {
         return send_msg(_port, str_cmd);
     }
 };
+
+template<typename Pipes>
+auto make_teensy_controller_manager(const Pipes& p) {
+    return std::make_unique<TeensyControllerManager<Pipes>>(p);
+}
+
 }  // namespace SBCQueens
 #endif

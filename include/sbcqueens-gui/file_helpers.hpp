@@ -135,7 +135,7 @@ struct dataFile {
 // smart pointers, and using a functional based approach it is easier
 // to parallelize it.
 template<typename T>
-using DataFile = std::unique_ptr<dataFile<T>>;
+using DataFile = std::shared_ptr<dataFile<T>>;
 
 // Opens the file with name fileName.
 // If file is an already opened file, it is closed and opened again.
@@ -143,14 +143,14 @@ using DataFile = std::unique_ptr<dataFile<T>>;
 template <typename T>
 void open(DataFile<T>& res, const std::string& fileName) {
     if (res) {
-        res.release();
+        res.reset();
     }
 
     res = std::make_unique<dataFile<T>>(fileName);
 
     // If it fails to open, release resources
     if (not res->IsOpen()) {
-        res.release();
+        res.reset();
     }
 }
 
@@ -164,7 +164,7 @@ void open(DataFile<T>& res,
     const std::string& fileName, InitWriteFunc&& f,  Args&&... args) {
 
     if (res) {
-        res.release();
+        res.reset();
     }
 
     res = std::make_unique<dataFile<T>>(fileName,
@@ -172,7 +172,7 @@ void open(DataFile<T>& res,
 
     // If it fails to open, release resources
     if (not res->IsOpen()) {
-        res.release();
+        res.reset();
     }
 }
 
@@ -180,7 +180,7 @@ void open(DataFile<T>& res,
 template <typename T>
 void close(DataFile<T>& res) {
     if (res) {
-        res.release();
+        res.reset();
     }
 }
 
@@ -238,6 +238,18 @@ void async_save(DataFile<T>& file, FormatFunc&& f, Args&&... args) noexcept {
 
     _pt(file, std::forward<FormatFunc>(f), std::forward<Args>(args)...);
 }
+
+struct SaveFileInfo {
+    double Time;
+    std::string FileName;
+
+    SaveFileInfo() {}
+    SaveFileInfo(const double& time, const std::string& fn) :
+        Time(time), FileName(fn) {}
+};
+
+// A simplification of DataFile for logging.
+using LogFile = DataFile<SaveFileInfo>;
 
 }  // namespace SBCQueens
 #endif

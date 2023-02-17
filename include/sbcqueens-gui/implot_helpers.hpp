@@ -1,581 +1,333 @@
 #ifndef IMPLOTHELPERS_H
 #define IMPLOTHELPERS_H
+#include <type_traits>
 #pragma once
 
 // C 3rd party includes
-#include <imgui.h>
 #include <implot.h>
-#include <spdlog/spdlog.h>
-#include <readerwriterqueue.h>
-#include <concurrentqueue.h>
 
 // C++ STD includes
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <ios>
+#include <array>
 #include <memory>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
-#include <sstream>
-#include <deque>
+
+// C++ 3rd party includes
+#include <armadillo>
 
 // my includes
+#include "sbcqueens-gui/imgui_helpers.hpp"
 
 namespace SBCQueens {
 
-template<typename T, typename DATA = double>
-class IndicatorReceiver;
-template<typename T, typename DATA = double>
-class IndicatorSender;
+// Internal structure to be used for Plot drawing functions. It holds the
+// plot data and is circular in nature: a new data pointer added beyond N
+// loops back.
+template<size_t NumPlots = 1, typename T = double>
+requires std::is_integral_v<T> || std::is_floating_point_v<T>
+class PlotDataBuffer {
+	static_assert(NumPlots > 0, "There must be a least one plot!");
 
-// Well, I will leave this as this until I can come up with
-// a better solution.
-// ImPlots are 2D by default. X, Y are the types of those two
-// axis which by default are float but they can be changed.
-// unsigned int is a number that instructs the consumer
-// to which graph is should go to.
-// T is reserved for the user, it could be an enum type (my preference)
-// or anything they want to distinguish them.
-template<typename T, typename DATA = double>
-struct IndicatorVector {
-    using type = T;
-    using data_type = DATA;
+    arma::uword N;
+    arma::uword _start = 0;
+    arma::uword _size = 0;
+    arma::uword _current_index = 0;
 
-    IndicatorVector() {}
-    IndicatorVector(const T& id, const DATA& x, const DATA& y)
-        : ID(id), X(x), Y(y) {}
-    IndicatorVector(const T& id, const DATA& x)
-        : ID(id), X(x) {}
+    std::shared_ptr<arma::Mat<T>> Data;
 
-    T ID;
-    DATA X;
-    DATA Y;
-};
+    typedef ImPlotPoint(*ImPlotGetterFunc)(int, void*);
 
-template<typename T, typename DATA = double>
-using IndicatorsQueue
-    = moodycamel::ConcurrentQueue< IndicatorVector<T, DATA> >;
-
-struct PlotFlags {
-    bool ClearOnNewData;
-};
-
-enum class NumericFormat {
-    Default, Scientific, HexFloat, Fixed
-};
-
-// An indicator is a ImGUI button that has been modified to act
-// like an indicator.
-// As for now, this indicator has some parameters such as
-// precision of the number to display, and format of the number
-template<typename T>
-class Indicator {
- protected:
-    T ID;
-    // _imgui_stack exists to give this button an unique id
-    // for the ImGUI API. If this were not there, it would share
-    // an ID with all the empty or same indicators.
-    std::string _imgui_stack;
-
- private:
-    // Actual string that gets displayed
-    std::string _display;
-
-    // Format parameters
-    unsigned int _precision;
-    NumericFormat _format;
-
-    double _val;
-
- public:
-    explicit Indicator(const T& id, const unsigned int& precision = 6,
-        const NumericFormat& format = NumericFormat::Default)
-        :   ID(id),
-            _imgui_stack("##" + std::to_string(static_cast<int>(id))),
-            _display(_imgui_stack), _precision(precision), _format(format),
-            _val(0.0)
-        { }
-
-    // Moving allowed
-    Indicator(Indicator&&) = default;
-    Indicator& operator=(Indicator&&) = default;
-
-    // No copying
-    Indicator(const Indicator&) = delete;
-
-    virtual ~Indicator() {}
-
-    template<typename OFFDATA>
-    // Adds element newVal.x to show in this indicator. newVal.y is ignored
-    void add(const IndicatorVector<T, OFFDATA>& newVal) {
-        if (newVal.ID == ID) {
-            std::ostringstream out;
-            out.precision(_precision);
-            if (_format == NumericFormat::Scientific) {
-                out << std::scientific;
-            } else if (_format == NumericFormat::HexFloat) {
-                out << std::hexfloat;
-            } else if (_format == NumericFormat::Fixed) {
-                out << std::fixed;
-            }
-
-            out << newVal.X;
-            _display = "";
-
-            if (!out.str().empty()) {
-                _display = out.str();
-            }
-
-            _display += _imgui_stack;
-
-            _val = static_cast<double>(newVal.X);
-        }
-    }
-
-    template<typename OFFDATA>
-    void operator()(const std::string& label, OFFDATA& out,
-        const float& offset = 0) {
-        ImGui::Text("%s", label.c_str()); ImGui::SameLine(offset);
-        ImGui::Button(_display.c_str());
-        out = static_cast<OFFDATA>(_val);
-    }
-
-    template<typename OFFDATA>
-    void Draw(const std::string& label, OFFDATA& out, const float& offset = 0) {
-        this->operator()(label, out, offset);
-    }
-
-    // For indicators, it does nothing.
-    virtual void ExecuteAttributes() { }
-
-    // For indicators, it does nothing.
-    virtual void ClearAttributes() { }
-
-    virtual T GetID() const {
-        return ID;
-    }
-};
-
-template<typename T>
-class BooleanIndicator : public Indicator<T> {
-    std::function<bool(const double&)> _f;
-    ImVec4 _off_color;
-    ImVec4 _on_color;
-    ImVec4 _current_color;
-    bool _is_on;
-
- public:
-    explicit BooleanIndicator(const T& id,
-        std::function<bool(const double&)>&& f)
-        : Indicator<T>(id), _f(f),
-        _off_color(static_cast<ImVec4>(ImColor::HSV(0.0f, 0.6f, 0.6f))),
-        _on_color(static_cast<ImVec4>(ImColor::HSV(2.0f / 7.0f, 0.6f, 0.6f))),
-        _current_color(_off_color), _is_on(false) {
-    }
-
-    // Moving allowed
-    BooleanIndicator(BooleanIndicator&&) = default;
-    BooleanIndicator& operator=(BooleanIndicator&&) = default;
-
-    // No copying
-    BooleanIndicator(const BooleanIndicator&) = delete;
-
-    template<typename OFFDATA>
-    // Uses newVal.x to indicate the equality
-    void add(const IndicatorVector<T, OFFDATA>& newVal) {
-        _is_on = _f(static_cast<double>(newVal.X));
-        _current_color = _is_on ? _on_color : _off_color;
-    }
-
-    void operator()(const std::string& label, bool& out,
-        const float& offset = 0) {
-        out = _is_on;
-        ImGui::Text("%s", label.c_str()); ImGui::SameLine(offset);
-
-        ImGui::PushStyleColor(ImGuiCol_Button, _current_color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, _current_color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, _current_color);
-
-        ImGui::Button(Indicator<T>::_imgui_stack.c_str(), ImVec2(15, 15));
-
-        ImGui::PopStyleColor(3);
-    }
-
-    void Draw(const std::string& label, bool& out, const float& offset = 0) {
-        this->operator()(label, out, offset);
-    }
-};
-
-// Internal structure to be used for Plot class. Servers as an interface
-// between this API and ImPlot
-struct PlotDataBuffer {
-    const std::size_t N;
-    std::size_t Start = 0;
-    std::size_t Size = 0;
-    std::size_t CurrentIndex = 0;
-
-    std::vector< std::pair <double, double> > Data;
-
-    explicit PlotDataBuffer(const std::size_t& max)
-        : N(max), Data(max) {}
-
-    std::pair<double, double>& operator[](const std::size_t& i) {
-        std::size_t index = (i + Start) % Size;
-        return Data[index];
-    }
-
-    void operator()(const double& x, const double& y) {
-        Data[CurrentIndex] = std::make_pair(
-                static_cast<double>(x),
-                static_cast<double>(y));
-
-        if (Size < N) {
-            Size++;
-            CurrentIndex = Size == N ? 0 : CurrentIndex + 1;
-        } else {
-            Start = (Start + 1) % Size;
-            CurrentIndex = Start;
-        }
-    }
-};
-
-enum class PlotStyle {
-    Line,
-    Scatter
-};
-// A plot indicator. It inherits from indicator, but more out of necessity.
-// It keeps the code clean, but it was really not necessary.
-// Originally, a plot could be any type that was not double but
-// ImPlot only shows double numbers or transforms them to doubles
-// internally. Also, x and y have to be the same type.
-template<typename T>
-class Plot : public Indicator<T> {
-    bool Cleared = false;
-    bool ClearOnNewData = false;
-
-
-    const std::size_t MaxSamples;
-    PlotDataBuffer plotData;
-
- public:
-    using type = T;
-    using data_type = double;
-
-    explicit Plot(const T& id, const bool& clearOnNewData = false,
-        const std::size_t& maxSamples = 100e3) : Indicator<T>(id),
-        ClearOnNewData(clearOnNewData), MaxSamples(maxSamples),
-        plotData(maxSamples) {
-    }
-
-    // No moving
-    Plot(Plot&&) = default;
-    Plot& operator=(Plot&&) = default;
-
-    // No copying
-    Plot(const Plot&) = delete;
-
-    template<typename OFFDATA>
-    void add(const IndicatorVector<T, OFFDATA>& v) {
-        if (v.ID == Indicator<T>::ID) {
-            plotData(v.X, v.Y);
-        }
-    }
-
-    template<typename OFFDATA>
-    void add(const OFFDATA& x, const OFFDATA& y) {
-        plotData(x, y);
-    }
-
-    void clear() {
-        plotData.Size = 0;
-        plotData.CurrentIndex = 0;
-    }
-
-    // Executes attributes. For plots, it clears on new data.
-    void ExecuteAttributes() {
-        if (ClearOnNewData) {
-            if (!Cleared) {
-                clear();
-                Cleared = true;
-            }
-        }
-    }
-
-    // Clears attributes. For plots, it resets if it should clear.
-    // on new data.
-    void ClearAttributes() {
-        Cleared = false;
-    }
-
-    // Wraps ImPlot::PlotLine
-    void operator()(const std::string& label,
-        const PlotStyle& style = PlotStyle::Line) {
-        // static ImPlotGetter getter = static_cast<ImPlotGetter>(_transform);
-        static auto transform = [](int idx, void* data) {
-            auto myData = static_cast<PlotDataBuffer*>(data);
-            auto pair = (*myData)[idx];
-            return ImPlotPoint(pair.first, pair.second);
+    template<size_t CH>
+    constexpr static auto transform() {
+        return [](int idx, void* data) {
+            auto myData = static_cast<PlotDataBuffer<NumPlots>*>(data);
+            auto data_column = (*myData)[idx];
+            return ImPlotPoint(data_column(0), data_column(CH + 1));
         };
+    }
 
-        switch (style) {
-            case PlotStyle::Scatter:
-                ImPlot::PlotScatterG(label.c_str(), transform, &plotData, plotData.Size);
-            break;
-            case PlotStyle::Line:
-            default:
-                ImPlot::PlotLineG(label.c_str(), transform, &plotData, plotData.Size);
-            break;
+    template<std::size_t... Indices>
+    constexpr static auto make_trans_func(std::index_sequence<Indices...>)
+    -> std::array<ImPlotGetterFunc, sizeof...(Indices)>{
+        return {{transform<Indices>()...}};
+    }
+
+    constexpr static std::array<ImPlotGetterFunc, NumPlots> generate_tans_funcs() {
+        return make_trans_func(std::make_index_sequence<NumPlots>{});
+    }
+ public:
+    // Used to interface the ImPlot API functions that end with G. They
+    // require a function with the ImPlotPoint(*)(int, void*) signature,
+    // but lambdas with any captures cannot be used (returns a compiler error).
+    // Under the hood there are a lot of constexpr functions that generates
+    // these functions at compile time which only difference is a number.
+    //
+    // The index is the getter function for Plot i.
+    constexpr static std::array<ImPlotGetterFunc, NumPlots> TranformFunctions
+        = generate_tans_funcs();
+
+    PlotDataBuffer() = default;
+    // Allocates memory constructor.
+    explicit PlotDataBuffer(const arma::uword& max) :
+        N(max),
+        Data(std::make_shared<arma::Mat<T>>(NumPlots + 1, max, arma::fill::zeros))
+    { }
+
+    // References to another array function.
+    explicit PlotDataBuffer(std::shared_ptr<arma::Mat<T>> data) :
+        N(data->n_rows), Data(data)
+    { }
+
+    // Returns all the graphs points for @ i.
+    // (x_i, y_{0, i}, y_{1, i}, ...)
+    arma::Col<T> operator[](const arma::uword& i) {
+        if (not Data) {
+            return arma::Col<T>{};
         }
 
+        arma::uword index = (i + _start) % _size;
+        return Data->unsafe_col(index);
     }
 
-    void Draw(const std::string& label,
-        const PlotStyle& style = PlotStyle::Line) {
-        this->operator()(label, style);
-    }
-
- private:
-};
-
-// This class is meant to be created once in the receiver/consumer thread
-// It will update all of the indicators values once information is sent
-template<typename T, typename DATA>
-class IndicatorReceiver  {
-    IndicatorsQueue<T, DATA>& _q;
-    std::unordered_map<T, std::unique_ptr<Indicator<T>>> _indicators;
-
-public:
-    using type = T;
-    using data_type = DATA;
-
-    explicit IndicatorReceiver(IndicatorsQueue<T, DATA>& q) : _q(q) { }
-
-
-    // No copying
-    IndicatorReceiver(const IndicatorReceiver&) = delete;
-
-    // This is meant to be run in the single consumer.
-    // Updates all the plots arrays from the queue.
-    void operator()() {
-        auto approx_length = _q.size_approx();
-        std::vector< IndicatorVector<T, DATA> > temp_items(approx_length);
-        _q.try_dequeue_bulk(temp_items.data(), approx_length);
-
-        for (IndicatorVector<T, DATA> item : temp_items) {
-            // If it contains one item, then it is a indicator
-            if (_indicators.count(item.ID)) {
-                auto& indicator = _indicators.at(item.ID);
-                indicator->ExecuteAttributes();
-
-                Plot<T>* plt = dynamic_cast<Plot<T>*>(indicator.get());
-                BooleanIndicator<T>* bind
-                    = dynamic_cast<BooleanIndicator<T>*>(indicator.get());
-                if (plt) {
-                    plt->add(item);
-                } else if (bind) {
-                    bind->add(item);
-                } else {
-                    indicator->add(item);
-                }
-            }
+    // Appends vals at the end of the circular buffer (if not full)
+    // or replaces the values of the current index if full.
+    template<typename... OtherTypes>
+    void operator()(const OtherTypes&... vals) {
+        if (not Data) {
+            return;
         }
 
-        for (auto& indicator : _indicators) {
-            indicator.second->ClearAttributes();
+        static_assert(sizeof...(vals) == NumPlots + 1,
+            "Passed number of parameters"
+            "must be equal to the number of plots plus one.");
+
+        Data->col(_current_index) = {static_cast<T>(vals)...};
+
+        if (_size < N) {
+            _size++;
+            _current_index = _size == N ? 0 : _current_index + 1;
+        } else {
+            _start = (_start + 1) % _size;
+            _current_index = _start;
         }
     }
 
-    void operator()(const T& key, const DATA& x, const DATA& y) {
-        IndicatorVector<T, DATA> newP(key, x, y);
-        _q.enqueue(newP);
-    }
+    // Adds vals at specific index i. It ignores the circular buffer
+    // conditions and does not advance them. To use this data structure
+    // as a circular buffer use the operator()
+    template<typename... OtherTypes>
+    void add_at(const arma::uword& i, const OtherTypes&... vals) {
+        static_assert(sizeof...(vals) == NumPlots + 1,
+            "Passed number of parameters"
+            "must be equal to the number of plots plus one.");
 
-    template<typename OFFDATA>
-    auto& indicator(const T& id, const std::string& label, OFFDATA& out,
-        const float& offset = 0,
-        const unsigned int& precision = 6,
-        const NumericFormat& format = NumericFormat::Default) {
-        _indicators.try_emplace(id,
-            std::make_unique<Indicator<T>>(id, precision, format));
-
-        auto& ind = _indicators.at(id);
-
-        ind->Draw(label, out, offset);
-
-        return ind;
-    }
-
-    auto& indicator(const T& id,
-        const std::string& label,
-        const float& offset = 0,
-        const unsigned int& precision = 6,
-        const NumericFormat& format = NumericFormat::Default) {
-
-        _indicators.try_emplace(id,
-            std::make_unique<Indicator<T>>(id, precision, format));
-        auto& ind = _indicators.at(id);
-
-        double tmp;
-        ind->Draw(label, tmp, offset);
-
-        return ind;
-    }
-
-    auto& booleanIndicator(const T& id, const std::string& label,
-        std::function<bool(const double&)>&& f, const float& offset = 0) {
-        _indicators.try_emplace(id,
-            std::make_unique<BooleanIndicator<T>>(id,
-                std::forward<std::function<bool(const double&)>>(f)));
-
-        auto& ind = _indicators.at(id);
-
-        auto b = dynamic_cast<BooleanIndicator<T>*>(ind.get());
-        if (b) {
-            b->Draw(label, offset);
+        if (not Data) {
+            return;
         }
 
-        return ind;
+        Data->col(i) = {static_cast<T>(vals)...};
     }
 
-    auto& booleanIndicator(const T& id, const std::string& label, bool& out,
-        std::function<bool(const double&)>&& f, const float& offset = 0) {
-        _indicators.try_emplace(id,
-            std::make_unique<BooleanIndicator<T>>(id,
-                std::forward<std::function<bool(const double&)>>(f)));
+    // Adds array at specific index i. It ignores the circular buffer
+    // conditions and does not advance them. To use this data structure
+    // as a circular buffer use the operator()
+    // template<typename OtherType, size_t N>
+    // void add_at(const arma::uword& i, const arma::Mat<T>& vals) {
+    //     static_assert(N == NumPlots + 1,
+    //         "Passed number of parameters"
+    //         "must be equal to the number of plots plus one.");
 
-        auto& ind = _indicators.at(id);
+    //     if (not Data) {
+    //         return;
+    //     }
 
-        auto b = dynamic_cast<BooleanIndicator<T>*>(ind.get());
-        if (b) {
-            b->Draw(label, out, offset);
-        }
-
-        return ind;
-    }
-
-    // auto& make_plot(const T& id) {
-    //  _indicators.try_emplace(id,
-    //      std::make_unique<Plot<T>>(id));
-
-    //  return _plots.at(id);
+    //     Data->col(i) = vals;
     // }
 
-    // Adds plot with ID, and draws it at the placed location if exists
-    // It returns a smart pointer to the indicator (not plot)
-    auto& plot(const T& id, const std::string& label,
-        const PlotStyle style = PlotStyle::Line, bool clearOnNewData = false) {
-        _indicators.try_emplace(id,
-            std::make_unique<Plot<T>>(id, clearOnNewData));
-
-        auto& ind = _indicators.at(id);
-
-        Plot<T>* plt = dynamic_cast<Plot<T>*>(ind.get());
-        if (plt) {
-            plt->Draw(label, style);
+    // Resizes the internal data buffer with new_size. Clears the data (faster)
+    // if clear_data is true, otherwise, it keeps the data (slower)
+    void resize(const arma::uword& new_size, const bool& clear_data = false) {
+        if (not Data) {
+            return;
         }
 
-        return ind;
+    	N = new_size;
+    	if (clear_data) {
+    		Data->set_size(NumPlots + 1, N);
+		    _size = 0;
+        	_current_index = 0;
+    	} else {
+    		Data->resize(NumPlots + 1, N);
+    	}
     }
 
-    void ClearPlot(const T& id) {
-        auto search = _indicators.find(id);
-        if (search != _indicators.end()) {
-            Plot<T>* plt = dynamic_cast<Plot<T>*>(
-                _indicators.at(id).get());
-            plt->clear();
+    // Clears the circular buffers registers. Does not clean the data.
+    void clear() {
+	    _size = 0;
+    	_current_index = 0;
+    }
+
+    auto size() const {
+    	return _size;
+    }
+
+    // Sets the circular buffer indexes to a full state without modifying
+    // the internal values.
+    void fill() {
+        _start = 0;
+        _current_index = 0;
+        _size = N;
+    }
+
+    // Fills the circular buffer and sets the start index to 0
+    // and size to N
+    void fill(const T& value) {
+        for(arma::uword i = 0; i < N; i++) {
+            Data->col(i) = arma::Mat<T>(NumPlots + 1,
+                                        1,
+                                        arma::fill::value(value));
         }
+
+        fill();
     }
 };
 
-// The IndicatorSender class is meant to be run in the producer threads
-// The producer thread can add a new IndicatorVector to this class
-// and this will send it forward.
-// It uses enums so the producer threads do not need to know if the
-// indicator/plot associated with that enum exists.
-template<typename T, typename DATA>
-class IndicatorSender {
-    IndicatorsQueue<T, DATA>& _q;
+using PlotGroupings_t = enum class PlotGroupingsEnum { One, Two, Three };
 
- public:
-    using type = T;
-    using data_type = DATA;
+template<size_t NPlots = 1, size_t NYAxis = 1>
+struct PlotOptions {
+    static_assert(NYAxis < 4, "More than 4 axes not allowed.");
+    static_assert(NPlots >= NYAxis, "Number of graphs has to be equal or higher"
+        " than the number of y-axes");
+    static_assert(NPlots > 0, "There must be a least one plot!");
 
-    explicit IndicatorSender(IndicatorsQueue<T, DATA>& q) : _q(q) { }
+    // Type of plot drawn
+    PlotType_t PlotType = PlotTypeEnum::Line;
+    //
+    bool ShowAllOptions = false;
 
-    // No copying
-    IndicatorSender(const IndicatorSender&) = delete;
+    // Labels of each plot
+    std::array<std::string_view, NPlots> PlotLabels;
+    // Group (in term of axes) where each plot belongs. Max 3
+    std::array<PlotGroupings_t, NPlots> PlotGroupings;
 
-    // Sends value x to indicator of type T
-    void operator()(const T& key, const DATA& x) {
-        IndicatorVector<T, DATA> newP(key, x);
-        _q.enqueue(newP);
-    }
+    const std::string_view XAxisLabel = "x";
+    std::string_view XAxisUnit = "[arb.]";
+    ImPlotScale XAxisScale = ImPlotScale_Linear;
+    ImPlotAxisFlags XAxisFlags = ImPlotAxisFlags_AutoFit;
 
-    // Sends value pair (x,y) to plot/indicator of type T
-    void operator()(const T& key, const DATA& x, const DATA& y) {
-        IndicatorVector<T, DATA> newP(key, x, y);
-        _q.enqueue(newP);
-    }
-
-    // Sends value pair (x,y) to plot/indicator of type T
-    // Note if an indicator is selected, only the latest value
-    // will be shown
-    void operator()(const IndicatorVector<T, DATA>& pv) {
-        _q.enqueue(pv);
-    }
-
-    // Sends a list of pairs (x,y) to plot/indicator of type T
-    // Note if an indicator is selected, only the latest value
-    // will be shown and the list y will be ignored
-    template<typename OFFDATA>
-    void operator()(const T& key, const std::vector<OFFDATA>& x,
-        const std::vector<OFFDATA>& y) {
-        std::vector< IndicatorVector<T, DATA> > items(x.size());
-        for (unsigned int i = 0; i < x.size(); i++) {
-            items[i] = IndicatorVector<T, DATA>(key,
-                static_cast<DATA>(x[i]),
-                static_cast<DATA>(y[i]));
-        }
-
-        _q.enqueue_bulk(items.begin(), items.size());
-    }
-
-    // Sends a list of pairs (x,y) to plot/indicator of type T
-    // Note if an indicator is selected, only the latest value
-    // will be shown and the list y will be ignored
-    template<typename OFFDATA>
-    void operator()(const T& key, OFFDATA* x_data, OFFDATA* y_data,
-        const size_t& size) {
-        std::vector< IndicatorVector<T, DATA> > items(size);
-        for (unsigned int i = 0; i < size; i++) {
-            items[i] = IndicatorVector<T, DATA>(key,
-                static_cast<DATA>(x_data[i]),
-                static_cast<DATA>(y_data[i]));
-        }
-
-        _q.enqueue_bulk(items.begin(), items.size());
-    }
+    const std::array<std::string_view, NYAxis> YAxisLabels = {"y"};
+    std::array<std::string_view, NYAxis> YAxisUnits = {"[arb.]"};
+    std::array<ImPlotScale, NYAxis> YAxisScales;
+    std::array<ImPlotAxisFlags, NYAxis> YAxisFlags;
 };
 
+template<StringLiteral list, size_t NPlots = 1, size_t NYAxis = 1>
+struct PlotIndicator {
+    static_assert(NYAxis < 4, "More than 4 axes not allowed.");
+    static_assert(NPlots >= NYAxis, "Number of graphs has to be equal or higher"
+        " than the number of y-axes");
+    static_assert(NPlots > 0, "There must be a least one plot!");
 
-template<typename T>
-// Creates indicator with Key and adds it to Receiver q
-inline Indicator<T> make_indicator(T&& key, unsigned int&& precision = 6,
-        NumericFormat&& format = NumericFormat::Default) {
-    return Indicator<T>(std::forward<T>(key),
-        std::forward<unsigned int>(precision),
-        std::forward<NumericFormat>(format));
+    const std::string_view Label = "";
+    // const std::string_view Text = "";
+    // const std::string_view HelpText = "";
+
+    // Information about the plots, their axes, and names
+    PlotOptions<NPlots, NYAxis> PlotDrawOptions;
+    const DrawingOptions DrawOptions;
+
+    constexpr ~PlotIndicator() {}
+
+    constexpr PlotIndicator() = default;
+    explicit constexpr PlotIndicator(
+        // const std::string_view& text, const std::string_view& help_text,
+        const PlotOptions<NPlots, NYAxis>& plot_draw_opts = PlotOptions<NYAxis>{},
+        const DrawingOptions& draw_opts = DrawingOptions{}) :
+        Label{list.value},
+        // Text{text},
+        // HelpText{help_text},
+        PlotDrawOptions{plot_draw_opts},
+        DrawOptions{draw_opts}
+    { }
+
+    explicit constexpr PlotIndicator(const std::string_view& text) :
+        PlotIndicator{text, ""}
+    { }
+};
+
+// Draws the data plot_data with draw options plot at the spot this function
+// is placed. Follows ImGUI/ImPlot rules.
+template<StringLiteral Label, size_t NPlots, size_t NYAxis>
+void Plot(const PlotIndicator<Label, NPlots, NYAxis>& plot,
+    PlotDataBuffer<NPlots>& plot_data) {
+    if (ImPlot::BeginPlot(Label.value, plot.DrawOptions.Size)) {
+        ImPlot::SetupAxisScale(ImAxis_X1, plot.PlotDrawOptions.XAxisScale);
+        ImPlot::SetupAxes(
+            (std::string(plot.PlotDrawOptions.XAxisLabel) +
+             std::string(plot.PlotDrawOptions.XAxisUnit)).c_str(),
+            (std::string(plot.PlotDrawOptions.YAxisLabels[0]) +
+             std::string(plot.PlotDrawOptions.YAxisUnits[0])).c_str(),
+            plot.PlotDrawOptions.XAxisFlags,
+            plot.PlotDrawOptions.YAxisFlags[0]);
+
+        if constexpr (NYAxis == 2) {
+            ImPlot::SetupAxis(ImAxis_Y2,
+                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
+                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
+                              plot.PlotDrawOptions.YAxisFlags[1]);
+        } else if constexpr (NYAxis == 3) {
+            ImPlot::SetupAxis(ImAxis_Y2,
+                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
+                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
+                              plot.PlotDrawOptions.YAxisFlags[1]);
+            ImPlot::SetupAxis(ImAxis_Y3,
+                              (std::string(plot.PlotDrawOptions.YAxisLabels[1]) +
+                              std::string(plot.PlotDrawOptions.YAxisUnits[1])).c_str(),
+                              plot.PlotDrawOptions.YAxisFlags[2]);
+        }
+
+        for (std::size_t i = 0; i < NPlots; i++) {
+            switch (plot.PlotDrawOptions.PlotGroupings[i]) {
+            case PlotGroupingsEnum::Two:
+                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+            break;
+            case PlotGroupingsEnum::Three:
+                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y3);
+            break;
+            default:
+                ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+            }
+
+            switch (plot.PlotDrawOptions.PlotType) {
+            case PlotTypeEnum::Scatter:
+                ImPlot::PlotScatterG(
+                    std::string(plot.PlotDrawOptions.PlotLabels[i]).c_str(),
+                                     PlotDataBuffer<NPlots>::TranformFunctions[i],
+                                     &plot_data,
+                                     plot_data.size());
+            break;
+            case PlotTypeEnum::Line:
+            default:
+                ImPlot::PlotLineG(
+                    std::string(plot.PlotDrawOptions.PlotLabels[i]).c_str(),
+                                  PlotDataBuffer<NPlots>::TranformFunctions[i],
+                                  &plot_data,
+                                  plot_data.size());
+            break;
+            }
+        }
+
+        ImPlot::EndPlot();
+    }
 }
 
-template<typename T>
-inline Plot<T> make_plot(T&& key) {
-    return Plot<T>(std::forward<T>(key));
+// Helper function to get a plot drawing options from a tuple.
+template<StringLiteral Label,
+         size_t NPlots = 1,
+         size_t NYAxis = 1,
+         typename... Types>
+constexpr static auto get_plot(const std::tuple<Types...>& list) {
+    return std::get<PlotIndicator<Label, NPlots, NYAxis>>(list);
 }
-
 
 }  // namespace SBCQueens
 #endif

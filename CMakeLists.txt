@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.11)
 include(cmake/CPM.cmake)
 
 project(SBCQueensGUIHelpers
-  VERSION 0.2.0
+  VERSION 0.3.0
   LANGUAGES C CXX)
 
 if(UNIX AND NOT APPLE)
@@ -41,12 +41,13 @@ endif()
 message(STATUS "Started CMake for ${PROJECT_NAME} v${PROJECT_VERSION}...\n")
 
 if (UNIX)
-  add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")    #this will allow to use same _DEBUG macro available in both Linux as well as Windows - MSCV environment. Easy to put Debug specific code.
+  add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")
+  #this will allow to use same _DEBUG macro available in both Linux as well as Windows - MSCV environment. Easy to put Debug specific code.
 endif (UNIX)
 
 
 add_compile_options(
-  "$<$<CONFIG:DEBUG>:-Og;-ggdb;>"
+  "$<$<CONFIG:DEBUG>:-O0;-ggdb;>"
   "$<$<CONFIG:RELEASE>:-O3;>"
 )
 
@@ -83,7 +84,7 @@ if(IS_DIRECTORY ${CAEN_DIR})
 
     # include_directories(SYSTEM ${CAEN_DIR}/VME/include)
     add_library(CAENVME SHARED IMPORTED GLOBAL)
-    set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/VME/lib/x86_64/CAENVME.lib)
+    set_target_properties(CAENVME PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/VME/lib/x86_64/CAENVMELib.lib)
     add_library(CAENComm SHARED IMPORTED GLOBAL)
     set_target_properties(CAENComm PROPERTIES IMPORTED_IMPLIB ${CAEN_DIR}/Comm/lib/x86_64/CAENComm.lib)
     add_library(CAENDigitizer SHARED IMPORTED GLOBAL)
@@ -104,9 +105,9 @@ file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 add_library(${PROJECT_NAME} ${sources} ${headers})
 
 include(cmake/CompilerWarnings.cmake)
-set(CMAKE_CXX_STANDARD 17)
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
 set_project_warnings(${PROJECT_NAME})
 
 # if(MINGW)
@@ -135,7 +136,6 @@ target_link_libraries(${PROJECT_NAME}
   Sipmanalysis::Sipmanalysis
   spdlog::spdlog
 )
-
 
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>/include

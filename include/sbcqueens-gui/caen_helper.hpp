@@ -1,5 +1,6 @@
 #ifndef CAENHELPER_H
 #define CAENHELPER_H
+#include <numeric>
 #pragma once
 
 // C STD includes
@@ -15,6 +16,8 @@
 #include <map>
 #include <cmath>
 #include <chrono>
+#include <array>
+#include <variant>
 
 // C++ 3rd party includes
 #include <CAENComm.h>
@@ -24,6 +27,13 @@
 #include "logger_helpers.hpp"
 
 namespace SBCQueens {
+
+enum class CAENDigitizerFamilies {
+#ifndef NDEBUG
+    DEBUG = 0,
+#endif
+    x725, x730, x740, x742, x743, x751
+};
 
 // Translates the CAEN API error code to a string.
 constexpr std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode& err);
@@ -37,10 +47,11 @@ enum class CAENConnectionType {
 // This list is incomplete
 enum class CAENDigitizerModel {
 #ifndef NDEBUG
-    DEBUG,
+    DEBUG = 0,
 #endif
-    DT5730B = 0,
-    DT5740D = 1
+    DT5730B,
+    DT5740D,
+    V1740D
 };
 
 // All the constants that never change for a given digitizer
@@ -69,40 +80,64 @@ struct CAENDigitizerModelConstants {
 };
 
 // This is here so we can transform string to enums
-// If it the key does not exist, this will throw an error
+// If the key does not exist, this will throw an error
 const static inline std::unordered_map<std::string, CAENDigitizerModel>
     CAENDigitizerModelsMap {
+#ifndef NDEBUG
+        {"DEBUG", CAENDigitizerModel::DEBUG},
+#endif
         {"DT5730B", CAENDigitizerModel::DT5730B},
-        {"DT5740D", CAENDigitizerModel::DT5740D}
+        {"DT5740D", CAENDigitizerModel::DT5740D},
+        {"V1740D", CAENDigitizerModel::V1740D}
 };
 
-// These maps are here to link all the enums with their constants or properties
-// that are fixed per digitizer. They can only be fixed at compile time.
-const static inline
-std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
+// These links all the enums with their constants or properties that
+// are fixed per digitizer
+const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
     CAENDigitizerModelsConstantsMap {
-        {CAENDigitizerModel::DT5730B,
-        CAENDigitizerModelConstants {
+        {CAENDigitizerModel::DEBUG, CAENDigitizerModelConstants {
+            8,  // ADCResolution
+            100e3,  //  AcquisitionRate
+            1024ul,  // MemoryPerChannel
+            1,  // NumChannels
+            0,  // NumberOfGroups, 0 -> no groups
+            1,  // NumChannelsPerGroup
+            1024,  // MaxNumBuffers
+            10.0f,  // NLOCToRecordLength
+            {1.0}  // VoltageRanges
+        }},
+        {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants {
             14,  // ADCResolution
             500e6,  //  AcquisitionRate
             static_cast<uint32_t>(5.12e6),  // MemoryPerChannel
             8,  // NumChannels
-            0,  // NumberOfGroups
+            0,  // NumberOfGroups, 0 -> no groups
             8,  // NumChannelsPerGroup
             1024,  // MaxNumBuffers
             10.0f,  // NLOCToRecordLength
             {0.5, 2.0}  // VoltageRanges
         }},
         {CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants {
-             12,  // ADCResolution
-             62.5e6,  //  AcquisitionRate
-             static_cast<uint32_t>(192e3),  // MemoryPerChannel
-             32,  // NumChannels
-             4,  // NumChannels
-             8,  // NumberOfGroups
-             1024,  // MaxNumBuffers
-             1.5f,  // NLOCToRecordLength
-             {2.0, 10.0}  // VoltageRanges
+            12,  // ADCResolution
+            62.5e6,  //  AcquisitionRate
+            static_cast<uint32_t>(192e3),  // MemoryPerChannel
+            32,  // NumChannels
+            4,  // NumChannelsPerGroup
+            8,  // NumberOfGroups
+            1024,  // MaxNumBuffers
+            1.5f,  // NLOCToRecordLength
+            {2.0, 10.0}  // VoltageRanges
+        }},
+        {CAENDigitizerModel::V1740D, CAENDigitizerModelConstants {
+            12,  // ADCResolution
+            62.5e6,  //  AcquisitionRate
+            static_cast<uint32_t>(192e3),  // MemoryPerChannel
+            64,  // NumChannels
+            8,  // NumChannelsPerGroup
+            8,  // NumberOfGroups
+            1024,  // MaxNumBuffers
+            1.5f,  // NLOCToRecordLength
+            {2.0}  // VoltageRanges
         }}
     // This is a C++20 higher feature so lets keep everything 17 compliant
     // CAENDigitizerModelsConstants_map {
@@ -134,7 +169,7 @@ struct CAENGlobalConfig {
     uint32_t MaxEventsPerRead = 512;
 
     // Record length in samples
-    uint32_t RecordLength = 400;
+    uint32_t RecordLength = 100;
 
     // In %
     uint32_t PostTriggerPorcentage = 50;
@@ -166,7 +201,7 @@ struct CAENGlobalConfig {
     CAEN_DGTZ_IOLevel_t IOLevel
         = CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM;
 
-    // This feature is only available for X730
+    // This feature is for x730, x740
     // True = disabled, False = enabled
     bool TriggerOverlappingEn = false;
 
@@ -182,26 +217,43 @@ struct CAENGlobalConfig {
         CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge;
 };
 
+struct ChannelsMask {
+    std::array<bool, 8> CH
+        = {false, false, false, false, false, false, false, false};
+
+    uint8_t get() noexcept {
+        uint8_t out = 0u;
+        for(std::size_t i = 0; i < CH.size(); i++) {
+            out |= static_cast<uint8_t>(CH[i]) << i;
+        }
+        return out;
+    }
+
+    bool& operator[](const std::size_t& iter) noexcept {
+        return CH[iter];
+    }
+};
+
 // As a general case, this holds all the configuration values for a channel
 // if a digitizer does not support groups, i.e x730, group = channel
 struct CAENGroupConfig {
-    // channel # or channel group
-    uint8_t Number = 0;
+    // Channel or group number
+    bool Enabled = 0;
 
     // Mask of channels within the group enabled to trigger
     // If Channel, if its != 0 then its enabled
-    uint8_t TriggerMask = 0;
+    ChannelsMask TriggerMask;
 
     // Mask of enabled channels within the group
     // Ignored for single channels.
-    uint8_t AcquisitionMask = 0;
+    ChannelsMask AcquisitionMask;
 
     // 0x8000 no offset if 16 bit DAC
     // 0x1000 no offset if 14 bit DAC
     // 0x400 no offset if 14 bit DAC
     // DC offsets of each channel in the group
-    uint16_t DCOffset = 0;
-    std::vector<uint8_t> DCCorrections = {};
+    uint32_t DCOffset = 0x8000;
+    std::array<uint8_t, 8> DCCorrections = {0, 0, 0, 0, 0, 0, 0, 0};
 
     // For DT5730
     // 0 = 2Vpp, 1 = 0.5Vpp
@@ -209,7 +261,7 @@ struct CAENGroupConfig {
     uint8_t DCRange = 0;
 
     // In ADC counts
-    uint16_t TriggerThreshold = 0;
+    uint32_t TriggerThreshold = 0;
 };
 
 
@@ -240,20 +292,20 @@ struct caenEvent {
         CAEN_DGTZ_FreeEvent(_handle, reinterpret_cast<void**>(&Data) );
     }
 
-    // This copies event other into this
-    caenEvent(const caenEvent& other) {
-        this->_handle = other._handle;
-        this->DataPtr = other.DataPtr;
-        CAEN_DGTZ_AllocateEvent(other._handle,
-            reinterpret_cast<void**>(&this->Data));
-        // *A = *B copies the data
-        *this->Data = *other.Data;
-        this->Info = other.Info;
-    }
+    // // This copies event other into this
+    // caenEvent(const caenEvent& other) {
+    //     this->_handle = other._handle;
+    //     this->DataPtr = other.DataPtr;
+    //     CAEN_DGTZ_AllocateEvent(other._handle,
+    //         reinterpret_cast<void**>(&this->Data));
+    //     // *A = *B copies the data
+    //     *this->Data = *other.Data;
+    //     this->Info = other.Info;
+    // }
 
-    caenEvent operator=(const caenEvent& other) {
-        return caenEvent(other);
-    }
+    // caenEvent operator=(const caenEvent& other) {
+    //     return caenEvent(other);
+    // }
 
  private:
     int _handle;
@@ -304,7 +356,7 @@ struct CAEN {
     Logger _logger;
 
     CAENGlobalConfig _global_config;
-    std::vector<CAENGroupConfig> _group_configs;
+    std::array<CAENGroupConfig, 8> _group_configs;
     uint32_t _current_max_buffers;
 
     // Translates the connection info data to a single number that should*
@@ -358,7 +410,20 @@ struct CAEN {
         }
     }
 
+    CAENDigitizerFamilies __get_family(const CAENDigitizerModel& model) {
+        switch(model) {
+        case CAENDigitizerModel::DT5740D:
+        case CAENDigitizerModel::V1740D: 
+            return CAENDigitizerFamilies::x740;
+        default:
+        case CAENDigitizerModel::DT5730B: 
+            return CAENDigitizerFamilies::x730;
+        }
+    }
+
  public:
+    // Family 
+    const CAENDigitizerFamilies Family;
     // Model
     const CAENDigitizerModel Model;
     // Constants associated with the model.
@@ -395,6 +460,7 @@ struct CAEN {
         const CAENConnectionType& ct, const int& ln, const int& cn,
         const uint32_t& addr) :
         _logger{logger},
+        Family{__get_family(model)}
         Model{model},
         ModelConstants{CAENDigitizerModelsConstantsMap.at(model)},
         ConnectionType{ct},
@@ -555,9 +621,9 @@ struct CAEN {
 
     // Returns the channel voltage range. If channel does not exist
     // returns 0
-    double GetVoltageRange(const uint8_t& ch) const {
+    double GetVoltageRange(const uint8_t& gr_n) const {
         try {
-            auto config = _group_configs.at(ch);
+            auto config = GroupConfigs[gr_n];
             return ModelConstants.VoltageRanges[config.DCRange];
         } catch(...) {
             return 0.0;

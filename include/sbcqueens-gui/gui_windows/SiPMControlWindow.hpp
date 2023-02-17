@@ -9,36 +9,37 @@
 #include <toml.hpp>
 
 // my includes
-#include "sbcqueens-gui/imgui_helpers.hpp"
-#include "sbcqueens-gui/hardware_helpers/CAENDigitizerInterface.hpp"
-#include "sbcqueens-gui/hardware_helpers/TeensyControllerInterface.hpp"
-#include "sbcqueens-gui/indicators.hpp"
+#include "sbcqueens-gui/gui_windows/Window.hpp"
+
+#include "sbcqueens-gui/hardware_helpers/SiPMAcquisitionData.hpp"
+#include "sbcqueens-gui/hardware_helpers/TeensyControllerData.hpp"
 
 namespace SBCQueens {
 
-class SiPMControlWindow {
-    toml::table _config_table;
-
-    ControlLink<CAENQueue>& CAENControlFac;
-    CAENInterfaceData& cgui_state;
-    IndicatorReceiver<IndicatorNames>& indicatorReceiver;
-    TeensyControllerData& tgui_state;
+class SiPMControlWindow :
+public Window<SiPMAcquisitionData, TeensyControllerData> {
+    SiPMAcquisitionData& _sipm_data;
+    TeensyControllerData& _teensy_data;
 
  public:
-    SiPMControlWindow(ControlLink<CAENQueue>& cc, CAENInterfaceData& cd,
-        IndicatorReceiver<IndicatorNames>& ir, TeensyControllerData& td)
-        : CAENControlFac(cc), cgui_state(cd), indicatorReceiver(ir),
-        tgui_state(td) {}
+    SiPMControlWindow(
+    SiPMAcquisitionData& sipm_data, TeensyControllerData& teensy_data) :
+        Window<SiPMAcquisitionData, TeensyControllerData>{"SiPM Acquisition Controls"} ,
+        _sipm_data(sipm_data), _teensy_data(teensy_data)
+    {}
 
-    // Moving allowed
-    SiPMControlWindow(SiPMControlWindow&&) = default;
+    ~SiPMControlWindow() {}
 
-    // No copying
-    SiPMControlWindow(const SiPMControlWindow&) = delete;
+    void init_window(const toml::table& tb);
 
-    void init(const toml::table& tb);
-    bool operator()();
+ private:
+    void draw();
 };
+
+inline auto make_sipm_control_window(
+    SiPMAcquisitionData& sipm_data, TeensyControllerData& teensy_data) {
+    return std::make_unique<SiPMControlWindow>(sipm_data, teensy_data);
+}
 
 }  // namespace SBCQueens
 

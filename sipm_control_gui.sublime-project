@@ -44,7 +44,7 @@
 			"name": "Build GUI Windows",
 			"shell" : true,
 			"working_dir" : "$project_path",
-			"shell_cmd": "cmake all -B build -G \"MinGW Makefiles\" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON && cmake --build build -j",
+			"shell_cmd": "cmake all -B build -G \"MinGW Makefiles\" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCAEN_DIR=\"D:/Program Files/CAEN\" -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=OFF && cmake --build build -j",
 			"syntax" : "Packages/Makefile/Make Output.sublime-syntax",
 		},
 
@@ -52,7 +52,7 @@
 			"name": "Build GUI Windows Debug",
 			"shell" : true,
 			"working_dir" : "$project_path",
-			"shell_cmd": "cmake all -B build -G \"MinGW Makefiles\" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCAEN_DIR=\"X:/Program Files/CAEN\" -DCMAKE_BUILD_TYPE=Debug -DUSE_VULKAN=OFF && cmake --build build -j",
+			"shell_cmd": "cmake all -B build -G \"MinGW Makefiles\" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCAEN_DIR=\"D:/Program Files/CAEN\" -DCMAKE_BUILD_TYPE=Debug -DUSE_VULKAN=OFF && cmake --build build -j",
 			"syntax" : "Packages/Makefile/Make Output.sublime-syntax",
 		}
 

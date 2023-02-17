@@ -21,6 +21,7 @@ arma::mat caen_event_to_armadillo(CAENEvent& evt, const uint32_t& n_chs) {
 	uint32_t n_chs_c = n_chs > 64 ? 64 : n_chs;
 
 	auto m = arma::Mat<uint16_t>(evt->Data->DataChannel[0], n_chs_c, size);
+	std::cout << m << "\n";
 	return arma::conv_to<arma::mat>::from(m);
 }
 

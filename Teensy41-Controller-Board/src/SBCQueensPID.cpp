@@ -61,14 +61,24 @@ namespace SBCQueens {
 				float pid_comm_err = controller._set_comm_err;
 				// Integral term
 				if(ti != 0) {
-					pid_comm_err += pid_error*delta_time / ti;
+					pid_comm_err += pid_error*(delta_time / ti);
+
+					// Values higher than 32767 do not make sense as this is a 16 bit PID
+					// To give headroom for when calculating the output, we use 16384
+					// or 2^14
+					float cmp_tmp = kp*pid_comm_err;
+					if (cmp_tmp > 16384.0f) {
+						pid_comm_err = 16384.0f;
+					} else if (cmp_tmp < -16384.0f) {
+						pid_comm_err = -16384.0f;
+					}
 				}
 
 				// Derivative term
 				// Td*de/DELTA_T
 				float derivative_error = 0.0;
 				if(td != 0) {
-					derivative_error = td*(pid_error - latest_current_error)/delta_time;
+					derivative_error = (pid_error - latest_current_error)*(td*delta_time);
 				}
 
 				// Before updating the register, ceil the tmp value to max and min values
@@ -104,10 +114,22 @@ namespace SBCQueens {
 				float& td = controller.REGISTERS.CONTROL_TD;
 
 				float pid_error = temperature_setpoint - latest_temp_meas;
+				// Temp solution. It is not the best but it will mitigate overflow
+				// TODO(Hector): investigate how to make this faster and better
 				float pid_comm_err = controller._cont_comm_err;
 				// Integral term
 				if(ti != 0) {
 					pid_comm_err += pid_error*(delta_time / ti);
+
+					// Values higher than 32767 do not make sense as this is a 16 bit PID
+					// To give headroom for when calculating the output, we use 16384
+					// or 2^14
+					float cmp_tmp = kp*pid_comm_err;
+					if (cmp_tmp > 16384.0f) {
+						pid_comm_err = 16384.0f;
+					} else if (cmp_tmp < -16384.0f) {
+						pid_comm_err = -16384.0f;
+					}
 				}
 
 				// Derivative term
