@@ -79,18 +79,8 @@ If the intention is to develop the code:
 
 # Common Problems:
 
-## LINUX:
-
- - If you install CAEN libraries the way it tell you to install them, cmake wont find them. My proposed solution is to imitate the Windows installation structure: first, create a folder named CAEN. Then, copy all the files extracted directly from the tar file (for example CAENComm-1.5.0). Then, rename: CAENComm-X.X.X to CAENComm, CAENDigitizer-X.X.X to CAENDigitizer, CAENVMELib-X.X.X to CAENVME. Finally, install the libs by running the install_64 that are found in each lib. If you do not have this problem, ignore it.
-
-## WINDOWS:
-
- - If during linking the compiler says "ld.exe: cannot find -lCAENVME", go where the library CAENVME was installed and rename all the files "CAENVMElib" to "CAENVME"
-
 ## ALL:
-
- - Do not forget to do "git submodule init" and "git submodule update" if it is possible not to find some dependencies.
-
+-- There are some I just need to write them down. For example: problems with old version of CAEN libs
 # Details about the binary save format (SBC preferred data format)
 
 Here is the fields and their corresponding dimensions of the binary data that are being saved. The data can be read by the DataHandling/ReadBinary.py script in the [SBC-Analysis](https://github.com/SBC-Collaboration/SBC-Analysis) repository.

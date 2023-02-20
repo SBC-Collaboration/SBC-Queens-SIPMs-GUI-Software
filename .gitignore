@@ -3,7 +3,9 @@ RUNS/
 build/
 *.sublime-*
 build*/
+clion_build
 compile_commands.json
+.idea
 
 Teensy41-Controller-Board/.pio
 Teensy41-Controller-Board/.pio

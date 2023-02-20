@@ -75,10 +75,18 @@ int main() {
     std::vector<std::unique_ptr<SBCQueens::ThreadManager<SiPMCharacterizationPipes>>> _threads;
     logger->info("Created pipes that communicate between threads.");
 
+    logger->info("Creating GUIMangaer using wrapper: ");
+#ifdef USE_VULKAN
+    _threads.push_back(SBCQueens::make_gui_manager(pipes,
+        ImGUIWrappers::main_glfw_vulkan_wrapper));
+    logger->info("VULKAN + GLFW backend.");
+#else
+    _threads.push_back(SBCQueens::make_gui_manager(pipes,
+                                                   ImGUIWrappers::main_glfw_open3gl_wrapper));
+    logger->info("OpenGL + GLFW backend.");
+#endif
     logger->info("Creating Teensy Controller Manager.");
     _threads.push_back(SBCQueens::make_teensy_controller_manager(pipes));
-    logger->info("Creating SiPM Controller Manager.");
-    _threads.push_back(SBCQueens::make_sipmacquisition_manager(pipes));
     logger->info("Creating Slow DAQ Controller Manager.");
     _threads.push_back(SBCQueens::make_slow_daq_manager(pipes));
 
@@ -93,31 +101,20 @@ int main() {
         t.detach();
     }
 
+    logger->info("Creating SiPM Controller Manager.");
+    auto sipm_thread = SBCQueens::make_sipmacquisition_manager(pipes);
+    std::jthread t([thread = std::move(sipm_thread)]() {
+        (*thread)();
+    });
+
+    t.join();
     // This function just holds the rendering framework we are using
     // all of them found under rendering_wrappers
     // We wrapping it under a lambda so we can pass it to a thread
     // because we do not care about its returning vallue
     // This is our GUI function which actually holds all of our buttons
     // labels, inputs, graphs and ect
-    logger->info("Creating GUIMangaer using wrapper: ");
-#ifdef USE_VULKAN
-    auto _gui_thread = SBCQueens::make_gui_manager(pipes,
-        ImGUIWrappers::main_glfw_vulkan_wrapper);
-    logger->info("VULKAN + GLFW backend.");
-    std::thread t([thread = std::move(_gui_thread)]() {
-        (*thread)();
-    });
-    t.join();
-#else
-    auto _gui_thread = SBCQueens::make_gui_manager(pipes,
-        ImGUIWrappers::main_glfw_open3gl_wrapper);
-    logger->info("OpenGL + GLFW backend.");
-    // (*_gui_thread)();
-    std::thread t([thread = std::move(_gui_thread)]() {
-        (*thread)();
-    });
-    t.join();
-#endif
+
 
     // logger->info("Closing spawning thread. See you on the other side!");
 

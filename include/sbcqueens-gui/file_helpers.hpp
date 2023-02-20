@@ -23,13 +23,17 @@
 
 namespace SBCQueens {
 
+template<typename T>
+concept HasOutstreamOp = requires (T x) { x.operator<<; };
+
 // Manages the ofstream to work in concurrent or non-concurrent modes.
-// Do not use on its own.
+// Closes the file when this class goes out of scope. It is possible
+// to close the file without destroying this class, but it is not
+// recommended.
 template <typename T>
-struct dataFile {
- private:
-    // Path to the file
-    bool _open;
+requires std::copyable<T> or std::movable<T>
+class DataFile {
+    bool _open = false;
     std::string _abs_dir;
     std::ofstream _stream;
 
@@ -38,10 +42,11 @@ struct dataFile {
  public:
     using type = T;
 
-    dataFile() : _open(false) { }
+    DataFile() = default;
 
-    // FileName: is the relative or absolute file dir
-    explicit dataFile(const std::string& fileName) : _abs_dir(fileName) {
+    // Opens file in append mode. If it does not exist, it creates it.
+    // It opens the file with no header.
+    explicit DataFile(std::string_view file_name) : _abs_dir(file_name) {
         _stream.open(_abs_dir,
             std::ofstream::app | std::ofstream::binary);
 
@@ -50,43 +55,33 @@ struct dataFile {
         }
     }
 
-    template<typename InitWriteFunc, typename... Args>
-    // FileName: is the relative or absolute file dir
-    // f -> function that takes args and returns string
-    // that is written at the start of the file only if
-    // the file did not exist before
-    dataFile(const std::string& fileName, InitWriteFunc&& f, Args&&... args) :
-        _abs_dir(fileName) {
-        _stream.open(_abs_dir,
-            std::ofstream::app | std::ofstream::binary);
-
-        if (_stream.is_open()) {
-            _open = true;
-
-            // TODO(Hector): create directories between file and
-            // current directory?
-            if (std::filesystem::is_empty(fileName)) {
+    // Opens file in append mode. If it does not exist, it creates it.
+    // It writes the return contents of InitWriteFunc as the header
+    // with args...
+    template<typename HeaderFunc, typename... Args>
+    requires HasOutstreamOp<std::invoke_result<HeaderFunc(Args...)>>
+    DataFile(std::string_view file_name, HeaderFunc&& f, Args&&... args) :
+        DataFile(file_name)
+    {
+        if (_open) {
+            if (std::filesystem::is_empty(file_name)) {
                 _stream << f(std::forward<Args>(args)...);
             }
         }
     }
 
-    // No copying nor moving
-    dataFile(dataFile&&) = delete;
-    dataFile(const dataFile&) = delete;
-
-    // It is very likely these two things are happening anyways when
-    // the Datafile is out of the scope but I want to make sure.
-    ~dataFile() {
+    ~DataFile() {
+        // It is very likely that the stream is closed and freed when this
+        // goes out of scope, but we are never too sure.
         _stream.close();
         _open = false;
     }
 
-    const bool& IsOpen() {
+    const bool& isOpen() {
         return _open;
     }
 
-    std::vector<T> GetData() {
+    std::vector<T> getData() {
         auto approx_length = _queue.size_approx();
         auto data = std::vector<T>(approx_length);
         _queue.try_dequeue_bulk(data.data(), approx_length);
@@ -95,12 +90,12 @@ struct dataFile {
     }
 
     // Adds element as a copy to current buffer
-    void Add(const T& element) {
+    void add(const T& element) {
         _queue.enqueue(element);
     }
 
     // Adds list as a copy to current buffer
-    void Add(const std::initializer_list<T>& list) {
+    void add(const std::initializer_list<T>& list) {
         _queue.enqueue_bulk(list.begin(), list.size());
     }
 
@@ -129,105 +124,74 @@ struct dataFile {
     void close() {
         _stream.close();
     }
-};
 
-// As a file is a dynamic resource, it is better to manage it using
-// smart pointers, and using a functional based approach it is easier
-// to parallelize it.
-template<typename T>
-using DataFile = std::shared_ptr<dataFile<T>>;
+    // Saves the contents of DataFile using three different methods depending on f:
+    //
+    // If f takes T (T& or const T) as an argument, it will write the return of
+    //      f for each data member in the vector.
+    // Else if f takes std::vector<T>& as argument, it will then use all the
+    //      information contained inside the vector before writing f.
+    // Else, write what f returns.
+    // Note: as long as the return type is compatible with the << operator
+    // for all of these cases.
+    template<typename FormatFunc, typename... Args>
+    requires HasOutstreamOp<std::invoke_result<FormatFunc(T, Args...)>> or
+             HasOutstreamOp<std::invoke_result<FormatFunc(std::vector<T>, Args...)>> or
+             HasOutstreamOp<std::invoke_result<FormatFunc(Args...)>>
+    void save(FormatFunc&& f,  Args&&... args) noexcept {
+        if(not _open) {
+            return;
+        }
 
-// Opens the file with name fileName.
-// If file is an already opened file, it is closed and opened again.
-// res returns nullptr if it failed to open.
-template <typename T>
-void open(DataFile<T>& res, const std::string& fileName) {
-    if (res) {
-        res.reset();
-    }
-
-    res = std::make_unique<dataFile<T>>(fileName);
-
-    // If it fails to open, release resources
-    if (not res->IsOpen()) {
-        res.reset();
-    }
-}
-
-// Opens the file with name fileName.
-// If file is an already opened file, it is closed and opened again.
-// It will also write to the file whatever f returns with args...
-// as long as f returns anything that can be saved using the steam << operator.
-// res returns nullptr if it failed to open.
-template <typename T, typename InitWriteFunc, typename... Args>
-void open(DataFile<T>& res,
-    const std::string& fileName, InitWriteFunc&& f,  Args&&... args) {
-
-    if (res) {
-        res.reset();
-    }
-
-    res = std::make_unique<dataFile<T>>(fileName,
-        std::forward<InitWriteFunc>(f), std::forward<Args>(args)...);
-
-    // If it fails to open, release resources
-    if (not res->IsOpen()) {
-        res.reset();
-    }
-}
-
-// Closes the file and releases resources (res is nullptr after this call)
-template <typename T>
-void close(DataFile<T>& res) {
-    if (res) {
-        res.reset();
-    }
-}
-
-// Saves the contents of DataFile using three different methods depending on f:
-//
-// If f takes T (T& or const T) as an argument, it will write the return of
-//      f for each data member in the vector.
-// Else if f takes std::vector<T>& as argument, it will then use all the
-//      information contained inside the vector before writing f.
-// Else, write what f returns.
-// Note: as long as the return type is compatible with the << operator
-// for all of these cases.
-template<typename T, typename FormatFunc, typename... Args>
-void save(DataFile<T>& file, FormatFunc&& f,  Args&&... args) noexcept {
-    if(!file) {
-        return;
-    }
-
-    if (file->IsOpen()) {
         // GetData becomes a thread-safe operation
         // because of the concurrent queue
         // for the async version this data is locked into the
         // thread that is saving and is cleared by the end
-        auto data = file->GetData();
+        auto data = getData();
         // If FormatFunc takes the single item as an argument
         // We will call f for every item in TempData
         if constexpr (
-            std::is_invocable_v<FormatFunc, T, Args...>         ||
-            std::is_invocable_v<FormatFunc, const T&, Args...>  ||
-            std::is_invocable_v<FormatFunc, T&, Args...>) {
+                std::is_invocable_v<FormatFunc, T, Args...>         or
+                std::is_invocable_v<FormatFunc, const T&, Args...>  or
+                std::is_invocable_v<FormatFunc, T&, Args...>) {
             for (auto item : data) {
-                (*file) << f(item, std::forward<Args>(args)...);
+                _stream << f(item, std::forward<Args>(args)...);
             }
 
-        // If it takes the entire format, then apply it to all.
+            // If it takes the entire format, then apply it to all.
         } else if constexpr (std::is_invocable_v<FormatFunc,
-            std::vector<T>&, Args...>) {
-            (*file) << f(data, std::forward<Args>(args)...);
+                std::vector<T>&, Args...>) {
+            _stream << f(data, std::forward<Args>(args)...);
 
-        // if not, just save what f returns
+            // if not, just save what f returns
         } else {
-            (*file) << f(std::forward<Args>(args)...);
+            _stream << f(std::forward<Args>(args)...);
         }
 
-        file->flush();
+        _stream.flush();
     }
+};
+
+// Opens the file with name file_name.
+// Essentially the same as calling DataFile<T>(file_name)
+template <typename T>
+DataFile<T> open_file(std::string_view file_name) {
+    return DataFile<T>(file_name);
 }
+
+// Opens the file with name fileName.
+// Essentially the same as calling DataFile<T>(file_name, f, args)
+template <typename T, typename InitWriteFunc, typename... Args>
+DataFile<T> open_file(DataFile<T>& res,
+                      std::string_view file_name,
+                      InitWriteFunc&& f,
+                      Args&&... args) {
+    return DataFile<T>(file_name,
+                       std::forward<InitWriteFunc>(f),
+                       std::forward<Args>(args)...);
+}
+
+
 
 // Saves the contents of the DataFile asynchronously using the save function
 // described here. See save for more information.
@@ -243,7 +207,7 @@ struct SaveFileInfo {
     double Time;
     std::string FileName;
 
-    SaveFileInfo() {}
+    SaveFileInfo() = default;
     SaveFileInfo(const double& time, const std::string& fn) :
         Time(time), FileName(fn) {}
 };

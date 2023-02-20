@@ -1,5 +1,8 @@
 include(cmake/CPM.cmake)
 
+set(SIPM_ANALYSIS_LIB_DIR ../../../../SiPMCharacterization
+        CACHE FILEPATH "Directory of where the SiPM Characterization/analysis lib is located" )
+
 # OpenGL
 find_package(OpenGL REQUIRED)
 find_package(OpenMP REQUIRED)
@@ -109,6 +112,6 @@ if(date_ADDED)
     $<BUILD_INTERFACE:${date_SOURCE_DIR}>/include)
 endif()
 
-CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacterization)
+CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ${SIPM_ANALYSIS_LIB_DIR})
 
 # CPMAddPackage(NAME Sipmanalysis SOURCE_DIR ../../../../SiPMCharacteriazation)

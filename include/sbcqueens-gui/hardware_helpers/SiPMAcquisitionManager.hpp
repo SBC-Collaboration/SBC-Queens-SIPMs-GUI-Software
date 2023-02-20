@@ -64,15 +64,25 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // IndicatorSender<IndicatorNames> _indicator_sender;
     // IndicatorSender<uint8_t> _plot_sender;
 
+    std::shared_ptr<spdlog::logger> _logger;
+
+    using SiPMCAEN = CAEN<std::shared_ptr<spdlog::logger>>;
+    using SiPMCAEN_ptr = std::unique_ptr<SiPMCAEN>;
+    SiPMCAEN_ptr _caen_port = nullptr;
+    SiPMAcquisitionStates _acq_state = SiPMAcquisitionStates::OscilloscopeMode;
+
+    using SiPMCAENFile = DataFile<const CAENEvent*>;
+    using SiPMCAENFile_ptr = std::unique_ptr<SiPMCAENFile>;
+    SiPMCAENFile_ptr _caen_file = nullptr;
+
     // Files
-    std::string _run_name =  "";
+    std::string _run_name;
     DataFile<SiPMVoltageMeasure> _voltages_file;
     LogFile _saveinfo_file;
 
     // Hardware
-    uint8_t _num_chs;
-    double _acq_rate;
-    CAEN _caen_port = nullptr;
+    uint8_t _num_chs = 0;
+    double _acq_rate = 0.0;
     ClientController<serial_ptr, SiPMVoltageMeasure> _sipm_volt_sys;
 
     uint32_t SavedWaveforms = 0;
@@ -83,8 +93,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // tmp stuff
     double _wait_time = 900000.0;
     double _reset_timer = 0;
-    uint16_t* _data;
-    size_t _length;
+    uint16_t* _data = nullptr;
+    size_t _length = 0;
     std::vector<double> _x_values, _y_values;
     CAENEvent _osc_event;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
@@ -111,11 +121,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     SiPMAcquisitionState_ptr main_loop_state;
 
     SiPMAcquisitionState_ptr standby_state;
-    SiPMAcquisitionState_ptr attemptConnection_state;
-    SiPMAcquisitionState_ptr oscilloscopeMode_state;
-    SiPMAcquisitionState_ptr measurementRoutineMode_state;
-    // SiPMAcquisitionState_ptr runMode_state;
-    SiPMAcquisitionState_ptr disconnected_state;
+    SiPMAcquisitionState_ptr acquisition_state;
     SiPMAcquisitionState_ptr closing_state;
 
  public:
@@ -129,29 +135,15 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             std::chrono::milliseconds(1000),
             std::bind(&SiPMAcquisitionManager::standby, this));
 
-        attemptConnection_state = std::make_shared<SiPMAcquisitioneState>(
+        acquisition_state = std::make_shared<SiPMAcquisitioneState>(
             std::chrono::milliseconds(1),
-            std::bind(&SiPMAcquisitionManager::attempt_connection, this));
-
-        oscilloscopeMode_state = std::make_shared<SiPMAcquisitioneState>(
-            std::chrono::milliseconds(500),
-            std::bind(&SiPMAcquisitionManager::oscilloscope, this));
-
-        measurementRoutineMode_state = std::make_shared<SiPMAcquisitioneState>(
-            std::chrono::milliseconds(50),
-            std::bind(&SiPMAcquisitionManager::measurement_routine_mode, this));
-
-        // runMode_state = std::make_shared<SiPMAcquisitioneState>(
-        //     std::chrono::milliseconds(50),
-        //     std::bind(&SiPMAcquisitionManager::run_mode, this));
-
-        disconnected_state = std::make_shared<SiPMAcquisitioneState>(
-            std::chrono::milliseconds(1),
-            std::bind(&SiPMAcquisitionManager::disconnected_mode, this));
+            std::bind(&SiPMAcquisitionManager::acquisition, this));
 
         closing_state = std::make_shared<SiPMAcquisitioneState>(
             std::chrono::milliseconds(1),
             std::bind(&SiPMAcquisitionManager::closing_mode, this));
+
+        _logger = spdlog::get("log");
     }
 
     ~SiPMAcquisitionManager() {
@@ -289,45 +281,24 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         last_waveforms = TriggeredWaveforms;
         last_time = current_time;
-        _doe.TriggeredRate = dWaveforms / dt;
+        _doe.TriggeredRate = static_cast<double>(dWaveforms) / dt;
     }
 
-    // Local error checking. Checks if there was an error and prints it
-    // using spdlog
-    bool lec() {
-        return check_error(_caen_port, [](const std::string& cmd) {
-            spdlog::error(cmd);
-        });
-    }
-
-    void switch_state(const SiPMAcquisitionStates& newState) {
+    // Changes the manager state. Currently only 3:
+    // Acquisition, Closing, and Standby
+    void switch_state(const SiPMAcquisitionManagerStates& newState) {
         _doe.CurrentState = newState;
         switch (_doe.CurrentState) {
-            case SiPMAcquisitionStates::AttemptConnection:
-                main_loop_state = attemptConnection_state;
+            case SiPMAcquisitionManagerStates::Acquisition:
+                _acq_state = SiPMAcquisitionStates::OscilloscopeMode;
+                main_loop_state = acquisition_state;
             break;
 
-            case SiPMAcquisitionStates::OscilloscopeMode:
-                main_loop_state = oscilloscopeMode_state;
-            break;
-
-            case SiPMAcquisitionStates::MeasurementRoutineMode:
-                main_loop_state = measurementRoutineMode_state;
-            break;
-
-            // case SiPMAcquisitionStates::RunMode:
-            //     main_loop_state = runMode_state;
-            // break;
-
-            case SiPMAcquisitionStates::Disconnected:
-                main_loop_state = disconnected_state;
-            break;
-
-            case SiPMAcquisitionStates::Closing:
+            case SiPMAcquisitionManagerStates::Closing:
                 main_loop_state = closing_state;
             break;
 
-            case SiPMAcquisitionStates::Standby:
+            case SiPMAcquisitionManagerStates::Standby:
             default:
                 // do nothing other than set to standby state
                 main_loop_state = standby_state;
@@ -336,7 +307,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
     // Envelopes the logic that listens to an external queue
     // that can the data inside this thread.
-    bool change_state() {
+    void change_state() {
         // GUI -> CAEN
         SiPMAcquisitionData task;
 
@@ -352,19 +323,9 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         // Send the current state to the GUI to update him
         _sipm_pipe_end.send();
-
-        return false;
     }
 
-    // Logic to disconnect the CAEN and clear up memory
-    void close_caen() {
-        auto err = disconnect(_caen_port);
-        check_error(err, [](const std::string& cmd) {
-            spdlog::error(cmd);
-        });
-    }
-
-    // Does nothing other than wait 100ms to avoid clogging PC resources.
+    // Does nothing other than wait 1000ms to avoid clogging PC resources.
     bool standby() {
         static double i = 0;
         _doe.IVData(i, cos(i/30.0), sin(i/30.0));
@@ -374,61 +335,95 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         return true;
     }
 
+    bool acquisition() {
+        auto caen_res = attempt_connection();
+        if (caen_res->HasError()) {
+            return false;
+        }
+
+        // We are stuck inside this while loop which will break under
+        // three conditions:
+        // 1. There is a fatal error in the CAEN digitizer.
+        // 2. GUI changes the state of the manager to something different
+        //     other than acquisition mode.
+        // 3.- Any
+        while(not caen_res->HasError()) {
+            switch(_acq_state) {
+                case SiPMAcquisitionStates::OscilloscopeMode:
+                    break;
+
+                case SiPMAcquisitionStates::AcquisitionMode:
+                    break;
+
+                // Resets the setup information without freeing the CAEN resource
+                case SiPMAcquisitionStates::Reset:
+                    caen_res = setup_and_prepare(caen_res);
+                    break;
+            }
+
+            // This manages the communication with the GUI
+            change_state();
+            // If the GUI says, hey stop acquiring, we do!
+            if (_doe.CurrentState != SiPMAcquisitionManagerStates::Acquisition) {
+                break;
+            }
+        }
+
+        return true;
+    }
+
     // Attempts a connection to the CAEN digitizer, setups the channels,
     // starts acquisition, and moves to the oscilloscope mode
-    bool attempt_connection() {
-        // If the port is open, clean up and close the port.
-        // This will help turn attempt_connection into a reset
-        // for the entire system.
-        if (_caen_port) {
-            close_caen();
-        }
-
-        auto err = connect(_caen_port,
-            _doe.Model,
-            _doe.ConnectionType,
-            _doe.PortNum,
-            0,
-            _doe.VMEAddress);
+    SiPMCAEN_ptr attempt_connection() {
+        auto caen_port = std::make_unique<SiPMCAEN>(_logger,
+                                  _doe.Model,
+                                  _doe.ConnectionType,
+                                  _doe.PortNum,
+                                  0,
+                                  _doe.VMEAddress);
 
         // If port resource was not created, it equals a failure!
-        if (!_caen_port) {
-            // Print what was the error
-            check_error(err, [](const std::string& cmd) {
-                spdlog::error(cmd);
-            });
-
-            // We disconnect because this will free resources (in case
-            // they were created)
-            disconnect(_caen_port);
-            switch_state(SiPMAcquisitionStates::Standby);
-            return true;
+        if (not caen_port->IsConnected()) {
+            switch_state(SiPMAcquisitionManagerStates::Standby);
+            return caen_port;
         }
 
-        spdlog::info("Connected to CAEN Digitizer!");
+        return setup_and_prepare(caen_port);
+    }
 
-        setup(_caen_port, _doe.GlobalConfig, _doe.GroupConfigs);
+    SiPMCAEN_ptr setup_and_prepare(SiPMCAEN_ptr caen_port) {
+        caen_port->Setup(_doe.GlobalConfig, _doe.GroupConfigs);
+        if(caen_port->HasError()) {
+            switch_state(SiPMAcquisitionManagerStates::Standby);
+            return caen_port;
+        }
 
         // The setup functions does change and make calculations
         // about some parameters we pass, we read them back to get a
         // more accurate value of them.
-        _doe.GlobalConfig = _caen_port->GlobalConfig;
-        _doe.GroupConfigs = _caen_port->GroupConfigs;
+        _doe.GlobalConfig = caen_port->GetGlobalConfiguration();
+        _doe.GroupConfigs = caen_port->GetGroupConfigurations();
 
+        // Initialize the plotting data
         std::generate(_doe.GroupData.begin(), _doe.GroupData.end(), [&](){
-            return PlotDataBuffer<8>(_caen_port->GlobalConfig.RecordLength);
+            return PlotDataBuffer<8>(_doe.GlobalConfig.RecordLength);
         });
 
+        // Fill them up as by default they act like circular buffers
         for(auto& data : _doe.GroupData) {
             data.fill();
         }
 
-        _num_chs = _caen_port->ModelConstants.NumChannels;
-        _acq_rate = _caen_port->ModelConstants.AcquisitionRate;
-        _doe.CAENBoardInfo = _caen_port->CAENBoardInfo;
+        _num_chs = caen_port->ModelConstants.NumChannels;
+        _acq_rate = caen_port->ModelConstants.AcquisitionRate;
+        _doe.CAENBoardInfo = caen_port->GetBoardInfo();
 
         // Enable acquisition HAS to be called AFTER setup
-        enable_acquisition(_caen_port);
+        caen_port->EnableAcquisition();
+        if(caen_port->HasError()) {
+            switch_state(SiPMAcquisitionManagerStates::Standby);
+            return caen_port;
+        }
 
         // Trying to call once will initialize the port
         // but really this call is not important
@@ -441,79 +436,63 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // });
 
         // Allocate memory for events
-        _osc_event = std::make_shared<caenEvent>(_caen_port->Handle);
-
-        auto failed = lec();
-
-        if (failed) {
-            spdlog::warn("Failed to setup CAEN");
-            err = disconnect(_caen_port);
-            check_error(err, [](const std::string& cmd) {
-                spdlog::error(cmd);
-            });
-
-            switch_state(SiPMAcquisitionStates::Standby);
-        } else {
-            spdlog::info("CAEN Setup complete!");
-            switch_state(SiPMAcquisitionStates::OscilloscopeMode);
-        }
 
         // These lines get today's date and creates a folder under that date
         // There is a similar code in the Teensy interface file
         std::ostringstream out;
         auto today = date::year_month_day{
-            date::floor<date::days>(std::chrono::system_clock::now())};
+                date::floor<date::days>(std::chrono::system_clock::now())};
         out << today;
         _run_name = out.str();
 
         std::filesystem::create_directory(_doe.RunDir
-            + "/" + _run_name);
+                                          + "/" + _run_name);
 
-        open(_saveinfo_file,
-            _doe.RunDir + "/" + _run_name + "/SaveInfo.txt");
-        bool s = (_saveinfo_file != nullptr);
+//        sipm_file(
+//             _doe.RunDir + "/" + _run_name + "/SaveInfo.txt");
+//
+//        if (not sipm_file.isOpen()) {
+//            spdlog::error("Failed to open SaveInfo.txt");
+//            switch_state(SiPMAcquisitionManagerStates::Standby);
+//        }
 
-        if (!s) {
-            spdlog::error("Failed to open SaveInfo.txt");
-            switch_state(SiPMAcquisitionStates::Disconnected);
-        }
+//        spdlog::info("Trying to open file {0}", _doe.RunDir
+//                                                + "/" + _run_name
+//                                                + "/SiPMIV.txt");
+//        open_file(_voltages_file, _doe.RunDir
+//                             + "/" + _run_name
+//                             + "/SiPMIV.txt");
 
-        spdlog::info("Trying to open file {0}", _doe.RunDir
-            + "/" + _run_name
-            + "/SiPMIV.txt");
-        open(_voltages_file, _doe.RunDir
-            + "/" + _run_name
-            + "/SiPMIV.txt");
-
-        s = _voltages_file > 0;
-        if (!s) {
-            spdlog::error("Failed to open voltage file");
-        }
+//        s = _voltages_file > 0;
+//        if (!s) {
+//            spdlog::error("Failed to open voltage file");
+//        }
 
         std::filesystem::create_directory(_doe.RunDir
-            + "/" + _run_name);
+                                          + "/" + _run_name);
 
-        change_state();
-        return true;
+        spdlog::info("CAEN Setup complete!");
+        return caen_port;
     }
 
     // While in this state it shares the data with the GUI but
     // no actual file saving is happening. It essentially serves
     // as a mode in where the user can see what is happening.
     // Similar to an oscilloscope
-    bool oscilloscope() {
-        auto events = get_events_in_buffer(_caen_port);
+    SiPMCAEN_ptr oscilloscope(SiPMCAEN_ptr caen_port) {
+        auto events = caen_port->GetEventsInBuffer();
         // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
 
-        retrieve_data(_caen_port);
-
         if (_doe.SoftwareTrigger) {
-            spdlog::info("Sending a software trigger");
-            software_trigger(_caen_port);
+            _logger->info("Sending a software trigger");
+            caen_port.SoftwareTrigger();
             _doe.SoftwareTrigger = false;
         }
 
-        if (_caen_port->Data.DataSize > 0 && _caen_port->Data.NumEvents > 0) {
+        _caen_port->RetrieveData();
+        // GetNumberOfEvents gets the actual acquired events
+        // while GetEventsInBuffer gets the events in CAEN buffer
+        if (_caen_port->GetNumberOfEvents() > 0) {
             // TriggeredWaveforms += _caen_port->Data.NumEvents;
             // Due to the slow rate oscilloscope mode is happening, using
             // events instead of ..->Data.NumEvents is a better number to use
@@ -523,6 +502,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // spdlog::info("Total size buffer: {0}",  _caen_port->Data.TotalSizeBuffer);
             // spdlog::info("Data size: {0}", _caen_port->Data.DataSize);
             // spdlog::info("Num events: {0}", _caen_port->Data.NumEvents);
+
 
             extract_event(_caen_port, 0, _osc_event);
             auto m = caen_event_to_armadillo(_osc_event, 64);
@@ -538,9 +518,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             clear_data(_caen_port);
         }
 
-        lec();
         change_state();
-        return true;
+        return std::move(caen_port);
     }
 
     // Does the SiPM pulse processing but no file saving

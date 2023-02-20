@@ -21,13 +21,16 @@ struct SiPMVoltageMeasure {
     double Time;  // in unix timestamp
 };
 
-enum class SiPMAcquisitionStates {
+enum class SiPMAcquisitionManagerStates {
     Standby,
-    AttemptConnection,
-    OscilloscopeMode,
-    MeasurementRoutineMode,
-    Disconnected,
+    Acquisition,
     Closing
+};
+
+enum class SiPMAcquisitionStates {
+    OscilloscopeMode,
+    AcquisitionMode,
+    Reset
 };
 
 struct BreakdownVoltageConfigData {
@@ -66,7 +69,7 @@ struct SiPMAcquisitionData {
     int PortNum = 0;
     uint32_t VMEAddress = 0;
 
-    SiPMAcquisitionStates CurrentState = SiPMAcquisitionStates::Standby;
+    SiPMAcquisitionManagerStates CurrentState = SiPMAcquisitionManagerStates::Standby;
 
     bool SoftwareTrigger = false;
     bool ResetCaen = false;
