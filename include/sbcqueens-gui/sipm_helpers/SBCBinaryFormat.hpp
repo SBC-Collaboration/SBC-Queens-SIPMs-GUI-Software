@@ -19,6 +19,7 @@
 
 // C++ 3rd party includes
 #include <concurrentqueue.h>
+#include <spdlog/spdlog.h>
 
 // my includes
 #include "sbcqueens-gui/file_helpers.hpp"
@@ -84,9 +85,9 @@ struct DynamicWriter {
 
 private:
     const std::string _file_name;
-    const std::array<std::string, n_cols>& _names;
-    const std::array<std::size_t, n_cols>& _ranks;
-    const std::vector<std::size_t>& _sizes;
+    const std::array<std::string, n_cols> _names;
+    const std::array<std::size_t, n_cols> _ranks;
+    const std::vector<std::size_t> _sizes;
 
     std::size_t total_ranks = 0;
     bool _open = false;
@@ -105,8 +106,8 @@ private:
                               std::size_t& loc,
                               const std::size_t& size = sizeof(T)) {
         const char* tmpstr = reinterpret_cast<const char*>(&num);
-        for(std::size_t i = loc; i < size + loc; i++) {
-            buffer[i] = tmpstr[i - loc];
+        for(std::size_t i = 0; i < size; i++) {
+            buffer[i + loc] = tmpstr[size - i - 1];
         }
 
         loc += size;
@@ -119,9 +120,7 @@ private:
         loc += source.length();
     }
 
-    void _create_file(const std::array<std::string, n_cols>& columns_names,
-                      const std::array<std::size_t, n_cols>& columns_ranks,
-                      const std::vector<std::size_t>& columns_sizes) {
+    void _create_file() {
 
         /*  SBC Binary Header description:
          * Header of a binary format is divided in 4 parts:
@@ -136,11 +135,11 @@ private:
          * Number of lines in the file. If 0, it is indefinitely long.
         */
         // Edianess first
-        uint32_t endianess = 0x010200304;
+        uint32_t endianess = 0x01020304;
         if constexpr (std::endian::native == std::endian::big) {
-            endianess = 0x040300201;
-        } else if constexpr (std::endian::native == std::endian::little) {
-            endianess = 0x010200304;
+            endianess = 0x04030201;
+        } else {
+            endianess = 0x01020304;
         }
 
         std::size_t total_header_size = 0;
@@ -148,23 +147,22 @@ private:
         uint16_t binary_header_size = 0;
         std::size_t total_ranks_so_far = 0;
         for (std::size_t i = 0; i < n_cols; i++) {
-            auto column_rank = columns_ranks[i];
-
+            auto column_rank = _ranks[i];
             // + 1 for the ; character
-            binary_header_size += columns_names[i].length() + 1;
+            binary_header_size += _names[i].length() + 1;
             // + 1 for the ; character
             binary_header_size += parameters_types_str[i].length() + 1;
 
             std::size_t total_rank_size = 0;
             for(std::size_t j = 0; j < column_rank; j ++) {
-                auto size = columns_sizes[total_ranks_so_far + j];
+                auto size = _sizes[total_ranks_so_far + j];
                 total_rank_size += size;
                 // It is always + 1 because there is either a ',' or a ';'
                 binary_header_size += std::to_string(size).length() + 1;
             }
 
             total_ranks_so_far += column_rank;
-            _line_byte_size = size_of_types[i]*total_rank_size;
+            _line_byte_size += size_of_types[i]*total_rank_size;
         }
         // We also calculate the line size very useful when we start data saving
 
@@ -183,16 +181,16 @@ private:
         _copy_number_to_buff(endianess, buffer, buffer_loc); // 1.
         _copy_number_to_buff(binary_header_size, buffer, buffer_loc); // 2.
         for (std::size_t i = 0; i < n_cols; i++) { // 3.
-            auto column_name = columns_names[i];
+            auto column_name = _names[i];
             auto column_type = parameters_types_str[i];
-            auto column_rank = columns_ranks[i];
+            auto column_rank = _ranks[i];
 
             _copy_str_to_buff(column_name, buffer, buffer_loc);
             _copy_str_to_buff(";", buffer, buffer_loc);
             _copy_str_to_buff(column_type, buffer, buffer_loc);
             _copy_str_to_buff(";", buffer, buffer_loc);
             for(std::size_t size_j = 0; size_j < column_rank; size_j++) {
-                _copy_str_to_buff(std::to_string(columns_sizes[total_ranks_so_far + size_j]),
+                _copy_str_to_buff(std::to_string(_sizes[total_ranks_so_far + size_j]),
                                   buffer, buffer_loc);
 
                 if(size_j != column_rank - 1) {
@@ -219,10 +217,10 @@ private:
 
         auto rank = _ranks[i];
         auto total_rank_up_to_i = std::accumulate(_ranks.begin(),
-                                                    &_ranks[i],
-                                                    0);
+                                                  &_ranks[i],
+                                                  0);
 
-        const auto& size_index_start = i + total_rank_up_to_i;
+        const auto& size_index_start = total_rank_up_to_i;
         const auto& total_size = std::accumulate(&_sizes[size_index_start],
                                                  &_sizes[size_index_start + rank],
                                                  0);
@@ -240,9 +238,8 @@ private:
 
     void _save_event(const tuple_type& data) {
         _line_buffer_loc = 0;
-
-        _save_item_helper(data,
-                          std::make_index_sequence<n_cols>{});
+        _save_item_helper(data, std::make_index_sequence<n_cols>{});
+        _stream << _line_buffer;
     }
 
  public:
@@ -256,7 +253,7 @@ private:
         _sizes{columns_sizes}
     {
         total_ranks = std::accumulate(columns_ranks.begin(),
-            columns_ranks.end(), 0);
+                                      columns_ranks.end(), 0);
 
         _stream.open(_file_name,
                      std::ofstream::app | std::ofstream::binary);
@@ -264,7 +261,7 @@ private:
         if (_stream.is_open()) {
             _open = true;
             if (std::filesystem::is_empty(file_name)) {
-                _create_file(columns_names, columns_ranks, columns_sizes);
+                _create_file();
             }
         }
     }

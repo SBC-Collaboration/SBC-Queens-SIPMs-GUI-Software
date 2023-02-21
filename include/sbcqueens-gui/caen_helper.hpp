@@ -1,6 +1,5 @@
 #ifndef CAENHELPER_H
 #define CAENHELPER_H
-#include <numeric>
 #pragma once
 
 // C STD includes
@@ -17,8 +16,8 @@
 #include <cmath>
 #include <chrono>
 #include <array>
-#include <variant>
 #include <stdexcept>
+#include <algorithm>
 
 // C++ 3rd party includes
 #include <CAENComm.h>

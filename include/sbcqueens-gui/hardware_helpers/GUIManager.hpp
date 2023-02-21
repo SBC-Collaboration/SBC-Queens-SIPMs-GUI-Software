@@ -124,6 +124,7 @@ class GUIManager : public ThreadManager<Pipes> {
         _teensy_pipe_end.send_if_changed();
 
         _sipm_doe.Changed = true;
+        _sipm_doe.IVData = PlotDataBuffer<2>(100);
         _sipm_doe.Callback = [&](SiPMAcquisitionData& twin) {
             twin = _sipm_doe;
         };

@@ -327,6 +327,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // Does nothing other than wait 1000ms to avoid clogging PC resources.
     bool standby() {
         static double i = 0;
+
         _doe.IVData(i, cos(i/30.0), sin(i/30.0));
         i += 1.0;
 
