@@ -61,9 +61,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // A reference to the DOE thats inside _caen_pipe_end
     SiPMAcquisitionData& _doe;
 
-    // IndicatorSender<IndicatorNames> _indicator_sender;
-    // IndicatorSender<uint8_t> _plot_sender;
-
     std::shared_ptr<spdlog::logger> _logger;
 
     using SiPMCAEN = CAEN<std::shared_ptr<spdlog::logger>>;
@@ -95,10 +92,9 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     double _reset_timer = 0;
     uint16_t* _data = nullptr;
     size_t _length = 0;
-    std::vector<double> _x_values, _y_values;
-    CAENEvent _osc_event;
+    const CAENEvent* _osc_event = nullptr;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
-    std::array<CAENEvent, 1024> _processing_evts;
+    std::array<const CAENEvent*, 1024> _processing_evts = {nullptr};
 
     // Analysis
     std::unique_ptr<BreakdownRoutine> _vbd_routine = nullptr;
@@ -346,10 +342,12 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // 1. There is a fatal error in the CAEN digitizer.
         // 2. GUI changes the state of the manager to something different
         //     other than acquisition mode.
-        // 3.- Any
-        while(not caen_res->HasError()) {
+        // 3.- Any other condition under acquisition mode. Such as number of
+        //     samples but it can always ran to go forever
+        while (not caen_res->HasError()) {
             switch(_acq_state) {
                 case SiPMAcquisitionStates::OscilloscopeMode:
+                    caen_res = oscilloscope(caen_res);
                     break;
 
                 case SiPMAcquisitionStates::AcquisitionMode:
@@ -369,6 +367,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             }
         }
 
+        // Once we go out of scope, we release/disconnect the CAEN
+        caen_res.reset(nullptr);
         return true;
     }
 
@@ -485,7 +485,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         if (_doe.SoftwareTrigger) {
             _logger->info("Sending a software trigger");
-            caen_port.SoftwareTrigger();
+            caen_port->SoftwareTrigger();
             _doe.SoftwareTrigger = false;
         }
 
@@ -503,8 +503,9 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // spdlog::info("Data size: {0}", _caen_port->Data.DataSize);
             // spdlog::info("Num events: {0}", _caen_port->Data.NumEvents);
 
-
-            extract_event(_caen_port, 0, _osc_event);
+            // Decode events
+            _caen_port->DecodeEvents();
+            _osc_event = _caen_port->GetEvent(0);
             auto m = caen_event_to_armadillo(_osc_event, 64);
 
             // spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
@@ -515,112 +516,111 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             process_data_for_gui();
 
             // Clear events in buffer
-            clear_data(_caen_port);
+            _caen_port->ClearData();
         }
 
-        change_state();
-        return std::move(caen_port);
+        return caen_port;
     }
 
     // Does the SiPM pulse processing but no file saving
     // is done. Serves more for the user to know
     // how things are changing.
-    bool measurement_routine_mode() {
-        if (not _vbd_routine) {
-            _vbd_routine = std::make_unique<BreakdownRoutine>(
-                _caen_port, _doe, _run_name, _saveinfo_file);
-
-            // // Reset all indicators for this section
-            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, false);
-            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
-            //     false);
-            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
-                // false);
-        }
-
-        _vbd_routine->update();
-
-        if(_vbd_routine->hasVoltageChanged()) {
-            _doe.SiPMVoltageSysVoltage = _vbd_routine->getCurrentVoltage();
-            _doe.SiPMVoltageSysChange = true;
-        }
-
-        _processing_evts = _vbd_routine->getLatestEvents();
-        rdm_extract_for_gui();
-
-        // GUI related stuff
-        TriggeredWaveforms += static_cast<uint64_t>(
-            _vbd_routine->getLatestNumEvents());
-        SavedWaveforms = _vbd_routine->getTotalAcquiredEvents();
-        // _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
-
-        switch (_vbd_routine->getCurrentState()) {
-        case BreakdownRoutineState::Finished:
-            switch_state(SiPMAcquisitionStates::OscilloscopeMode);
-
-            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, true);
-
-            // Set back to 52 just in case.
-            _doe.SiPMVoltageSysVoltage = *_vbd_routine->GainVoltages.cbegin();
-            _doe.SiPMVoltageSysChange = true;
-            // Clean resources and get the port back
-            // _caen_port = _vbd_routine->retrieveCAEN();
-            _vbd_routine = nullptr;
-            break;
-        case BreakdownRoutineState::GainMeasurements:
-            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING, true);
-        case BreakdownRoutineState::CalculateBreakdownVoltage:
-            if (_vbd_routine->hasNewGainMeasurement())
-            {
-                // auto pars = _vbd_routine->getAnalysisLatestValues();
-                // _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
-                //     _doe.LatestMeasure.Volt, pars.SPEParameters(1));
-                // _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
-                // pars.SPEParameters(1));
-
-                // _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
-                //     pars.SPEEfficiency);
-                // _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
-                //     pars.IntegralThreshold);
-
-                // _indicator_sender(IndicatorNames::OFFSET,
-                //     pars.SPEParameters(2));
-
-                // _indicator_sender(IndicatorNames::RISE_TIME,
-                //     pars.SPEParameters(3));
-
-                // _indicator_sender(IndicatorNames::FALL_TIME,
-                //     pars.SPEParameters(4));
-            }
-            break;
-        case BreakdownRoutineState::Acquisition:
-            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING, true);
-            if (_vbd_routine->hasNewBreakdownVoltage()) {
-               // auto values = _vbd_routine->getBreakdownVoltage();
-
-                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
-                //     values.BreakdownVoltage);
-                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
-                //     values.BreakdownVoltageError);
-            }
-
-            break;
-        default:
-        break;
-        }
-
-        // Cancel button routine
-        if (_doe.CancelMeasurements && _vbd_routine) {
-            switch_state(SiPMAcquisitionStates::OscilloscopeMode);
-
-            // _caen_port = _vbd_routine->retrieveCAEN();
-            _vbd_routine = nullptr;
-            _doe.CancelMeasurements = false;
-        }
-
-        change_state();
-        return true;
-    }
+//    bool measurement_routine_mode() {
+//        if (not _vbd_routine) {
+//            _vbd_routine = std::make_unique<BreakdownRoutine>(
+//                _caen_port, _doe, _run_name, _saveinfo_file);
+//
+//            // // Reset all indicators for this section
+//            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, false);
+//            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
+//            //     false);
+//            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
+//                // false);
+//        }
+//
+//        _vbd_routine->update();
+//
+//        if(_vbd_routine->hasVoltageChanged()) {
+//            _doe.SiPMVoltageSysVoltage = _vbd_routine->getCurrentVoltage();
+//            _doe.SiPMVoltageSysChange = true;
+//        }
+//
+//        _processing_evts = _vbd_routine->getLatestEvents();
+//        rdm_extract_for_gui();
+//
+//        // GUI related stuff
+//        TriggeredWaveforms += static_cast<uint64_t>(
+//            _vbd_routine->getLatestNumEvents());
+//        SavedWaveforms = _vbd_routine->getTotalAcquiredEvents();
+//        // _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
+//
+//        switch (_vbd_routine->getCurrentState()) {
+//        case BreakdownRoutineState::Finished:
+//            switch_state(SiPMAcquisitionStates::OscilloscopeMode);
+//
+//            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, true);
+//
+//            // Set back to 52 just in case.
+//            _doe.SiPMVoltageSysVoltage = *_vbd_routine->GainVoltages.cbegin();
+//            _doe.SiPMVoltageSysChange = true;
+//            // Clean resources and get the port back
+//            // _caen_port = _vbd_routine->retrieveCAEN();
+//            _vbd_routine = nullptr;
+//            break;
+//        case BreakdownRoutineState::GainMeasurements:
+//            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING, true);
+//        case BreakdownRoutineState::CalculateBreakdownVoltage:
+//            if (_vbd_routine->hasNewGainMeasurement())
+//            {
+//                // auto pars = _vbd_routine->getAnalysisLatestValues();
+//                // _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
+//                //     _doe.LatestMeasure.Volt, pars.SPEParameters(1));
+//                // _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
+//                // pars.SPEParameters(1));
+//
+//                // _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
+//                //     pars.SPEEfficiency);
+//                // _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
+//                //     pars.IntegralThreshold);
+//
+//                // _indicator_sender(IndicatorNames::OFFSET,
+//                //     pars.SPEParameters(2));
+//
+//                // _indicator_sender(IndicatorNames::RISE_TIME,
+//                //     pars.SPEParameters(3));
+//
+//                // _indicator_sender(IndicatorNames::FALL_TIME,
+//                //     pars.SPEParameters(4));
+//            }
+//            break;
+//        case BreakdownRoutineState::Acquisition:
+//            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING, true);
+//            if (_vbd_routine->hasNewBreakdownVoltage()) {
+//               // auto values = _vbd_routine->getBreakdownVoltage();
+//
+//                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
+//                //     values.BreakdownVoltage);
+//                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
+//                //     values.BreakdownVoltageError);
+//            }
+//
+//            break;
+//        default:
+//        break;
+//        }
+//
+//        // Cancel button routine
+//        if (_doe.CancelMeasurements && _vbd_routine) {
+//            switch_state(SiPMAcquisitionStates::OscilloscopeMode);
+//
+//            // _caen_port = _vbd_routine->retrieveCAEN();
+//            _vbd_routine = nullptr;
+//            _doe.CancelMeasurements = false;
+//        }
+//
+//        change_state();
+//        return true;
+//    }
 
     // bool run_mode() {
     //     if (not _acq_routine) {
@@ -668,17 +668,14 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     //     return true;
     // }
 
-    bool disconnected_mode() {
-        spdlog::warn("Manually losing connection to the CAEN digitizer.");
-        close_caen();
-        switch_state(SiPMAcquisitionStates::Standby);
-        return true;
-    }
-
     // Only mode that stops the main_loop and frees all resources
     bool closing_mode() {
         spdlog::info("Going to close the CAEN thread.");
-        close_caen();
+        // We make sure we clean here
+        // It should also be done in the destructor.
+        if (_caen_port) {
+            _caen_port.reset(nullptr);
+        }
         return false;
     }
 
@@ -710,8 +707,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             return;
         }
 
-        auto size = _osc_event->Data->ChSize[0];
-        auto all_chs = _osc_event->Data->DataChannel;
+        auto size = _osc_event->getData()->ChSize[0];
+        auto all_chs = _osc_event->getData()->DataChannel;
 
         if (size <= 0) {
             return;
@@ -743,171 +740,171 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         }
     }
 
-    void sipm_voltage_system_update() {
-        static auto get_voltage = make_total_timed_event(
-            std::chrono::seconds(1),
-            [&]() {
-                _sipm_volt_sys.async_get(
-                [=](serial_ptr& port)
-                    -> std::optional<SiPMVoltageMeasure> {
-                    static auto send_msg_slow = make_blocking_total_timed_event(
-                        std::chrono::milliseconds(10),
-                        [&](const std::string& msg){
-                            send_msg(port, msg + "\n", "");
-                        }
-                    );
-
-                    send_msg_slow.ChangeWaitTime(
-                        std::chrono::milliseconds(10));
-                    send_msg_slow("++addr 10");
-                    send_msg_slow(":fetch?");
-                    send_msg_slow("++read eoi");
-
-                    auto volt = retrieve_msg<double>(port);
-
-                    if (!volt) {
-                        return {};
-                    }
-
-                    double time = get_current_time_epoch() / 1000.0;
-                    send_msg_slow.ChangeWaitTime(
-                        std::chrono::milliseconds(100));
-                    send_msg_slow("++addr 22");
-                    send_msg_slow(":fetch?");
-                    send_msg_slow("++read eoi");
-
-                    auto curr = retrieve_msg<double>(port);
-
-                    send_msg_slow(":init");
-
-                    if (!curr) {
-                        return {};
-                    }
-
-                    SiPMVoltageMeasure out;
-                    out.Time = time;
-                    out.Volt = volt.value();
-                    out.Current = curr.value();
-
-                    return std::make_optional(out);
-            });
-
-            auto latest_values = _sipm_volt_sys.async_get_values();
-            for (auto r : latest_values) {
-                double time = r.Time;
-                double volt = r.Volt;
-                double curr = r.Current;
-
-                volt = calculate_sipm_voltage(volt, curr);
-
-                // This measure is a NaN/Overflow from the picoammeter
-                if (curr < 9.9e37){
-                    _doe.LatestMeasure.Volt = volt;
-                    _doe.LatestMeasure.Time = time;
-                    _doe.LatestMeasure.Current = curr;
-                    _voltages_file->Add(_doe.LatestMeasure);
-                    // _indicator_sender(IndicatorNames::DMM_VOLTAGE, time, volt);
-                    // _indicator_sender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
-                    // _indicator_sender(IndicatorNames::PICO_CURRENT, time, curr);
-                    // _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
-                }
-            }
-
-        });
-
-        static auto save_voltages = make_total_timed_event(
-            std::chrono::seconds(30),
-            [&]() {
-                spdlog::info("Saving voltage (Keithley 2000) voltages.");
-                async_save(_voltages_file,
-                [](const SiPMVoltageMeasure& mes) {
-                    std::ostringstream out;
-                    out.precision(7);
-                    out << "," << mes.Volt <<
-                        "," << mes.Current << "\n" << std::scientific;;
-
-                    return  std::to_string(mes.Time) + out.str();
-            });
-        });
-
-        switch (_doe.CurrentState) {
-            case SiPMAcquisitionStates::OscilloscopeMode:
-            case SiPMAcquisitionStates::MeasurementRoutineMode:
-                if (_doe.SiPMVoltageSysChange) {
-                    _sipm_volt_sys.get([&](serial_ptr& port)
-                    -> std::optional<SiPMVoltageMeasure> {
-                        send_msg(port, "++addr 22\n", "");
-
-                        // The wait time to let the user know the voltage
-                        // has stabilized is 90s or 3 mins
-                    #ifdef NDEBUG
-                        _wait_time = 90000.0;
-                    #else
-                        // Debug mode reduces to 30secs. We do not have time!
-                        _wait_time = 30000.0;
-                    #endif
-                        if (_doe.SiPMVoltageSysSupplyEN) {
-                            send_msg(port, ":sour:volt:stat ON\n", "");
-                            spdlog::warn("Turning on voltage supply.");
-
-                        } else {
-                            send_msg(port, ":sour:volt:stat OFF\n", "");
-                            spdlog::warn("Turning off voltage supply.");
-                        }
-
-                        auto dV = std::abs(_doe.LatestMeasure.Volt
-                            - _doe.SiPMVoltageSysVoltage);
-                        if (dV >= 10.0) {
-                            // However, when the voltage swing is higher than
-                            // 10V, it should be multiplied it by 2.5.
-                            _wait_time *= 1.0;
-                        }
-
-                        send_msg(port, ":sour:volt "
-                            + std::to_string(_doe.SiPMVoltageSysVoltage)
-                            + "\n", "");
-
-                        spdlog::info("Changing output voltage to {0}",
-                            _doe.SiPMVoltageSysVoltage);
-
-                        // Resetting the timer.
-                        _reset_timer = get_current_time_epoch(); // ms
-
-                        // Let's also reset this indicator which helps
-                        // minimize confusion in the GUI
-                        // _indicator_sender(IndicatorNames::DONE_DATA_TAKING,
-                        //     false);
-
-                        return {};
-                    });
-
-                    // Reset
-                    _doe.SiPMVoltageSysChange = false;
-                }
-
-                // This is to allow some time between voltage changes so it
-                // settles before a measurement is done.
-                if ((get_current_time_epoch() - _reset_timer) < _wait_time) {
-                    _doe.isVoltageStabilized = false;
-                } else {
-                    _doe.isVoltageStabilized = true;
-                }
-
-                // _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
-                //         _doe.isVoltageStabilized);
-
-                get_voltage();
-                save_voltages();
-            break;
-
-            case SiPMAcquisitionStates::Standby:
-            case SiPMAcquisitionStates::AttemptConnection:
-            case SiPMAcquisitionStates::Disconnected:
-            case SiPMAcquisitionStates::Closing:
-            default:
-            break;
-        }
-    }
+//    void sipm_voltage_system_update() {
+//        static auto get_voltage = make_total_timed_event(
+//            std::chrono::seconds(1),
+//            [&]() {
+//                _sipm_volt_sys.async_get(
+//                [=](serial_ptr& port)
+//                    -> std::optional<SiPMVoltageMeasure> {
+//                    static auto send_msg_slow = make_blocking_total_timed_event(
+//                        std::chrono::milliseconds(10),
+//                        [&](const std::string& msg){
+//                            send_msg(port, msg + "\n", "");
+//                        }
+//                    );
+//
+//                    send_msg_slow.ChangeWaitTime(
+//                        std::chrono::milliseconds(10));
+//                    send_msg_slow("++addr 10");
+//                    send_msg_slow(":fetch?");
+//                    send_msg_slow("++read eoi");
+//
+//                    auto volt = retrieve_msg<double>(port);
+//
+//                    if (!volt) {
+//                        return {};
+//                    }
+//
+//                    double time = get_current_time_epoch() / 1000.0;
+//                    send_msg_slow.ChangeWaitTime(
+//                        std::chrono::milliseconds(100));
+//                    send_msg_slow("++addr 22");
+//                    send_msg_slow(":fetch?");
+//                    send_msg_slow("++read eoi");
+//
+//                    auto curr = retrieve_msg<double>(port);
+//
+//                    send_msg_slow(":init");
+//
+//                    if (!curr) {
+//                        return {};
+//                    }
+//
+//                    SiPMVoltageMeasure out;
+//                    out.Time = time;
+//                    out.Volt = volt.value();
+//                    out.Current = curr.value();
+//
+//                    return std::make_optional(out);
+//            });
+//
+//            auto latest_values = _sipm_volt_sys.async_get_values();
+//            for (auto r : latest_values) {
+//                double time = r.Time;
+//                double volt = r.Volt;
+//                double curr = r.Current;
+//
+//                volt = calculate_sipm_voltage(volt, curr);
+//
+//                // This measure is a NaN/Overflow from the picoammeter
+//                if (curr < 9.9e37){
+//                    _doe.LatestMeasure.Volt = volt;
+//                    _doe.LatestMeasure.Time = time;
+//                    _doe.LatestMeasure.Current = curr;
+//                    _voltages_file->Add(_doe.LatestMeasure);
+//                    // _indicator_sender(IndicatorNames::DMM_VOLTAGE, time, volt);
+//                    // _indicator_sender(IndicatorNames::LATEST_DMM_VOLTAGE, volt);
+//                    // _indicator_sender(IndicatorNames::PICO_CURRENT, time, curr);
+//                    // _indicator_sender(IndicatorNames::LATEST_PICO_CURRENT, curr);
+//                }
+//            }
+//
+//        });
+//
+//        static auto save_voltages = make_total_timed_event(
+//            std::chrono::seconds(30),
+//            [&]() {
+//                spdlog::info("Saving voltage (Keithley 2000) voltages.");
+//                async_save(_voltages_file,
+//                [](const SiPMVoltageMeasure& mes) {
+//                    std::ostringstream out;
+//                    out.precision(7);
+//                    out << "," << mes.Volt <<
+//                        "," << mes.Current << "\n" << std::scientific;;
+//
+//                    return  std::to_string(mes.Time) + out.str();
+//            });
+//        });
+//
+//        switch (_doe.CurrentState) {
+//            case SiPMAcquisitionStates::OscilloscopeMode:
+//            case SiPMAcquisitionStates::MeasurementRoutineMode:
+//                if (_doe.SiPMVoltageSysChange) {
+//                    _sipm_volt_sys.get([&](serial_ptr& port)
+//                    -> std::optional<SiPMVoltageMeasure> {
+//                        send_msg(port, "++addr 22\n", "");
+//
+//                        // The wait time to let the user know the voltage
+//                        // has stabilized is 90s or 3 mins
+//                    #ifdef NDEBUG
+//                        _wait_time = 90000.0;
+//                    #else
+//                        // Debug mode reduces to 30secs. We do not have time!
+//                        _wait_time = 30000.0;
+//                    #endif
+//                        if (_doe.SiPMVoltageSysSupplyEN) {
+//                            send_msg(port, ":sour:volt:stat ON\n", "");
+//                            spdlog::warn("Turning on voltage supply.");
+//
+//                        } else {
+//                            send_msg(port, ":sour:volt:stat OFF\n", "");
+//                            spdlog::warn("Turning off voltage supply.");
+//                        }
+//
+//                        auto dV = std::abs(_doe.LatestMeasure.Volt
+//                            - _doe.SiPMVoltageSysVoltage);
+//                        if (dV >= 10.0) {
+//                            // However, when the voltage swing is higher than
+//                            // 10V, it should be multiplied it by 2.5.
+//                            _wait_time *= 1.0;
+//                        }
+//
+//                        send_msg(port, ":sour:volt "
+//                            + std::to_string(_doe.SiPMVoltageSysVoltage)
+//                            + "\n", "");
+//
+//                        spdlog::info("Changing output voltage to {0}",
+//                            _doe.SiPMVoltageSysVoltage);
+//
+//                        // Resetting the timer.
+//                        _reset_timer = get_current_time_epoch(); // ms
+//
+//                        // Let's also reset this indicator which helps
+//                        // minimize confusion in the GUI
+//                        // _indicator_sender(IndicatorNames::DONE_DATA_TAKING,
+//                        //     false);
+//
+//                        return {};
+//                    });
+//
+//                    // Reset
+//                    _doe.SiPMVoltageSysChange = false;
+//                }
+//
+//                // This is to allow some time between voltage changes so it
+//                // settles before a measurement is done.
+//                if ((get_current_time_epoch() - _reset_timer) < _wait_time) {
+//                    _doe.isVoltageStabilized = false;
+//                } else {
+//                    _doe.isVoltageStabilized = true;
+//                }
+//
+//                // _indicator_sender(IndicatorNames::CURRENT_STABILIZED,
+//                //         _doe.isVoltageStabilized);
+//
+//                get_voltage();
+//                save_voltages();
+//            break;
+//
+//            case SiPMAcquisitionStates::Standby:
+//            case SiPMAcquisitionStates::AttemptConnection:
+//            case SiPMAcquisitionStates::Disconnected:
+//            case SiPMAcquisitionStates::Closing:
+//            default:
+//            break;
+//        }
+//    }
 };
 
 template<typename Pipes>

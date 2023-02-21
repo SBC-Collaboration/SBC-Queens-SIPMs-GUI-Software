@@ -8,21 +8,31 @@
 
 namespace SBCQueens {
 
-arma::mat caen_event_to_armadillo(CAENEvent& evt, const uint32_t& n_chs) {
-	if (!evt) {
-		return arma::mat();
+arma::mat caen_event_to_armadillo(const CAENEvent* evt, const uint32_t& n_chs) {
+	if (not evt) {
+		return {};
 	}
 
-	if (evt->Data == nullptr) {
-		return arma::mat();
-	}
-
-	uint32_t size = evt->Data->ChSize[0];
+    const auto* data = evt->getData();
+	uint32_t size = data->ChSize[0];
 	uint32_t n_chs_c = n_chs > 64 ? 64 : n_chs;
 
-	auto m = arma::Mat<uint16_t>(evt->Data->DataChannel[0], n_chs_c, size);
-	std::cout << m << "\n";
+	auto m = arma::Mat<uint16_t>(data->DataChannel[0], n_chs_c, size);
 	return arma::conv_to<arma::mat>::from(m);
+}
+
+void caen_event_to_armadillo(const CAENEvent* evt, arma::mat& out,
+                             const uint32_t& n_chs) {
+    if (not evt) {
+        return;
+    }
+
+    const auto* data = evt->getData();
+    uint32_t size = data->ChSize[0];
+    uint32_t n_chs_c = n_chs > 64 ? 64 : n_chs;
+
+    auto m = arma::Mat<uint16_t>(data->DataChannel[0], n_chs_c, size);
+    out = arma::conv_to<arma::mat>::from(m);
 }
 
 }  // namespace SBCQueens

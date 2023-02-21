@@ -58,9 +58,9 @@ class DataFile {
     // Opens file in append mode. If it does not exist, it creates it.
     // It writes the return contents of InitWriteFunc as the header
     // with args...
-    template<typename HeaderFunc, typename... Args>
-    requires HasOutstreamOp<std::invoke_result<HeaderFunc(Args...)>>
-    DataFile(std::string_view file_name, HeaderFunc&& f, Args&&... args) :
+    template<typename HeaderFunc, typename... HeaderFuncArgs>
+    requires HasOutstreamOp<std::invoke_result<HeaderFunc(HeaderFuncArgs...)>>
+    DataFile(std::string_view file_name, HeaderFunc&& f, HeaderFuncArgs&&... args) :
         DataFile(file_name)
     {
         if (_open) {
@@ -70,18 +70,16 @@ class DataFile {
         }
     }
 
-    ~DataFile() {
+    virtual ~DataFile() {
         // It is very likely that the stream is closed and freed when this
         // goes out of scope, but we are never too sure.
         _stream.close();
         _open = false;
     }
 
-    const bool& isOpen() {
-        return _open;
-    }
+    const bool& isOpen() noexcept { return _open; }
 
-    std::vector<T> getData() {
+    std::vector<T> getData() noexcept {
         auto approx_length = _queue.size_approx();
         auto data = std::vector<T>(approx_length);
         _queue.try_dequeue_bulk(data.data(), approx_length);
@@ -90,38 +88,38 @@ class DataFile {
     }
 
     // Adds element as a copy to current buffer
-    void add(const T& element) {
+    void add(const T& element) noexcept {
         _queue.enqueue(element);
     }
 
     // Adds list as a copy to current buffer
-    void add(const std::initializer_list<T>& list) {
+    void add(const std::initializer_list<T>& list) noexcept {
         _queue.enqueue_bulk(list.begin(), list.size());
     }
 
     // Adds element as a copy to current buffer
-    void operator()(const T& element) {
-        Add(element);
+    void operator()(const T& element) noexcept {
+        add(element);
     }
 
     // Adds list as a copy to current buffer
-    void operator()(const std::initializer_list<T>& list) {
-        Add(list);
+    void operator()(const std::initializer_list<T>& list) noexcept {
+        add(list);
     }
 
     // Saves string to the file
     template <typename DATA>
-    void operator<<(const DATA& fmt) {
+    void operator<<(const DATA& fmt) noexcept {
         _stream << fmt;
     }
 
     // Flush the buffer to file
-    void flush() {
+    void flush() noexcept {
         _stream.flush();
     }
 
     // Closes the file
-    void close() {
+    void close() noexcept {
         _stream.close();
     }
 
@@ -175,7 +173,7 @@ class DataFile {
 // Opens the file with name file_name.
 // Essentially the same as calling DataFile<T>(file_name)
 template <typename T>
-DataFile<T> open_file(std::string_view file_name) {
+DataFile<T> open_file(std::string_view file_name) noexcept {
     return DataFile<T>(file_name);
 }
 
@@ -185,7 +183,7 @@ template <typename T, typename InitWriteFunc, typename... Args>
 DataFile<T> open_file(DataFile<T>& res,
                       std::string_view file_name,
                       InitWriteFunc&& f,
-                      Args&&... args) {
+                      Args&&... args) noexcept {
     return DataFile<T>(file_name,
                        std::forward<InitWriteFunc>(f),
                        std::forward<Args>(args)...);

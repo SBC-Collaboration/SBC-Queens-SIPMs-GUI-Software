@@ -350,8 +350,8 @@ class CAENEvent {
     }
 
     // A read-only access to the event data.
-    const CAEN_DGTZ_UINT16_EVENT_t& getData() {
-        return *Data;
+    [[nodiscard]] const CAEN_DGTZ_UINT16_EVENT_t* getData() const {
+        return Data;
     }
 
     // A read-only access to the event info.
@@ -1007,8 +1007,11 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
 
     } else {
         // custom error message if not above models
-        latest_err = -1;
-        err_msg += "Model not supported.";
+        _err_code = CAEN_DGTZ_ErrorCode::CAEN_DGTZ_BadBoardType;
+        _print_if_err("setup", __FUNCTION__,
+                      "This API does not support your model/family."
+                      " Maybe help writing the support code? :)");
+
     }
 }
 
@@ -1184,7 +1187,6 @@ const CAENEvent* CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
         return &_events[_caen_raw_data.NumEvents - 1];
     }
 
-    int& handle = _caen_api_handle;
     if (_has_error or not _is_connected) {
         return nullptr;
     }
@@ -1209,8 +1211,6 @@ void CAEN<T, N>::DecodeEvents() noexcept {
     if (_has_error or not _is_connected) {
         return;
     }
-
-    int& handle = _caen_api_handle;
 
     for (uint32_t i = 0; i < _caen_raw_data.NumEvents; i++) {
         _err_code = _events[i].getEventInfo(_caen_raw_data.Buffer,
@@ -1255,10 +1255,10 @@ void CAEN<T, N>::ClearData() noexcept {
 // Saves the digitizer data in the Binary format SBC collboration is using
 // This only writes the header at the beginning of the file.
 // Meant to be written once.
-std::string sbc_init_file(CAEN&) noexcept;
-
-// Saves the digitizer data in the Binary format SBC collboration is using
-std::string sbc_save_func(CAENEvent&, CAEN&) noexcept;
+//std::string sbc_init_file(CAEN&) noexcept;
+//
+//// Saves the digitizer data in the Binary format SBC collboration is using
+//std::string sbc_save_func(CAENEvent&, CAEN&) noexcept;
 
 /// End File functions
 
