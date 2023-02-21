@@ -251,7 +251,7 @@ private:
 
     void _save_data(const DataTypes&... data) {
         _line_buffer_loc = 0;
-        _save_item<DataTypes>...(data, i, _line_buffer_loc);
+        (_save_item(data, i, _line_buffer_loc),...);
     }
 public:
 
@@ -277,9 +277,6 @@ public:
         _stream.close();
     }
 
-    void add(const Args&&... args) noexcept {
-        this->add(std::make_tuple(args...));
-    }
 
     void save() noexcept {
 
