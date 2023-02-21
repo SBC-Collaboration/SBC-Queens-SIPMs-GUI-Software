@@ -214,7 +214,7 @@ private:
     // Save item from tuple in position i
     template<std::size_t i>
     void _save_item(const tuple_type& items, std::size_t& loc) {
-        constexpr auto& item = std::get<i>(items);
+        const auto& item = std::get<i>(items);
         using T = decltype(item);
 
         auto rank = _ranks[i];

@@ -335,6 +335,14 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             {1, 1},
             {1, 1});
 
+        double x[1];
+        x[0] = cos(i/30.0);
+        double y[1];
+        y[0] = sin(i / 30.0);
+
+        foo.add(&x[0], &y[0]);
+        foo.save();
+
         change_state();
         return true;
     }
