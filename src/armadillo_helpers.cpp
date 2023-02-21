@@ -8,7 +8,7 @@
 
 namespace SBCQueens {
 
-arma::mat caen_event_to_armadillo(const CAENEvent* evt, const uint32_t& n_chs) {
+arma::mat caen_event_to_armadillo(const CAENEvent* const evt, const uint32_t& n_chs) {
 	if (not evt) {
 		return {};
 	}
@@ -21,7 +21,7 @@ arma::mat caen_event_to_armadillo(const CAENEvent* evt, const uint32_t& n_chs) {
 	return arma::conv_to<arma::mat>::from(m);
 }
 
-void caen_event_to_armadillo(const CAENEvent* evt, arma::mat& out,
+void caen_event_to_armadillo(const CAENEvent* const evt, arma::mat& out,
                              const uint32_t& n_chs) {
     if (not evt) {
         return;

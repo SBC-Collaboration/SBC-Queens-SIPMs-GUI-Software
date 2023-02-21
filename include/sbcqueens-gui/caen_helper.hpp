@@ -45,7 +45,7 @@ enum class CAENDigitizerFamilies {
 };
 
 // Translates the CAEN API error code to a string.
-constexpr std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode&);
+std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode&);
 
 // This list is incomplete
 enum class CAENConnectionType {
@@ -107,6 +107,7 @@ const static inline std::unordered_map<std::string, CAENDigitizerModel>
 // are fixed per digitizer
 const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
     CAENDigitizerModelsConstantsMap {
+        #ifndef NDEBUG
         {CAENDigitizerModel::DEBUG, CAENDigitizerModelConstants {
             8,          // ADCResolution
             100e3,      //  AcquisitionRate
@@ -118,6 +119,7 @@ const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelCon
             10.0f,      // NLOCToRecordLength
             {1.0}       // VoltageRanges
         }},
+        #endif
         {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants {
             14,         // ADCResolution
             500e6,      //  AcquisitionRate
@@ -414,6 +416,7 @@ class CAEN {
             char* tmp_ptr;
             _err_code = CAEN_DGTZ_MallocReadoutBuffer(handle, &tmp_ptr,
                                                       &TotalSizeBuffer);
+            return tmp_ptr;
         }
      public:
         // Unsafe C buffer. Only this class has access to CAENData
@@ -423,6 +426,7 @@ class CAEN {
         uint32_t DataSize = 0;
         uint32_t NumEvents = 0;
 
+        CAENData() = default;
         CAENData(Logger logger, const int& handle) :
             _logger{logger},
             Buffer{_caen_malloc(handle)} { }
@@ -435,10 +439,9 @@ class CAEN {
             _err_code = CAEN_DGTZ_FreeReadoutBuffer(&Buffer);
 
             if(_err_code < 0) {
-                _logger.error("Fatal error at CAENData -> _clear_data_mem."
+                _logger->error("Fatal error at CAENData -> _clear_data_mem."
                     "Failed to free memory with error: {}",
                     translate_caen_error_code(_err_code));
-                throw;
             }
         }
     };
@@ -485,6 +488,7 @@ class CAEN {
         switch (ct) {
         case CAENConnectionType::A4818:
             id |= 1;
+        break;
         case CAENConnectionType::USB:
         default:
             id |= 0;
@@ -514,13 +518,13 @@ class CAEN {
         case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_DPPFirmwareNotSupported:
         case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_NotYetImplemented:
             _has_warning = true;
-            _logger->warning(expression_str, "Warning", location,
+            _logger->warn(expression_str, "Warning", location,
                 CAEN_func_name, translate_caen_error_code(_err_code),
                 extra_msg);
             break;
         default:
             _has_error = true;
-            _logger->warning(expression_str, "Warning", location,
+            _logger->error(expression_str, "Error", location,
                 CAEN_func_name, translate_caen_error_code(_err_code),
                 extra_msg);
         }
@@ -576,7 +580,6 @@ class CAEN {
          const CAENConnectionType& ct, const int& ln, const int& cn,
          const uint32_t& addr) :
         _logger{logger},
-        _caen_raw_data{logger},
         Family{_get_family(model)},
         Model{model},
         ModelConstants{CAENDigitizerModelsConstantsMap.at(model)},
@@ -638,7 +641,7 @@ class CAEN {
         _connection_info_map.erase(id);
 
         if (_is_connected) {
-            _logger.info("Going to disconnect resource with handle {0} with "
+            _logger->info("Going to disconnect resource with handle {0} with "
             "link number {1}, conet node {2} and VME address {3}.",
             _caen_api_handle, LinkNum, ConetNode, VMEBaseAddress);
 
@@ -988,12 +991,12 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
                 word += gr_config.DCCorrections[ch] << (ch * 8);
             }
 
-            WriteBits(0x10C0 | (grp_n << 8), word);
+            WriteRegister(0x10C0 | (grp_n << 8), word);
             word = 0;
             for (int ch = 4; ch < 8; ch++) {
                 word += gr_config.DCCorrections[ch] << ((ch - 4) * 8);
             }
-            WriteBits(0x10C4 | (grp_n << 8), word);
+            WriteRegister(0x10C4 | (grp_n << 8), word);
         }
 
         bool trg_out = false;
@@ -1043,8 +1046,8 @@ void CAEN<T, N>::EnableAcquisition() noexcept {
     _print_if_err("CAENData", __FUNCTION__);
 
     // Allocates all the memory for the internal events buffer
-    std::generate(_events.begin(), _events.end(), [](){
-        return CAENEvent(handle);
+    std::generate(_events.begin(), _events.end(), [h = handle](){
+        return CAENEvent(h);
     });
 
     _err_code = CAEN_DGTZ_ClearData(handle);
@@ -1153,7 +1156,7 @@ void CAEN<T, N>::RetrieveData() noexcept {
     _err_code = CAEN_DGTZ_ReadData(handle,
         CAEN_DGTZ_ReadMode_t::CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT,
         _caen_raw_data.Buffer,
-        _caen_raw_data.DataSize);
+        &_caen_raw_data.DataSize);
     _print_if_err("CAEN_DGTZ_ReadData", __FUNCTION__);
 
     _err_code = CAEN_DGTZ_GetNumEvents(handle,

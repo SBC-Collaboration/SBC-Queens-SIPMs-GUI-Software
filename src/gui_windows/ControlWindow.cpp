@@ -21,7 +21,7 @@ void ControlWindow::init_window(const toml::table& tb) {
 
     /// CAEN config
     // CAEN initial state
-    _sipm_doe.CurrentState = SiPMAcquisitionStates::Standby;
+    _sipm_doe.CurrentState = SiPMAcquisitionManagerStates::Standby;
 
     /// CAEN model configs
 

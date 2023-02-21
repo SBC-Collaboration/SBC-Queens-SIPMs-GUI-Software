@@ -85,7 +85,7 @@ class GUIManager : public ThreadManager<Pipes> {
         _teensy_doe(_teensy_pipe_end.Data),
         _slowdaq_pipe_end(p.SlowDAQPipe),
         _slowdaq_doe(_slowdaq_pipe_end.Data)
-        {
+    {
         _windows.push_back(
             make_indicator_window(_sipm_doe, _teensy_doe, _slowdaq_doe));
         _windows.push_back(
@@ -137,16 +137,19 @@ class GUIManager : public ThreadManager<Pipes> {
     }
 
     ~GUIManager() {
+        _teensy_doe.Changed = true;
         _teensy_doe.Callback = [](TeensyControllerData& state) {
             state.CurrentState = TeensyControllerStates::Closing;
         };
 
         // CAENQueue& cq = std::get<CAENQueue&>(_queues);
+        _sipm_doe.Changed = true;
         _sipm_doe.Callback = [](SiPMAcquisitionData& state) {
-            state.CurrentState = SiPMAcquisitionStates::Closing;
+            state.CurrentState = SiPMAcquisitionManagerStates::Closing;
         };
 
         // SlowDAQQueue& oq = std::get<SlowDAQQueue&>(_queues);
+        _slowdaq_doe.Changed = true;
         _slowdaq_doe.Callback = [](SlowDAQData& state) {
             state.PFEIFFERState = PFEIFFERSSGState::Closing;
         };

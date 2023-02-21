@@ -65,7 +65,7 @@ class DataFile {
     {
         if (_open) {
             if (std::filesystem::is_empty(file_name)) {
-                _stream << f(std::forward<Args>(args)...);
+                _stream << f(std::forward<HeaderFuncArgs>(args)...);
             }
         }
     }
@@ -173,18 +173,17 @@ class DataFile {
 // Opens the file with name file_name.
 // Essentially the same as calling DataFile<T>(file_name)
 template <typename T>
-DataFile<T> open_file(std::string_view file_name) noexcept {
-    return DataFile<T>(file_name);
+auto open_file(std::string_view file_name) noexcept {
+    return std::make_shared<DataFile<T>>(file_name);
 }
 
 // Opens the file with name fileName.
 // Essentially the same as calling DataFile<T>(file_name, f, args)
 template <typename T, typename InitWriteFunc, typename... Args>
-DataFile<T> open_file(DataFile<T>& res,
-                      std::string_view file_name,
-                      InitWriteFunc&& f,
-                      Args&&... args) noexcept {
-    return DataFile<T>(file_name,
+auto open_file(std::string_view file_name,
+               InitWriteFunc&& f,
+               Args&&... args) noexcept {
+    return std::make_shared<DataFile<T>>(file_name,
                        std::forward<InitWriteFunc>(f),
                        std::forward<Args>(args)...);
 }
@@ -192,14 +191,14 @@ DataFile<T> open_file(DataFile<T>& res,
 
 
 // Saves the contents of the DataFile asynchronously using the save function
-// described here. See save for more information.
-template<typename T, typename FormatFunc, typename... Args>
-void async_save(DataFile<T>& file, FormatFunc&& f, Args&&... args) noexcept {
-    std::packaged_task<void(DataFile<T>&, FormatFunc&&)>
-        _pt(save<T, FormatFunc>);
+// // described here. See save for more information.
+// template<typename T, typename FormatFunc, typename... Args>
+// void async_save(DataFile<T>& file, FormatFunc&& f, Args&&... args) noexcept {
+//     std::packaged_task<void(DataFile<T>&, FormatFunc&&)>
+//         _pt(save<T, FormatFunc>);
 
-    _pt(file, std::forward<FormatFunc>(f), std::forward<Args>(args)...);
-}
+//     _pt(file, std::forward<FormatFunc>(f), std::forward<Args>(args)...);
+// }
 
 struct SaveFileInfo {
     double Time;

@@ -36,7 +36,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
     SlowDAQPipeEnd<SlowDAQ_type, PipeEndType::Consumer> _slowdaq_pipe_end;
     SlowDAQData& _slowdaq_doe;
 
-    DataFile<PFEIFFERSingleGaugeData> _pfeiffer_file;
+    std::shared_ptr<DataFile<PFEIFFERSingleGaugeData>> _pfeiffer_file;
 
     // IndicatorSender<IndicatorNames> _plot_sender;
 
@@ -88,11 +88,11 @@ class SlowDAQManager : public ThreadManager<Pipes> {
                     if (_pfeiffers_port) {
                         if (_pfeiffers_port->isOpen()) {
                             _init_time = get_current_time_epoch();
-                            open(_pfeiffer_file,
+                            _pfeiffer_file = std::make_shared<DataFile<PFEIFFERSingleGaugeData>>(
                                 _slowdaq_doe.RunDir
                                 + "/" + _slowdaq_doe.RunName
                                 + "/PFEIFFERSSPressures.txt");
-                            bool s = _pfeiffer_file > 0;
+                            bool s = _pfeiffer_file->isOpen();
 
                             if (not s) {
                                     spdlog::error("Failed to open files.");
@@ -211,7 +211,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
                             PFEIFFERSingleGaugeData d;
                             d.Pressure = pressure;
                             d.time = get_current_time_epoch();
-                            _pfeiffer_file->Add(d);
+                            _pfeiffer_file->add(d);
                         }
                     }
                 }
@@ -222,14 +222,14 @@ class SlowDAQManager : public ThreadManager<Pipes> {
             [&](){
                 spdlog::info("Saving PFEIFFER data...");
 
-                async_save(_pfeiffer_file,
-                [](const PFEIFFERSingleGaugeData& data) {
-                    std::ostringstream out;
-                    out.precision(4);
-                    out << std::scientific;
-                    out << data.Pressure;
-                    return std::to_string(data.time) + "," + out.str() + "\n";
-                });
+                // async_save(_pfeiffer_file,
+                // [](const PFEIFFERSingleGaugeData& data) {
+                //     std::ostringstream out;
+                //     out.precision(4);
+                //     out << std::scientific;
+                //     out << data.Pressure;
+                //     return std::to_string(data.time) + "," + out.str() + "\n";
+                // });
         });
 
         retrieve_press_nb();

@@ -20,7 +20,7 @@ namespace SBCQueens {
 // from ch 2 filled with all 0s.
 //
 // Returns an empty mat if there is no event or data.
-arma::mat caen_event_to_armadillo(const CAENEvent* evt,
+arma::mat caen_event_to_armadillo(const CAENEvent* const evt,
                                   const uint32_t& n_chs = 64);
 
 // Translates a CAENEvent into a matrix where each row is a waveform
@@ -31,7 +31,7 @@ arma::mat caen_event_to_armadillo(const CAENEvent* evt,
 // from ch 2 filled with all 0s.
 //
 // Copies data to out. If there is no event or data, it does nothing
-void caen_event_to_armadillo(const CAENEvent* evt,
+void caen_event_to_armadillo(const CAENEvent* const evt,
                              arma::mat& out,
                              const uint32_t& n_chs = 64);
 

@@ -179,10 +179,10 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
     double _init_time;
 
     std::string _run_name     = "";
-    DataFile<Peltiers> _peltiers_file;
-    DataFile<Pressures> _pressures_file;
-    DataFile<RawRTDs> _RTDs_file;
-    DataFile<BMEs> _BMEs_file;
+    std::shared_ptr<DataFile<Peltiers>> _peltiers_file;
+    std::shared_ptr<DataFile<Pressures>> _pressures_file;
+    std::shared_ptr<DataFile<RawRTDs>> _RTDs_file;
+    std::shared_ptr<DataFile<BMEs>> _BMEs_file;
 
     serial_ptr _port;
 
@@ -276,29 +276,29 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                                 + "/" + _run_name);
 
                             // Open files to start saving!
-                            open(_pressures_file,
+                            _pressures_file = std::make_shared<DataFile<Pressures>>(
                                 _doe.RunDir
                                 + "/" + _run_name
                                 + "/Pressures.txt");
-                            bool s = (_pressures_file != nullptr);
+                            bool s = _pressures_file->isOpen();
 
-                            open(_RTDs_file,
+                            _RTDs_file = std::make_shared<DataFile<RawRTDs>>(
                                 _doe.RunDir
                                 + "/" + _run_name
                                 + "/RTDs.txt");
-                            s = (_RTDs_file != nullptr) && s;
+                            s = _RTDs_file->isOpen() && s;
 
-                            open(_peltiers_file,
+                            _peltiers_file = std::make_shared<DataFile<Peltiers>>(
                                 _doe.RunDir
                                 + "/" + _run_name
                                 + "/Peltiers.txt");
-                            s = (_peltiers_file != nullptr)  && s;
+                            s = _peltiers_file->isOpen() && s;
 
-                            open(_BMEs_file,
+                            _BMEs_file = std::make_shared<DataFile<BMEs>>(
                                 _doe.RunDir
                                 + "/" + _run_name
                                 + "/BMEs.txt");
-                            s = (_BMEs_file != nullptr)  && s;
+                            s = _BMEs_file->isOpen()  && s;
 
 
                             if (!s) {
@@ -452,7 +452,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 // _indicator_sender(IndicatorNames::LATEST_PELTIER_CURR,
                 //     pids.PID.Current);
 
-                _peltiers_file->Add(pids);
+                _peltiers_file->add(pids);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
@@ -498,7 +498,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 // _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
                 //     arma::mean(_error_temp_cf.GetBuffer()));
 
-                _RTDs_file->Add(rtds);
+                _RTDs_file->add(rtds);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
@@ -521,7 +521,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 // _indicator_sender(IndicatorNames::LATEST_VACUUM_PRESS,
                 //     press.Vacuum.Pressure);
 
-                _pressures_file->Add(press);
+                _pressures_file->add(press);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
@@ -546,7 +546,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 // _indicator_sender(IndicatorNames::LOCAL_BME_HUMD,
                 //     bmes.time , bmes.LocalBME.Humidity);
 
-                _BMEs_file->Add(bmes);
+                _BMEs_file->add(bmes);
             } catch (... ) {
                 spdlog::warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
@@ -604,45 +604,45 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             [&]() {
                 spdlog::info("Saving teensy data...");
 
-                async_save(_RTDs_file,
-                    [](const RawRTDs& rtds) {
-                        std::ostringstream out;
-                        for (std::size_t i = 0; i < rtds.RTDREGS.size(); i++) {
-                            out << rtds.Resistances[i] << ","
-                                << rtds.Temps[i];
+                // async_save(_RTDs_file,
+                //     [](const RawRTDs& rtds) {
+                //         std::ostringstream out;
+                //         for (std::size_t i = 0; i < rtds.RTDREGS.size(); i++) {
+                //             out << rtds.Resistances[i] << ","
+                //                 << rtds.Temps[i];
 
-                            if (i == rtds.RTDREGS.size() - 1) {
-                                out << '\n';
-                            } else {
-                                out << ',';
-                            }
-                        }
+                //             if (i == rtds.RTDREGS.size() - 1) {
+                //                 out << '\n';
+                //             } else {
+                //                 out << ',';
+                //             }
+                //         }
 
-                        return  std::to_string(rtds.time) + "," + out.str();
-                });
+                //         return  std::to_string(rtds.time) + "," + out.str();
+                // });
 
                 if (!_doe.SystemParameters.InRTDOnlyMode){
-                    async_save(_peltiers_file,
-                        [](const Peltiers& pid) {
-                            return  std::to_string(pid.time) + "," +
-                                    std::to_string(pid.PID.Current) + "\n";
-                    });
+                    // async_save(_peltiers_file,
+                    //     [](const Peltiers& pid) {
+                    //         return  std::to_string(pid.time) + "," +
+                    //                 std::to_string(pid.PID.Current) + "\n";
+                    // });
 
-                    async_save(_pressures_file,
-                        [](const Pressures& press) {
-                            return  std::to_string(press.time) + "," +
-                                    std::to_string(press.Vacuum.Pressure) + "\n";
+                    // async_save(_pressures_file,
+                    //     [](const Pressures& press) {
+                    //         return  std::to_string(press.time) + "," +
+                    //                 std::to_string(press.Vacuum.Pressure) + "\n";
 
-                    });
+                    // });
 
-                    async_save(_BMEs_file,
-                        [](const BMEs& bme) {
-                            return  std::to_string(bme.time) + "," +
-                                    std::to_string(bme.LocalBME.Temperature) + "," +
-                                    std::to_string(bme.LocalBME.Pressure) + "," +
-                                    std::to_string(bme.LocalBME.Humidity) + "\n";
+                    // async_save(_BMEs_file,
+                    //     [](const BMEs& bme) {
+                    //         return  std::to_string(bme.time) + "," +
+                    //                 std::to_string(bme.LocalBME.Temperature) + "," +
+                    //                 std::to_string(bme.LocalBME.Pressure) + "," +
+                    //                 std::to_string(bme.LocalBME.Humidity) + "\n";
 
-                    });
+                    // });
                 }
             });
 

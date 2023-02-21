@@ -24,7 +24,7 @@
 
 namespace SBCQueens {
 
-constexpr std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode& err) {
+std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode& err) {
     switch(err) {
         case CAEN_DGTZ_Success:
             return "Success";
@@ -850,345 +850,345 @@ constexpr std::string translate_caen_error_code(const CAEN_DGTZ_ErrorCode& err) 
 //    return real_max_buffs;
 //}
 
-std::string sbc_init_file(CAEN& res) noexcept {
-    // header string = name;type;x,y,z...;
-    auto g_config = res->GlobalConfig;
-    auto group_configs = res->GroupConfigs;
-    const uint8_t num_groups = res->ModelConstants.NumberOfGroups;
-    const bool has_groups = num_groups > 0;
+// std::string sbc_init_file(CAEN& res) noexcept {
+//     // header string = name;type;x,y,z...;
+//     auto g_config = res->GlobalConfig;
+//     auto group_configs = res->GroupConfigs;
+//     const uint8_t num_groups = res->ModelConstants.NumberOfGroups;
+//     const bool has_groups = num_groups > 0;
 
-    // The enum and the map is to simplify the code for the lambdas.
-    // and the header could potentially change any moment with any type
-    enum class Types { CHAR, INT8, INT16, INT32, INT64, UINT8, UINT16,
-        UINT32, UINT64, SINGLE, FLOAT, DOUBLE, FLOAT128 };
+//     // The enum and the map is to simplify the code for the lambdas.
+//     // and the header could potentially change any moment with any type
+//     enum class Types { CHAR, INT8, INT16, INT32, INT64, UINT8, UINT16,
+//         UINT32, UINT64, SINGLE, FLOAT, DOUBLE, FLOAT128 };
 
-    const std::unordered_map<Types, std::string> type_to_string = {
-        {Types::CHAR, "char"},
-        {Types::INT8, "int8"}, {Types::INT16, "int16"},
-        {Types::INT32, "int32"}, {Types::UINT8, "uint8"},
-        {Types::UINT16, "uint16"}, {Types::UINT32, "uint32"},
-        {Types::SINGLE, "single"}, {Types::FLOAT, "single"},
-        {Types::DOUBLE, "double"}, {Types::FLOAT128, "float128"}
-    };
+//     const std::unordered_map<Types, std::string> type_to_string = {
+//         {Types::CHAR, "char"},
+//         {Types::INT8, "int8"}, {Types::INT16, "int16"},
+//         {Types::INT32, "int32"}, {Types::UINT8, "uint8"},
+//         {Types::UINT16, "uint16"}, {Types::UINT32, "uint32"},
+//         {Types::SINGLE, "single"}, {Types::FLOAT, "single"},
+//         {Types::DOUBLE, "double"}, {Types::FLOAT128, "float128"}
+//     };
 
-    auto NumToBinString = [] (auto num) -> std::string {
-        char* tmpstr = reinterpret_cast<char*>(&num);
-        return std::string(tmpstr, sizeof(num) / sizeof(char));
-    };
+//     auto NumToBinString = [] (auto num) -> std::string {
+//         char* tmpstr = reinterpret_cast<char*>(&num);
+//         return std::string(tmpstr, sizeof(num) / sizeof(char));
+//     };
 
-    // Lambda to help to save a single number to the binary format
-    // file. The numbers are always converted to double
-    auto SingleDimToBinaryHeader = [&] (std::string name, Types type,
-        uint32_t length) -> std::string {
-        auto type_s = type_to_string.at(type);
-        auto header = name + ";" + type_s + ";" + std::to_string(length) + ";";
+//     // Lambda to help to save a single number to the binary format
+//     // file. The numbers are always converted to double
+//     auto SingleDimToBinaryHeader = [&] (std::string name, Types type,
+//         uint32_t length) -> std::string {
+//         auto type_s = type_to_string.at(type);
+//         auto header = name + ";" + type_s + ";" + std::to_string(length) + ";";
 
-        return header;
-    };
+//         return header;
+//     };
 
-    uint32_t l = 0x01020304;
-    auto endianness_s = NumToBinString(l);
+//     uint32_t l = 0x01020304;
+//     auto endianness_s = NumToBinString(l);
 
-    std::string header = SingleDimToBinaryHeader("sample_rate",
-        Types::DOUBLE, 1);
+//     std::string header = SingleDimToBinaryHeader("sample_rate",
+//         Types::DOUBLE, 1);
 
-    std::function<uint32_t(uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
-        return acq_mask == 0 ? 0 : (acq_mask & 1) + n_channels_acq(acq_mask>>1);
-    };
+//     std::function<uint32_t(uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
+//         return acq_mask == 0 ? 0 : (acq_mask & 1) + n_channels_acq(acq_mask>>1);
+//     };
 
-    uint32_t num_ch = 0;
-    for (auto gr_pair : res->GroupConfigs) {
-        // This bool will make sure nothing will be added if it does not
-        // have groups
-        if (has_groups) {
-            auto acq_mask = gr_pair.AcquisitionMask.get();
-            num_ch += has_groups*n_channels_acq(acq_mask);
-        } else {
-            num_ch = static_cast<uint32_t>(res->GroupConfigs.size());
-        }
-    }
+//     uint32_t num_ch = 0;
+//     for (auto gr_pair : res->GroupConfigs) {
+//         // This bool will make sure nothing will be added if it does not
+//         // have groups
+//         if (has_groups) {
+//             auto acq_mask = gr_pair.AcquisitionMask.get();
+//             num_ch += has_groups*n_channels_acq(acq_mask);
+//         } else {
+//             num_ch = static_cast<uint32_t>(res->GroupConfigs.size());
+//         }
+//     }
 
-    header += SingleDimToBinaryHeader(
-        "en_chs", Types::UINT8, num_ch);
+//     header += SingleDimToBinaryHeader(
+//         "en_chs", Types::UINT8, num_ch);
 
-    header += SingleDimToBinaryHeader(
-        "trg_mask", Types::UINT32, 1);
+//     header += SingleDimToBinaryHeader(
+//         "trg_mask", Types::UINT32, 1);
 
-    header += SingleDimToBinaryHeader(
-        "thresholds", Types::UINT16, num_ch);
+//     header += SingleDimToBinaryHeader(
+//         "thresholds", Types::UINT16, num_ch);
 
-    header += SingleDimToBinaryHeader(
-        "dc_offsets", Types::UINT16, num_ch);
+//     header += SingleDimToBinaryHeader(
+//         "dc_offsets", Types::UINT16, num_ch);
 
-    header += SingleDimToBinaryHeader(
-        "dc_corrections", Types::UINT8, num_ch);
+//     header += SingleDimToBinaryHeader(
+//         "dc_corrections", Types::UINT8, num_ch);
 
-    header += SingleDimToBinaryHeader(
-        "dc_range", Types::SINGLE, num_ch);
+//     header += SingleDimToBinaryHeader(
+//         "dc_range", Types::SINGLE, num_ch);
 
-    header += SingleDimToBinaryHeader(
-        "time_stamp", Types::UINT32, 1);
+//     header += SingleDimToBinaryHeader(
+//         "time_stamp", Types::UINT32, 1);
 
-    header += SingleDimToBinaryHeader(
-        "trg_source", Types::UINT32, 1);
+//     header += SingleDimToBinaryHeader(
+//         "trg_source", Types::UINT32, 1);
 
-    // This part is the header for the SiPM pulses
-    // The pulses are saved as raw counts, so uint16 is enough
-    const std::string c_type = "uint16";
-    // Name of this block
-    const std::string c_sipm_name = "sipm_traces";
+//     // This part is the header for the SiPM pulses
+//     // The pulses are saved as raw counts, so uint16 is enough
+//     const std::string c_type = "uint16";
+//     // Name of this block
+//     const std::string c_sipm_name = "sipm_traces";
 
-    // These are all the data line dimensions
-    // RecordLengthxNumChannels
-    std::string record_length_s = std::to_string(g_config.RecordLength);
-    std::string num_channels_s = std::to_string(num_ch);
+//     // These are all the data line dimensions
+//     // RecordLengthxNumChannels
+//     std::string record_length_s = std::to_string(g_config.RecordLength);
+//     std::string num_channels_s = std::to_string(num_ch);
 
-    std::string data_header = c_sipm_name + ";";  // name
-    data_header += c_type + ";";          // type
-    data_header += record_length_s + ",";       // dim 1
-    data_header += num_channels_s + ";";          // dim 2
+//     std::string data_header = c_sipm_name + ";";  // name
+//     data_header += c_type + ";";          // type
+//     data_header += record_length_s + ",";       // dim 1
+//     data_header += num_channels_s + ";";          // dim 2
 
-    // uint16_t is required as the format requires it to be 16 unsigned max
-    uint16_t s = static_cast<uint16_t>((header + data_header).length());
-    std::string data_header_size = NumToBinString(s);
+//     // uint16_t is required as the format requires it to be 16 unsigned max
+//     uint16_t s = static_cast<uint16_t>((header + data_header).length());
+//     std::string data_header_size = NumToBinString(s);
 
-    // 0 means that it will be calculated by the number of lines
-    // int32 is required
-    int32_t j = 0x00000000;
-    std::string num_data_lines = NumToBinString(j);
+//     // 0 means that it will be calculated by the number of lines
+//     // int32 is required
+//     int32_t j = 0x00000000;
+//     std::string num_data_lines = NumToBinString(j);
 
-    // binary format goes like: endianess, header size, header string
-    // then number of lines (in this case 0)
-    return endianness_s + data_header_size
-        + header + data_header + num_data_lines;
-}
-
-// std::string sbc_init_file(CAENEvent& evt) noexcept {
-
-//  uint16_t numchannels = 0;
-//  uint16_t rl = 0;
-//  // We need  the channels that are enabled but for that it is actually
-//  // easier to count all the channels that have a size different than 0
-//  for(int i = 0; i < MAX_UINT16_CHANNEL_SIZE; i++){
-//    if(evt->Data->ChSize[i] > 0) {
-//      numchannels++;
-//      // all evt->Data->ChSize should be the same size...
-//      rl = evt->Data->ChSize[i];
-//    }
-//  }
-
-//  return sbc_init_file(rl, numchannels);
+//     // binary format goes like: endianess, header size, header string
+//     // then number of lines (in this case 0)
+//     return endianness_s + data_header_size
+//         + header + data_header + num_data_lines;
 // }
 
-std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
-    // TODO(Hector): so this code could be improved and half of the reason
-    // it is related to the format itself. A bunch of the details
-    // it is saving with each line should not be saved every time. They are
-    // run constants, but that is how it is for now. Maybe in the future
-    // it will change.
+// // std::string sbc_init_file(CAENEvent& evt) noexcept {
 
-    // TODO(Zhiheng): add the code you need to save the channels on
-    // a group by using the mask.
+// //  uint16_t numchannels = 0;
+// //  uint16_t rl = 0;
+// //  // We need  the channels that are enabled but for that it is actually
+// //  // easier to count all the channels that have a size different than 0
+// //  for(int i = 0; i < MAX_UINT16_CHANNEL_SIZE; i++){
+// //    if(evt->Data->ChSize[i] > 0) {
+// //      numchannels++;
+// //      // all evt->Data->ChSize should be the same size...
+// //      rl = evt->Data->ChSize[i];
+// //    }
+// //  }
 
-    // order of header:
-    // Name           type    length (B)    is Constant?
-    // sample_rate    double    8             Y
-    // en_chs         uint8     1*ch_size     Y
-    // trg_mask       uint32    4             Y
-    // thresholds     uint16    2*ch_size     Y
-    // dc_offsets     uint16    2*ch_size     Y
-    // dc_corrections uint8     1*ch_size     Y
-    // dc_range       single    4*ch_size     Y
-    // time_stamp     uint32    4             N
-    // trg_source     uint32    4             N
-    // data           uint16    2*rl*ch_size  N
-    //
-    // Total length         20 + ch_size(10 + 2*recordlength)
+// //  return sbc_init_file(rl, numchannels);
+// // }
 
-    const auto rl = res->GlobalConfig.RecordLength;
-    const uint8_t ch_per_group = res->ModelConstants.NumChannelsPerGroup;
-    const uint8_t num_groups = res->ModelConstants.NumberOfGroups;
-    const bool has_groups = num_groups > 0;
+// std::string sbc_save_func(CAENEvent& evt, CAEN& res) noexcept {
+//     // TODO(Hector): so this code could be improved and half of the reason
+//     // it is related to the format itself. A bunch of the details
+//     // it is saving with each line should not be saved every time. They are
+//     // run constants, but that is how it is for now. Maybe in the future
+//     // it will change.
 
-    static std::function<uint32_t(uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
-        return acq_mask == 0 ? 0: (acq_mask & 1) + n_channels_acq(acq_mask>>1);
-    };
+//     // TODO(Zhiheng): add the code you need to save the channels on
+//     // a group by using the mask.
 
-    uint64_t file_offset = 0;
-    auto append_cstr = [](auto num, uint64_t& offset, char* str) {
-        char* ptr = reinterpret_cast<char*>(&num);
-        for (size_t i = 0; i < sizeof(num) / sizeof(char); i++) {
-            str[offset + i] = ptr[i];
-        }
-        offset += sizeof(num) / sizeof(char);
-    };
+//     // order of header:
+//     // Name           type    length (B)    is Constant?
+//     // sample_rate    double    8             Y
+//     // en_chs         uint8     1*ch_size     Y
+//     // trg_mask       uint32    4             Y
+//     // thresholds     uint16    2*ch_size     Y
+//     // dc_offsets     uint16    2*ch_size     Y
+//     // dc_corrections uint8     1*ch_size     Y
+//     // dc_range       single    4*ch_size     Y
+//     // time_stamp     uint32    4             N
+//     // trg_source     uint32    4             N
+//     // data           uint16    2*rl*ch_size  N
+//     //
+//     // Total length         20 + ch_size(10 + 2*recordlength)
 
-    // This will switch between Zhiheng code and mine if it has groups
-    auto wrap_if_group = [=, grp_conf = res->GroupConfigs]
-        (uint64_t& offset, char* str, auto f) {
-        for (std::size_t gr_n = 0; gr_n < grp_conf.size(); gr_n++) {
-            auto gr_pair = grp_conf[gr_n];
-            if (has_groups) {
-                for (int ch = 0; ch < ch_per_group; ch++) {
-                    auto acq_mask = gr_pair.AcquisitionMask.get();
-                    if (acq_mask & (1 << ch)) {
-                        f(gr_n, gr_pair, offset, str, ch);
-                    }
-                }
-            } else {
-                f(gr_n, gr_pair, offset, str, 0);
-            }
-        }
-    };
+//     const auto rl = res->GlobalConfig.RecordLength;
+//     const uint8_t ch_per_group = res->ModelConstants.NumChannelsPerGroup;
+//     const uint8_t num_groups = res->ModelConstants.NumberOfGroups;
+//     const bool has_groups = num_groups > 0;
 
-    uint32_t num_ch = 0;
-    for (auto gr_pair : res->GroupConfigs) {
-        if (has_groups) {
-            auto acq_mask = gr_pair.AcquisitionMask.get();
-            num_ch += has_groups*n_channels_acq(acq_mask);
-        } else {
-            num_ch = res->GroupConfigs.size();
-        }
-    }
+//     static std::function<uint32_t(uint32_t)> n_channels_acq = [&](uint8_t acq_mask) {
+//         return acq_mask == 0 ? 0: (acq_mask & 1) + n_channels_acq(acq_mask>>1);
+//     };
 
-    // No strings for this one as this is more efficient
-    const size_t kNumLines = 20 + (2*rl + 10)*num_ch;
-    char out_str[kNumLines];
+//     uint64_t file_offset = 0;
+//     auto append_cstr = [](auto num, uint64_t& offset, char* str) {
+//         char* ptr = reinterpret_cast<char*>(&num);
+//         for (size_t i = 0; i < sizeof(num) / sizeof(char); i++) {
+//             str[offset + i] = ptr[i];
+//         }
+//         offset += sizeof(num) / sizeof(char);
+//     };
 
-    // sample_rate
-    append_cstr(res->ModelConstants.AcquisitionRate, file_offset, &out_str[0]);
+//     // This will switch between Zhiheng code and mine if it has groups
+//     auto wrap_if_group = [=, grp_conf = res->GroupConfigs]
+//         (uint64_t& offset, char* str, auto f) {
+//         for (std::size_t gr_n = 0; gr_n < grp_conf.size(); gr_n++) {
+//             auto gr_pair = grp_conf[gr_n];
+//             if (has_groups) {
+//                 for (int ch = 0; ch < ch_per_group; ch++) {
+//                     auto acq_mask = gr_pair.AcquisitionMask.get();
+//                     if (acq_mask & (1 << ch)) {
+//                         f(gr_n, gr_pair, offset, str, ch);
+//                     }
+//                 }
+//             } else {
+//                 f(gr_n, gr_pair, offset, str, 0);
+//             }
+//         }
+//     };
 
-    // en_chs
-    // for(auto gr_pair : res->GroupConfigs) {
-    //  for(int ch = 0; ch < ch_per_group; ch++) {
-    //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
-    //      uint8_t channel = gr_pair.second.Number * ch_per_group + ch;
-    //      append_cstr(channel, offset, &out_str[0]);
-    //    }
-    //  }
-    // }
+//     uint32_t num_ch = 0;
+//     for (auto gr_pair : res->GroupConfigs) {
+//         if (has_groups) {
+//             auto acq_mask = gr_pair.AcquisitionMask.get();
+//             num_ch += has_groups*n_channels_acq(acq_mask);
+//         } else {
+//             num_ch = res->GroupConfigs.size();
+//         }
+//     }
 
-    wrap_if_group(file_offset, &out_str[0],
-        [=](std::size_t grp_n, auto, uint64_t& offset, char* str, uint8_t ch) {
-            uint8_t channel = grp_n * ch_per_group + ch;
-            append_cstr(channel, offset, str);
-        });
+//     // No strings for this one as this is more efficient
+//     const size_t kNumLines = 20 + (2*rl + 10)*num_ch;
+//     char out_str[kNumLines];
 
-    // trg_mask
-    uint32_t trg_mask = 0;
-    for (std::size_t ch = 0; ch < res->GroupConfigs.size(); ch++) {
-        auto gr_pair = res->GroupConfigs[ch];
-        uint32_t pos = has_groups ? ch * ch_per_group
-        : ch;
+//     // sample_rate
+//     append_cstr(res->ModelConstants.AcquisitionRate, file_offset, &out_str[0]);
 
-        auto trig_mask = gr_pair.TriggerMask.get();
-        trg_mask |= (trig_mask << pos);
-    }
+//     // en_chs
+//     // for(auto gr_pair : res->GroupConfigs) {
+//     //  for(int ch = 0; ch < ch_per_group; ch++) {
+//     //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
+//     //      uint8_t channel = gr_pair.second.Number * ch_per_group + ch;
+//     //      append_cstr(channel, offset, &out_str[0]);
+//     //    }
+//     //  }
+//     // }
 
-    append_cstr(trg_mask, file_offset, &out_str[0]);
+//     wrap_if_group(file_offset, &out_str[0],
+//         [=](std::size_t grp_n, auto, uint64_t& offset, char* str, uint8_t ch) {
+//             uint8_t channel = grp_n * ch_per_group + ch;
+//             append_cstr(channel, offset, str);
+//         });
 
-    // thresholds
-    // for(auto gr_pair : res->GroupConfigs) {
-    //  if(has_groups){
-    //    for(int ch = 0; ch < ch_per_group; ch++) {
-    //      if (gr_pair.second.AcquisitionMask & (1 << ch)){
-    //        append_cstr(gr_pair.second.TriggerThreshold, offset, &out_str[0]);
-    //      }
-    //    }
-    //  } else {
-    //    append_cstr(gr_pair.second.TriggerThreshold, offset, &out_str[0]);
-    //  }
-    // }
+//     // trg_mask
+//     uint32_t trg_mask = 0;
+//     for (std::size_t ch = 0; ch < res->GroupConfigs.size(); ch++) {
+//         auto gr_pair = res->GroupConfigs[ch];
+//         uint32_t pos = has_groups ? ch * ch_per_group
+//         : ch;
 
-    wrap_if_group(file_offset, &out_str[0],
-        [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t) {
-            append_cstr(group.TriggerThreshold, offset, str);
-        });
+//         auto trig_mask = gr_pair.TriggerMask.get();
+//         trg_mask |= (trig_mask << pos);
+//     }
 
-    // dc_offsets
-    // for(auto gr_pair : res->GroupConfigs) {
-    //  for(int ch = 0; ch < ch_per_group; ch++) {
-    //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
-    //      append_cstr(gr_pair.second.DCOffset, offset, &out_str[0]);
-    //    }
-    //  }
-    // }
-    wrap_if_group(file_offset, &out_str[0],
-        [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t) {
-            append_cstr(group.DCOffset, offset, str);
-        });
+//     append_cstr(trg_mask, file_offset, &out_str[0]);
 
-    // dc_corrections
-    // for(auto gr_pair : res->GroupConfigs) {
-    //  for(int ch = 0; ch < ch_per_group; ch++) {
-    //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
-    //      append_cstr(gr_pair.second.DCCorrections[ch], offset, &out_str[0]);
-    //    }
-    //  }
-    // }
-    wrap_if_group(file_offset, &out_str[0],
-        [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t ch) {
-            if (group.DCCorrections.size() == 8) {
-                append_cstr(group.DCCorrections[ch], offset, str);
-            } else {
-                uint8_t tmp = 0;
-                append_cstr(tmp, offset, str);
-            }
-        });
+//     // thresholds
+//     // for(auto gr_pair : res->GroupConfigs) {
+//     //  if(has_groups){
+//     //    for(int ch = 0; ch < ch_per_group; ch++) {
+//     //      if (gr_pair.second.AcquisitionMask & (1 << ch)){
+//     //        append_cstr(gr_pair.second.TriggerThreshold, offset, &out_str[0]);
+//     //      }
+//     //    }
+//     //  } else {
+//     //    append_cstr(gr_pair.second.TriggerThreshold, offset, &out_str[0]);
+//     //  }
+//     // }
 
-    // dc_range
-    // for(auto gr_pair : res->GroupConfigs) {
-    //  for(int ch = 0; ch < ch_per_group; ch++) {
-    //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
-    //      float val = res->GetVoltageRange(gr_pair.second.Number);
-    //      append_cstr(val, offset, &out_str[0]);
-    //    }
-    //  }
-    // }
+//     wrap_if_group(file_offset, &out_str[0],
+//         [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t) {
+//             append_cstr(group.TriggerThreshold, offset, str);
+//         });
 
-    wrap_if_group(file_offset, &out_str[0],
-        [&](std::size_t gr_n, auto, uint64_t& off, char* str, uint8_t) {
-            float val = res->GetVoltageRange(gr_n);
-            append_cstr(val, off, str);
-        });
+//     // dc_offsets
+//     // for(auto gr_pair : res->GroupConfigs) {
+//     //  for(int ch = 0; ch < ch_per_group; ch++) {
+//     //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
+//     //      append_cstr(gr_pair.second.DCOffset, offset, &out_str[0]);
+//     //    }
+//     //  }
+//     // }
+//     wrap_if_group(file_offset, &out_str[0],
+//         [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t) {
+//             append_cstr(group.DCOffset, offset, str);
+//         });
 
-    // time_stamp
-    append_cstr(evt->Info.TriggerTimeTag, file_offset, &out_str[0]);
+//     // dc_corrections
+//     // for(auto gr_pair : res->GroupConfigs) {
+//     //  for(int ch = 0; ch < ch_per_group; ch++) {
+//     //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
+//     //      append_cstr(gr_pair.second.DCCorrections[ch], offset, &out_str[0]);
+//     //    }
+//     //  }
+//     // }
+//     wrap_if_group(file_offset, &out_str[0],
+//         [=](std::size_t, auto group, uint64_t& offset, char* str, uint8_t ch) {
+//             if (group.DCCorrections.size() == 8) {
+//                 append_cstr(group.DCCorrections[ch], offset, str);
+//             } else {
+//                 uint8_t tmp = 0;
+//                 append_cstr(tmp, offset, str);
+//             }
+//         });
 
-    // tgr_source
-    append_cstr(evt->Info.Pattern, file_offset, &out_str[0]);
+//     // dc_range
+//     // for(auto gr_pair : res->GroupConfigs) {
+//     //  for(int ch = 0; ch < ch_per_group; ch++) {
+//     //    if (gr_pair.second.AcquisitionMask & (1<<ch)){
+//     //      float val = res->GetVoltageRange(gr_pair.second.Number);
+//     //      append_cstr(val, offset, &out_str[0]);
+//     //    }
+//     //  }
+//     // }
+
+//     wrap_if_group(file_offset, &out_str[0],
+//         [&](std::size_t gr_n, auto, uint64_t& off, char* str, uint8_t) {
+//             float val = res->GetVoltageRange(gr_n);
+//             append_cstr(val, off, str);
+//         });
+
+//     // time_stamp
+//     append_cstr(evt->Info.TriggerTimeTag, file_offset, &out_str[0]);
+
+//     // tgr_source
+//     append_cstr(evt->Info.Pattern, file_offset, &out_str[0]);
 
 
-    // For CAEN data, each line is an Event which contains a 2-D array
-    // where the x-axis is the record length and the y-axis are the
-    // number of channels that are activated
-    auto& evtdata = evt->Data;
-    for (std::size_t gr = 0; gr < res->GroupConfigs.size(); gr++) {
-        auto gr_pair = res->GroupConfigs[gr];
-        if (has_groups){
-            for (int ch = 0; ch < ch_per_group; ch++) {
-                auto acq_mask = gr_pair.AcquisitionMask.get();
-                if (acq_mask & (1<<ch)) {
-                    for(uint32_t xp = 0; xp < evtdata->ChSize[gr*ch_per_group+ch]; xp++) {
-                        append_cstr(evtdata->DataChannel[ch][xp],
-                            file_offset, &out_str[0]);
-                    }
-                }
-            }
-        } else {
-            if (evtdata->ChSize[gr] > 0) {
-                for (uint32_t xp = 0; xp < evtdata->ChSize[gr]; xp++) {
-                    append_cstr(evtdata->DataChannel[gr][xp],
-                        file_offset, &out_str[0]);
-                }
-            }
-        }
-    }
+//     // For CAEN data, each line is an Event which contains a 2-D array
+//     // where the x-axis is the record length and the y-axis are the
+//     // number of channels that are activated
+//     auto& evtdata = evt->Data;
+//     for (std::size_t gr = 0; gr < res->GroupConfigs.size(); gr++) {
+//         auto gr_pair = res->GroupConfigs[gr];
+//         if (has_groups){
+//             for (int ch = 0; ch < ch_per_group; ch++) {
+//                 auto acq_mask = gr_pair.AcquisitionMask.get();
+//                 if (acq_mask & (1<<ch)) {
+//                     for(uint32_t xp = 0; xp < evtdata->ChSize[gr*ch_per_group+ch]; xp++) {
+//                         append_cstr(evtdata->DataChannel[ch][xp],
+//                             file_offset, &out_str[0]);
+//                     }
+//                 }
+//             }
+//         } else {
+//             if (evtdata->ChSize[gr] > 0) {
+//                 for (uint32_t xp = 0; xp < evtdata->ChSize[gr]; xp++) {
+//                     append_cstr(evtdata->DataChannel[gr][xp],
+//                         file_offset, &out_str[0]);
+//                 }
+//             }
+//         }
+//     }
 
-    // However, we do convert to string at the end, I wonder if this
-    // is a big performance impact?
-    return std::string(out_str, kNumLines);
-}
+//     // However, we do convert to string at the end, I wonder if this
+//     // is a big performance impact?
+//     return std::string(out_str, kNumLines);
+// }
 
 }  // namespace SBCQueens
 

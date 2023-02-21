@@ -36,12 +36,12 @@ void SiPMControlWindow::draw()  {
         [&](){ return tmp; },
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& doe_twin) {
-            if (doe_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode ||
-            doe_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
+            if (doe_twin.AcquisitionState == SiPMAcquisitionStates::OscilloscopeMode ||
+            doe_twin.AcquisitionState == SiPMAcquisitionStates::AcquisitionMode) {
                 // Setting it to AttemptConnection will force it to reset
                 doe_twin = _sipm_data;
                 doe_twin.SiPMVoltageSysChange = false;
-                doe_twin.CurrentState = SiPMAcquisitionStates::AttemptConnection;
+                doe_twin.AcquisitionState = SiPMAcquisitionStates::Reset;
             }
     });
     // ImGui::PopStyleColor(3);
@@ -93,7 +93,7 @@ void SiPMControlWindow::draw()  {
         [&](SiPMAcquisitionData& doe_twin) {
             // Ignore the input under BVMode or RunMode
             if (doe_twin.CurrentState
-                == SiPMAcquisitionStates::MeasurementRoutineMode) {
+                == SiPMAcquisitionManagerStates::Standby) {
                 return;
             }
 
@@ -114,8 +114,8 @@ void SiPMControlWindow::draw()  {
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& doe_twin) {
-            if (doe_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode) {
-                doe_twin.CurrentState = SiPMAcquisitionStates::MeasurementRoutineMode;
+            if (doe_twin.AcquisitionState == SiPMAcquisitionStates::OscilloscopeMode) {
+                doe_twin.AcquisitionState = SiPMAcquisitionStates::AcquisitionMode;
 
                 if (doe_twin.SiPMVoltageSysSupplyEN) {
                     doe_twin.LatestTemperature = _teensy_data.PIDTempValues.SetPoint;
@@ -134,7 +134,7 @@ void SiPMControlWindow::draw()  {
         tmp, [&](){ return tmp; },
         // Callback when IsItemEdited !
         [](SiPMAcquisitionData& doe_twin) {
-            if (doe_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
+            if (doe_twin.AcquisitionState == SiPMAcquisitionStates::AcquisitionMode) {
                 doe_twin.CancelMeasurements = true;
             }
     });

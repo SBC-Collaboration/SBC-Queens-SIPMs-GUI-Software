@@ -70,6 +70,7 @@ struct SiPMAcquisitionData {
     uint32_t VMEAddress = 0;
 
     SiPMAcquisitionManagerStates CurrentState = SiPMAcquisitionManagerStates::Standby;
+    SiPMAcquisitionStates AcquisitionState = SiPMAcquisitionStates::OscilloscopeMode;
 
     bool SoftwareTrigger = false;
     bool ResetCaen = false;

@@ -21,7 +21,7 @@ void CAENGeneralConfigTab::init_tab(const toml::table& tb) {
         = CAEN_conf["PostBufferPorcentage"].value_or(50u);
     _sipm_doe.GlobalConfig.TriggerOverlappingEn
         = CAEN_conf["OverlappingRejection"].value_or(false);
-    _sipm_doe.GlobalConfig.EXTasGate
+    _sipm_doe.GlobalConfig.EXTAsGate
         = CAEN_conf["TRGINasGate"].value_or(false);
     _sipm_doe.GlobalConfig.EXTTriggerMode
         = static_cast<CAEN_DGTZ_TriggerMode_t>(CAEN_conf["ExternalTrigger"].value_or(0L));
@@ -62,7 +62,7 @@ void CAENGeneralConfigTab::draw() {
     //         "HIGHLY UNSTABLE FEATURE, DO NOT ENABLE.");
     // }
 
-    ImGui::Checkbox("TRG-IN as Gate", &_sipm_doe.GlobalConfig.EXTasGate);
+    ImGui::Checkbox("TRG-IN as Gate", &_sipm_doe.GlobalConfig.EXTAsGate);
 
     const std::unordered_map<CAEN_DGTZ_TriggerMode_t, std::string> tgg_mode_map = {
         {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_DISABLED, "Disabled"},

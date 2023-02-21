@@ -43,8 +43,10 @@
 #include "sbcqueens-gui/hardware_helpers/ClientController.hpp"
 #include "sbcqueens-gui/hardware_helpers/Calibration.hpp"
 
-#include "sbcqueens-gui/sipm_helpers/BreakDownRoutine.hpp"
-#include "sbcqueens-gui/sipm_helpers/AcquisitionRoutine.hpp"
+#include "sbcqueens-gui/sipm_helpers/SBCBinaryFormat.hpp"
+
+// #include "sbcqueens-gui/sipm_helpers/BreakDownRoutine.hpp"
+// #include "sbcqueens-gui/sipm_helpers/AcquisitionRoutine.hpp"
 
 #include "sipmanalysis/PulseFunctions.hpp"
 #include "sipmanalysis/SPEAnalysis.hpp"
@@ -75,12 +77,12 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // Files
     std::string _run_name;
     DataFile<SiPMVoltageMeasure> _voltages_file;
-    LogFile _saveinfo_file;
+    std::unique_ptr<LogFile> _saveinfo_file = nullptr;
 
     // Hardware
     uint8_t _num_chs = 0;
     double _acq_rate = 0.0;
-    ClientController<serial_ptr, SiPMVoltageMeasure> _sipm_volt_sys;
+    // ClientController<serial_ptr, SiPMVoltageMeasure> _sipm_volt_sys;
 
     uint32_t SavedWaveforms = 0;
     uint64_t TriggeredWaveforms = 0;
@@ -96,10 +98,12 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // 1024 because the caen can only hold 1024 no matter what model (so far)
     std::array<const CAENEvent*, 1024> _processing_evts = {nullptr};
 
+
+
     // Analysis
-    std::unique_ptr<BreakdownRoutine> _vbd_routine = nullptr;
-    GainVBDFitParameters _latest_breakdown_voltage;
-    std::unique_ptr<AcquisitionRoutine> _acq_routine = nullptr;
+    // std::unique_ptr<BreakdownRoutine> _vbd_routine = nullptr;
+    // GainVBDFitParameters _latest_breakdown_voltage;
+    // std::unique_ptr<AcquisitionRoutine> _acq_routine = nullptr;
 
     // As long as we make the Func template argument a std::fuction
     // we can then use pointer magic to initialize them
@@ -123,8 +127,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
  public:
     explicit SiPMAcquisitionManager(const Pipes& pipes) :
         ThreadManager<Pipes>(pipes),
-        _sipm_pipe_end(pipes.SiPMPipe), _doe{_sipm_pipe_end.Data},
-        _sipm_volt_sys("Keithley 2000/6487") {
+        _sipm_pipe_end(pipes.SiPMPipe), _doe{_sipm_pipe_end.Data} {
         // This is possible because std::function can be assigned
         // to whatever std::bind returns
         standby_state = std::make_shared<SiPMAcquisitioneState>(
@@ -143,11 +146,11 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     }
 
     ~SiPMAcquisitionManager() {
-        spdlog::info("Closing SiPMAcquisitionManager");
+        _logger->info("Closing SiPMAcquisitionManager");
     }
 
     void operator()() {
-        spdlog::info("Initializing CAEN thread");
+        _logger->info("Initializing CAEN thread");
 
         _doe.IVData = PlotDataBuffer<2>(100);
 
@@ -327,6 +330,11 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         _doe.IVData(i, cos(i/30.0), sin(i/30.0));
         i += 1.0;
 
+        static BinaryFormat::DynamicWriter<double*, double*> foo("./out.bin",
+            {"x", "y"},
+            {1, 1},
+            {1, 1});
+
         change_state();
         return true;
     }
@@ -347,7 +355,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         while (not caen_res->HasError()) {
             switch(_acq_state) {
                 case SiPMAcquisitionStates::OscilloscopeMode:
-                    caen_res = oscilloscope(caen_res);
+                    caen_res = oscilloscope(std::move(caen_res));
                     break;
 
                 case SiPMAcquisitionStates::AcquisitionMode:
@@ -355,7 +363,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
                 // Resets the setup information without freeing the CAEN resource
                 case SiPMAcquisitionStates::Reset:
-                    caen_res = setup_and_prepare(caen_res);
+                    caen_res = setup_and_prepare(std::move(caen_res));
                     break;
             }
 
@@ -388,7 +396,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             return caen_port;
         }
 
-        return setup_and_prepare(caen_port);
+        return setup_and_prepare(std::move(caen_port));
     }
 
     SiPMCAEN_ptr setup_and_prepare(SiPMCAEN_ptr caen_port) {
@@ -528,7 +536,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 //    bool measurement_routine_mode() {
 //        if (not _vbd_routine) {
 //            _vbd_routine = std::make_unique<BreakdownRoutine>(
-//                _caen_port, _doe, _run_name, _saveinfo_file);
+//                _caen_port, _doe, _run_name, _saveinfo_file = nullptr);
 //
 //            // // Reset all indicators for this section
 //            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, false);
@@ -626,7 +634,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     //     if (not _acq_routine) {
     //         _indicator_sender(IndicatorNames::DONE_DATA_TAKING, false);
     //         _acq_routine = std::make_unique<AcquisitionRoutine> (
-    //             _caen_port, _doe, _run_name, _saveinfo_file,
+    //             _caen_port, _doe, _run_name, _saveinfo_file = nullptr,
     //             _latest_breakdown_voltage);
     //     }
 

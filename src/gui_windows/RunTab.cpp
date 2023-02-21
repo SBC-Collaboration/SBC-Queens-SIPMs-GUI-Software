@@ -177,7 +177,7 @@ void RunTab::draw() {
             caen_twin = doe;
 
             caen_twin.RunDir = run_dir;
-            caen_twin.CurrentState = SiPMAcquisitionStates::AttemptConnection;
+            caen_twin.CurrentState = SiPMAcquisitionManagerStates::Acquisition;
     });
     ImGui::SameLine();
 
@@ -187,9 +187,8 @@ void RunTab::draw() {
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
         [](SiPMAcquisitionData& caen_twin) {
-            if(caen_twin.CurrentState == SiPMAcquisitionStates::OscilloscopeMode ||
-                caen_twin.CurrentState == SiPMAcquisitionStates::MeasurementRoutineMode) {
-                    caen_twin.CurrentState = SiPMAcquisitionStates::Disconnected;
+            if(caen_twin.CurrentState == SiPMAcquisitionManagerStates::Acquisition) {
+                    caen_twin.CurrentState = SiPMAcquisitionManagerStates::Standby;
             }
     });
 
@@ -198,9 +197,8 @@ void RunTab::draw() {
     constexpr auto caen_connected_led = get_indicator<IndicatorTypes::LED,
                                         "##CAEN Connected?">(SiPMGUIIndicators);
     draw_indicator(caen_connected_led, _sipm_doe.CurrentState,
-        [](const SiPMAcquisitionStates& state) -> bool {
-            return state != SiPMAcquisitionStates::Standby and
-                state != SiPMAcquisitionStates::AttemptConnection;
+        [](const SiPMAcquisitionManagerStates& state) -> bool {
+            return state != SiPMAcquisitionManagerStates::Standby;
     });
 
     ImGui::Separator();

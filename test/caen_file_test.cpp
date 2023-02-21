@@ -12,10 +12,10 @@ int main(int argc, char const *argv[])
 {
 	// This should never done in an actual production code
 	// as no actual digitizer will be associated with this
-	SBCQueens::CAEN res = std::make_unique<SBCQueens::caen>(
+	SBCQueens::CAEN res = SBCQueens::CAEN(
 		SBCQueens::CAENDigitizerModel::DT5730B,
-		CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
-		0, 0, 0, 0, SBCQueens::CAENError()
+		CAEN_DGTZ_ConnectionType::A4818,
+		23473, 0, 0, 0
 	);
 
 	res->GlobalConfig = SBCQueens::CAENGlobalConfig {
