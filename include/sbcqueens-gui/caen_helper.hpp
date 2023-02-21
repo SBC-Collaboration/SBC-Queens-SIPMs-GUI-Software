@@ -28,12 +28,24 @@
 namespace SBCQueens {
 
 enum class CAENDigitizerFamilies {
-    x725, x730, x740, x742, x743, x751
+    DEBUG = 0,
+    x721, x724, x725,
+    x731,
+    x730, // Actually supported
+    x740, // Actually supported
+    x742, x743,
+    x751,
+    x761,
+    x780, x781, x782,
+    x790
 };
 
 enum class CAENConnectionType {
     USB,
-    A4818
+    A4818,
+    OpticalLink, // Not supported
+    Ethernet_V4718, // Only available for V4718 (not supported)
+    USB_V4718 // not supported
 };
 
 enum class CAENDigitizerModel {
@@ -63,27 +75,6 @@ struct CAENDigitizerModelConstants {
     float NLOCToRecordLength = 1;
 
     std::vector<double> VoltageRanges = {};
-
-    // CAENDigitizerModelConstants() {}
-    // CAENDigitizerModelConstants(const uint32_t& res,
-    //     const double& acqRate, const uint32_t& memPerCh, const uint8_t& numChs,
-    //     const uint8_t& numGrps, const uint8_t& numChsPerGrp,
-    //     const uint32_t maxNumBuffs, const float& nloctorl,
-    //     std::initializer_list<double> voltRanges) :
-    //     ADCResolution{res},
-    //     AcquisitionRate{acqRate},
-    //     MemoryPerChannel{memPerCh},
-    //     NumChannels{numChs},
-    //     NumberOfGroups{numGrps},
-    //     NumChannelsPerGroup{numChsPerGrp},
-    //     MaxNumBuffers{maxNumBuffs},
-    //     NLOCToRecordLength{nloctorl},
-    //     VoltageRanges{voltRanges}
-    //     {}
-
-    // CAENDigitizerModelConstants(const CAENDigitizerModelConstants&) = default;
-    // CAENDigitizerModelConstants&
-    //     operator=(const CAENDigitizerModelConstants&) = default;
 };
 
 // This is here so we can transform string to enums
@@ -100,48 +91,48 @@ const static inline std::unordered_map<std::string, CAENDigitizerModel>
 const static inline std::unordered_map<CAENDigitizerModel, CAENDigitizerModelConstants>
     CAENDigitizerModelsConstantsMap {
         {CAENDigitizerModel::DEBUG, CAENDigitizerModelConstants {
-            8,  // ADCResolution
-            100e3,  //  AcquisitionRate
-            1024ul,  // MemoryPerChannel
-            1,  // NumChannels
-            0,  // NumberOfGroups, 0 -> no groups
-            1,  // NumChannelsPerGroup
-            1024,  // MaxNumBuffers
-            10.0f,  // NLOCToRecordLength
-            {1.0}  // VoltageRanges
+            8,          // ADCResolution
+            100e3,      //  AcquisitionRate
+            1024ul,     // MemoryPerChannel
+            1,          // NumChannels
+            0,          // NumberOfGroups, 0 -> no groups
+            1,          // NumChannelsPerGroup
+            1024,       // MaxNumBuffers
+            10.0f,      // NLOCToRecordLength
+            {1.0}       // VoltageRanges
         }},
         {CAENDigitizerModel::DT5730B, CAENDigitizerModelConstants {
-            14,  // ADCResolution
-            500e6,  //  AcquisitionRate
+            14,         // ADCResolution
+            500e6,      //  AcquisitionRate
             static_cast<uint32_t>(5.12e6),  // MemoryPerChannel
-            8,  // NumChannels
-            0,  // NumberOfGroups, 0 -> no groups
-            8,  // NumChannelsPerGroup
-            1024,  // MaxNumBuffers
-            10.0f,  // NLOCToRecordLength
+            8,          // NumChannels
+            0,          // NumberOfGroups, 0 -> no groups
+            8,          // NumChannelsPerGroup
+            1024,       // MaxNumBuffers
+            10.0f,      // NLOCToRecordLength
             {0.5, 2.0}  // VoltageRanges
         }},
         {CAENDigitizerModel::DT5740D, CAENDigitizerModelConstants {
-            12,  // ADCResolution
-            62.5e6,  //  AcquisitionRate
+            12,         // ADCResolution
+            62.5e6,     //  AcquisitionRate
             static_cast<uint32_t>(192e3),  // MemoryPerChannel
-            32,  // NumChannels
-            4,  // NumChannelsPerGroup
-            8,  // NumberOfGroups
-            1024,  // MaxNumBuffers
-            1.5f,  // NLOCToRecordLength
-            {2.0, 10.0}  // VoltageRanges
+            32,         // NumChannels
+            4,          // NumChannelsPerGroup
+            8,          // NumberOfGroups
+            1024,       // MaxNumBuffers
+            1.5f,       // NLOCToRecordLength
+            {2.0, 10.0} // VoltageRanges
         }},
         {CAENDigitizerModel::V1740D, CAENDigitizerModelConstants {
-            12,  // ADCResolution
-            62.5e6,  //  AcquisitionRate
+            12,         // ADCResolution
+            62.5e6,     //  AcquisitionRate
             static_cast<uint32_t>(192e3),  // MemoryPerChannel
-            64,  // NumChannels
-            8,  // NumChannelsPerGroup
-            8,  // NumberOfGroups
-            1024,  // MaxNumBuffers
-            1.5f,  // NLOCToRecordLength
-            {2.0}  // VoltageRanges
+            64,         // NumChannels
+            8,          // NumChannelsPerGroup
+            8,          // NumberOfGroups
+            1024,       // MaxNumBuffers
+            1.5f,       // NLOCToRecordLength
+            {2.0}       // VoltageRanges
         }}
     // This is a C++20 higher feature so lets keep everything 17 compliant
     // CAENDigitizerModelsConstants_map {
@@ -219,6 +210,8 @@ struct CAENGlobalConfig {
         CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge;
 };
 
+// Help structure to link an array of booleans to a single uint8_t
+// without the use of other C++ features which makes it trickier to use
 struct ChannelsMask {
     std::array<bool, 8> CH
         = {false, false, false, false, false, false, false, false};
@@ -239,7 +232,7 @@ struct ChannelsMask {
 // As a general case, this holds all the configuration values for a channel
 // if a digitizer does not support groups, i.e x730, group = channel
 struct CAENGroupConfig {
-    // Channel or group number
+    // Is this group/channel enabled?
     bool Enabled = 0;
 
     // Mask of channels within the group enabled to trigger
@@ -250,14 +243,12 @@ struct CAENGroupConfig {
     // Ignored for single channels.
     ChannelsMask AcquisitionMask;
 
-    // 0x8000 no offset if 16 bit DAC
-    // 0x1000 no offset if 14 bit DAC
-    // 0x400 no offset if 14 bit DAC
-    // DC offsets of each channel in the group
+    // DC offsets of each channel in the group in ADC counts.
+    // Usually the DC offset is a 16bit DAC. Check documentation.
     uint32_t DCOffset = 0x8000;
     std::array<uint8_t, 8> DCCorrections = {0, 0, 0, 0, 0, 0, 0, 0};
 
-    // For DT5730
+    // For digitizers that support several ranges.
     // 0 = 2Vpp, 1 = 0.5Vpp
     // DC range of the group or channel
     uint8_t DCRange = 0;

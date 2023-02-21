@@ -254,6 +254,7 @@ void setup(CAEN &res, CAENGlobalConfig g_config,
     // 1 = trigger overlapping allowed
     write_bits(res, 0x8000, res->GlobalConfig.TriggerOverlappingEn, 1);
 
+    //
     write_bits(res, 0x8100, res->GlobalConfig.MemoryFullModeSelection, 5);
 
     // Channel stuff
