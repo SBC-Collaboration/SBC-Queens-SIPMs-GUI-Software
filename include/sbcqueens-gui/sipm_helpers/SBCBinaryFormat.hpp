@@ -4,6 +4,8 @@
 
 #ifndef SBCBINARYFORMAT_H
 #define SBCBINARYFORMAT_H
+#include <algorithm>
+#include <cstdint>
 #include <tuple>
 #pragma once
 
@@ -16,6 +18,8 @@
 #include <fstream>
 #include <type_traits>
 #include <filesystem>
+#include <algorithm>
+#include <array>
 
 // C++ 3rd party includes
 #include <concurrentqueue.h>
@@ -23,6 +27,7 @@
 
 // my includes
 #include "sbcqueens-gui/file_helpers.hpp"
+#include "sbcqueens-gui/caen_helper.hpp"
 
 namespace SBCQueens {
 namespace BinaryFormat {
@@ -35,7 +40,7 @@ namespace Tools {
     template<typename T>
     concept is_arithmethic_ptr = std::is_arithmetic_v<
                                         std::remove_cvref_t<
-                                        std::remove_pointer_t<T>>> and std::is_pointer_v<T>;
+                                        std::remove_pointer_t<T>>> and not std::is_pointer_v<T>;
 
 
     template<typename... T>
@@ -57,12 +62,16 @@ namespace Tools {
             return "uint16";
         } else if constexpr (std::is_same_v<T_no_const, uint32_t>) {
             return "uint32";
+        } else if constexpr (std::is_same_v<T_no_const, uint64_t>) {
+            return "uint64";
         } else if constexpr (std::is_same_v<T_no_const, int8_t>) {
             return "int8";
         } else if constexpr (std::is_same_v<T_no_const, int16_t>) {
             return "int16";
         } else if constexpr (std::is_same_v<T_no_const, int32_t>) {
             return "int32";
+        } else if constexpr (std::is_same_v<T_no_const, int64_t>) {
+            return "int64";
         } else if constexpr (std::is_same_v<T_no_const, float>) {
             return "single";
         } else if constexpr (std::is_same_v<T_no_const, double>) {
@@ -70,7 +79,7 @@ namespace Tools {
         } else if constexpr (std::is_same_v<T_no_const, long double>) {
             return "float128";
         }
-        // TODO(All): maybe the default should be uint32?
+        // TODO(All): maybe the default should be uint32? or no default?
     }
 
 } // namespace Tools
@@ -78,7 +87,10 @@ namespace Tools {
 template<typename... DataTypes>
 requires Tools::is_arithmetic_ptr_unpack<DataTypes...>
 struct DynamicWriter {
-    using tuple_type = std::tuple<DataTypes...>;
+    /* TODO(Any): this writer is unsafe. It uses raw pointers.
+     * maybe change it to take normal types and then internally
+     * use spans? */
+    using tuple_type = std::tuple<const DataTypes*...>;
     constexpr static std::size_t n_cols = sizeof...(DataTypes);
     constexpr static std::array<std::size_t, n_cols> size_of_types = { sizeof(DataTypes)... };
     constexpr static std::array<std::string_view, n_cols> parameters_types_str = { Tools::type_to_string<DataTypes>()... };
@@ -107,7 +119,7 @@ private:
                               const std::size_t& size = sizeof(T)) {
         const char* tmpstr = reinterpret_cast<const char*>(&num);
         for(std::size_t i = 0; i < size; i++) {
-            buffer[i + loc] = tmpstr[size - i - 1];
+            buffer[i + loc] = tmpstr[i];
         }
 
         loc += size;
@@ -212,7 +224,7 @@ private:
     // Save item from tuple in position i
     template<std::size_t i>
     void _save_item(const tuple_type& items, std::size_t& loc) {
-        const auto& item = std::get<i>(items);
+        auto item = std::get<i>(items);
         using T = decltype(item);
 
         auto rank = _ranks[i];
@@ -271,7 +283,7 @@ private:
         _stream.close();
     }
 
-    void add(const DataTypes&... data) noexcept {
+    void add(const DataTypes* const... data) noexcept {
         _queue.enqueue(std::make_tuple(data...));
     }
 
@@ -288,6 +300,150 @@ private:
 
         return true;
     }
+};
+
+// TODO(Hector): we need this!
+template<typename... DataTypes>
+struct Reader {
+
+
+
+ private:
+};
+
+class SiPMDynamicWriter {
+    using SiPMDW = DynamicWriter<   double,    // sample rate
+                                    uint8_t,   // Enabled Channels
+                                    uint64_t,  // Trigger Mask
+                                    uint16_t,  // Thresholds
+                                    uint16_t,  // DC Offsets
+                                    uint8_t,   // DC Corrections
+                                    float,     // DC Range
+                                    uint32_t,  // Time stamp
+                                    uint32_t,  // Trigger source
+                                    uint16_t>; // Waveforms
+
+    constexpr static std::size_t num_cols = 10;
+    constexpr static std::array<std::size_t, num_cols> sipm_ranks =
+                                    {1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
+    const inline static std::array<std::string, num_cols> sipm_names =
+            {"sample_rate", "en_chs", "trg_mask", "thresholds", "dc_offsets",
+             "dc_corrections", "dc_range", "time_stamp", "trg_source", "data"};
+
+
+    double _sample_rate = 0.0;
+    const std::vector<std::uint8_t> _en_chs;
+    uint64_t _trigger_mask = 0;
+    std::vector<uint16_t> _thresholds;
+    std::vector<uint16_t> _dc_offsets;
+    std::vector<uint8_t> _dc_corrections;
+    std::vector<float> _dc_ranges;
+
+    uint32_t _record_length;
+    SiPMDW _streamer;
+ public:
+    /* Details of each parameters:
+    Name          | type      | length (in Bytes) | is a constant?|
+    ---------------------------------------------------------------
+    sample_rate   | double    | 8                 | Y
+    en_chs        | uint8     | 1*ch_size         | Y
+    trg_mask      | uint64    | 8                 | Y
+    thresholds    | uint16    | 2*ch_size         | Y
+    dc_offsets    | uint16    | 2*ch_size         | Y
+    dc_corrections| uint8     | 1*ch_size         | Y
+    dc_range      | single    | 4*ch_size         | Y
+    time_stamp    | uint32    | 4                 | N
+    trg_source    | uint32    | 4                 | N
+    data          | uint16    | 2*rl*ch_size      | N
+    ---------------------------------------------------------------
+    rl -> record length of the waveforms
+    ch_size -> number of enabled channels
+    en_chs  -> the channels # that were enabled
+
+    Total length = 24 + ch_size*(10 + 2*record_length)
+    */
+
+    SiPMDynamicWriter(std::string_view file_name,
+                      const CAENDigitizerModelConstants& model_consts,
+                      const CAENGlobalConfig& global_config,
+                      const std::array<CAENGroupConfig, 8>& group_configs) :
+        _sample_rate{model_consts.AcquisitionRate},
+        _en_chs{_get_en_chs(model_consts, group_configs)},
+        _record_length{global_config.RecordLength},
+        _streamer{file_name, sipm_names,  sipm_ranks, _form_sizes(global_config)}
+    {
+        for(auto ch : _en_chs) {
+            CAENGroupConfig group;
+            if (model_consts.NumberOfGroups == 0) {
+                group = group_configs[ch];
+                _dc_corrections.push_back(group.DCCorrections[0]);
+            } else {
+                group =  group_configs[ch % 8];
+                _dc_corrections.push_back(group.DCCorrections[ch % 8]);
+            }
+
+            _trigger_mask |= (1 << ch);  // flip the bit at position ch
+            _thresholds.push_back(group.TriggerThreshold);
+            _dc_offsets.push_back(group.DCOffset);
+            _dc_corrections.push_back(group.DCCorrections[ch % 8]);
+            _dc_ranges.push_back(model_consts.VoltageRanges.at(group.DCRange));
+        }
+    }
+
+    ~SiPMDynamicWriter() = default;
+
+    void save_waveform(const CAENWaveforms<uint16_t>& waveform) {
+        _streamer.add(&_sample_rate,
+                      &_en_chs[0],
+                      &_trigger_mask,
+                      &_thresholds[0],
+                      &_dc_offsets[0],
+                      &_dc_corrections[0],
+                      &_dc_ranges[0],
+                      &waveform.getInfo().TriggerTimeTag,
+                      &waveform.getInfo().Pattern,
+                      waveform.getData());
+
+        _streamer.save();
+    }
+
+ private:
+
+    std::vector<std::size_t> _form_sizes(
+        const CAENGlobalConfig& caen_global_config) {
+
+        auto num_en_chs = _en_chs.size();
+        return {1, num_en_chs, 1, num_en_chs, num_en_chs, num_en_chs, num_en_chs,
+                1, 1, num_en_chs, caen_global_config.RecordLength};
+    }
+
+    std::vector<std::uint8_t> _get_en_chs(
+            const CAENDigitizerModelConstants& model_constants,
+            const std::array<CAENGroupConfig, 8>& groups) {
+        std::vector<std::uint8_t> out;
+        for(std::size_t group_num = 0; group_num < groups.size(); group_num++) {
+            const auto& group = groups[group_num];
+            if (not group.Enabled) {
+                continue;
+            }
+
+            // If the digitizer does not support groups, group_num = ch
+            if(model_constants.NumberOfGroups == 0) {
+                out.push_back(group_num);
+                continue;
+            }
+
+            // Othewise, calculate using the AcquisitionMask
+            for(std::size_t ch = 0; ch < model_constants.NumChannelsPerGroup; ch++) {
+                if(group.AcquisitionMask.at(ch)) {
+                    out.push_back(ch + model_constants.NumChannelsPerGroup * group_num);
+                }
+            }
+        }
+        return out;
+    }
+
+
 };
 
 } // namespace BinaryFormat

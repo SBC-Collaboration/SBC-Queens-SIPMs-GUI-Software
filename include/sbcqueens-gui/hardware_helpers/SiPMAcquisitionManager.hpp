@@ -67,7 +67,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
     using SiPMCAEN = CAEN<std::shared_ptr<spdlog::logger>>;
     using SiPMCAEN_ptr = std::unique_ptr<SiPMCAEN>;
-    SiPMCAEN_ptr _caen_port = nullptr;
     SiPMAcquisitionStates _acq_state = SiPMAcquisitionStates::OscilloscopeMode;
 
     using SiPMCAENFile = DataFile<const CAENEvent*>;
@@ -82,7 +81,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // Hardware
     uint8_t _num_chs = 0;
     double _acq_rate = 0.0;
-    // ClientController<serial_ptr, SiPMVoltageMeasure> _sipm_volt_sys;
 
     uint32_t SavedWaveforms = 0;
     uint64_t TriggeredWaveforms = 0;
@@ -331,7 +329,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         _doe.IVData(i, cos(i/30.0), sin(i/30.0));
         i += 1.0;
 
-        static BinaryFormat::DynamicWriter<double*, double*> foo("./out.bin",
+        static BinaryFormat::DynamicWriter<double, double> foo("./out.bin",
             {"x", "y"},
             {1, 1},
             {1, 1});
@@ -351,7 +349,9 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     bool acquisition() {
         auto caen_res = attempt_connection();
         if (caen_res->HasError()) {
-            return false;
+            caen_res.reset();
+            change_state();
+            return true;
         }
 
         // We are stuck inside this while loop which will break under
@@ -385,7 +385,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         }
 
         // Once we go out of scope, we release/disconnect the CAEN
-        caen_res.reset(nullptr);
+        caen_res.reset();
         return true;
     }
 
@@ -488,7 +488,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         std::filesystem::create_directory(_doe.RunDir
                                           + "/" + _run_name);
 
-        spdlog::info("CAEN Setup complete!");
+        _logger->info("CAEN Setup complete!");
         return caen_port;
     }
 
@@ -505,11 +505,16 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             caen_port->SoftwareTrigger();
             _doe.SoftwareTrigger = false;
         }
+//
+//        static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
+//                                       caen_port->ModelConstants,
+//                                       caen_port->GetGlobalConfiguration(),
+//                                       caen_port->GetGroupConfigurations());
 
-        _caen_port->RetrieveData();
+        caen_port->RetrieveData();
         // GetNumberOfEvents gets the actual acquired events
         // while GetEventsInBuffer gets the events in CAEN buffer
-        if (_caen_port->GetNumberOfEvents() > 0) {
+        if (caen_port->GetNumberOfEvents() > 0) {
             // TriggeredWaveforms += _caen_port->Data.NumEvents;
             // Due to the slow rate oscilloscope mode is happening, using
             // events instead of ..->Data.NumEvents is a better number to use
@@ -521,9 +526,12 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // spdlog::info("Num events: {0}", _caen_port->Data.NumEvents);
 
             // Decode events
-            _caen_port->DecodeEvents();
-            _osc_event = _caen_port->GetEvent(0);
+            caen_port->DecodeEvents();
+            _osc_event = caen_port->GetEvent(0);
             auto m = caen_event_to_armadillo(_osc_event, 64);
+
+            auto waveform = caen_port->GetWaveform(0);
+//            _file.save_waveform(waveform);
 
             // spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
             // spdlog::info("Event counter: {0}", _osc_event->Info.EventCounter);
@@ -533,7 +541,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             process_data_for_gui();
 
             // Clear events in buffer
-            _caen_port->ClearData();
+            caen_port->ClearData();
         }
 
         return caen_port;
@@ -687,12 +695,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
     // Only mode that stops the main_loop and frees all resources
     bool closing_mode() {
-        spdlog::info("Going to close the CAEN thread.");
-        // We make sure we clean here
-        // It should also be done in the destructor.
-        if (_caen_port) {
-            _caen_port.reset(nullptr);
-        }
+        _logger->info("Going to close the CAEN thread.");
         return false;
     }
 
@@ -731,29 +734,19 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             return;
         }
 
-        spdlog::info("size {}", size);
         for (std::size_t i = 0; i < size; i++) {
-            // auto& ch_num = ch.second.Number;
-// *(1e9/_acq_rate)
-            _doe.GroupData[0].add_at(i, i,
-                all_chs[0][i],
-                all_chs[1][i],
-                all_chs[2][i],
-                all_chs[3][i],
-                all_chs[4][i],
-                all_chs[5][i],
-                all_chs[6][i],
-                all_chs[7][i]);
-
-            _doe.GroupData[1].add_at(i, i,
-                all_chs[8][i],
-                all_chs[9][i],
-                all_chs[10][i],
-                all_chs[11][i],
-                all_chs[12][i],
-                all_chs[13][i],
-                all_chs[14][i],
-                all_chs[15][i]);
+            for(std::size_t group = 0; group < 4; group ++) {
+                auto offset = group*8;
+                _doe.GroupData.at(group).add_at(i, i,
+                                         all_chs[offset + 0] == nullptr ? 0 : all_chs[offset + 0][i],
+                                         all_chs[offset + 1] == nullptr ? 0 : all_chs[offset + 1][i],
+                                         all_chs[offset + 2] == nullptr ? 0 : all_chs[offset + 2][i],
+                                         all_chs[offset + 3] == nullptr ? 0 : all_chs[offset + 3][i],
+                                         all_chs[offset + 4] == nullptr ? 0 : all_chs[offset + 4][i],
+                                         all_chs[offset + 5] == nullptr ? 0 : all_chs[offset + 5][i],
+                                         all_chs[offset + 6] == nullptr ? 0 : all_chs[offset + 6][i],
+                                         all_chs[offset + 7] == nullptr ? 0 : all_chs[offset + 7][i]);
+            }
         }
     }
 

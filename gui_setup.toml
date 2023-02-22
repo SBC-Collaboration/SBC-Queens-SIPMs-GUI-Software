@@ -58,7 +58,7 @@ Offset = 0x8000
 # Individual corrections to offset
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
-Range = 1
+Range = 0
 Threshold = 0x0800
 
 [CAEN.group1]
@@ -73,7 +73,7 @@ Offset = 0x8000
 # Individual corrections to offset
 Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
 
-Range = 1
+Range = 0
 Threshold = 0x0800
 
 [Other]

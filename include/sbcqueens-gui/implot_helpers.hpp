@@ -126,6 +126,7 @@ class PlotDataBuffer {
         Data->col(i) = {static_cast<T>(vals)...};
     }
 
+
     // Adds array at specific index i. It ignores the circular buffer
     // conditions and does not advance them. To use this data structure
     // as a circular buffer use the operator()
