@@ -308,16 +308,9 @@ class CAENEvent {
     CAEN_DGTZ_EventInfo_t Info = CAEN_DGTZ_EventInfo_t{};
 
     CAEN_DGTZ_ErrorCode _err_code = CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Success;
-
-    // Why is this here? Glad you asked! See the destructor
-    std::shared_ptr<int> _shared_ptr_trick;
-
  public:
-    // Default constructor does not allocate memory.
-    CAENEvent() = default;
     // Creating an Event using a handle allocates memory
-    explicit CAENEvent(const int& handle)
-        : _handle(handle), _shared_ptr_trick(new int) {
+    explicit CAENEvent(const int& handle) : _handle(handle) {
         // This will only allocate memory if handle does
         // has an associated digitizer to it.
         _err_code = CAEN_DGTZ_AllocateEvent(_handle,
@@ -327,33 +320,7 @@ class CAENEvent {
     // If handle is released before this event is freed,
     // it will cause a memory leak, maybe?
     ~CAENEvent() {
-        /*
-            Here is where _shared_ptr_trick becomes useful.
-            By default, the copy operator of this class will be enabled because
-            the copy of the raw pointers and normal types will be copied
-            directly. The shared_ptr will also be transferred. This allows us
-            to a neat trick.
-            Let's say we have:
-
-            CAENEvent evt1, evt2;
-            evt1 = CAENEvent(42); // now evt1 has allocated value and
-                                  // _shared_ptr_trick does not hold a nullptr
-            evt2 = evt1           // evt2 now copies Data, Info and created
-                                  // a new _shared_ptr_trick which shares
-                                  // an int
-            ...
-            destroy(evt1);        // now evt1 goes out of scope but because
-                                  // _shared_ptr_trick is not unique
-                                  // nothing got freed!
-            destroy(evt2);        // now everything got cleared!
-
-            Now CAENEvent acts like a shared_ptr!
-        */
-        if (not _shared_ptr_trick or Data == nullptr) {
-            return;
-        }
-
-        if (_shared_ptr_trick.unique()) {
+        if (Data) {
             _err_code = CAEN_DGTZ_FreeEvent(_handle,
                                             reinterpret_cast<void**>(&Data));
             if(_err_code < 0) {
@@ -364,7 +331,7 @@ class CAENEvent {
         }
     }
 
-    const CAEN_DGTZ_ErrorCode& getError() const {
+    [[nodiscard]] const CAEN_DGTZ_ErrorCode& getError() const {
         return _err_code;
     }
 
@@ -374,7 +341,7 @@ class CAENEvent {
     }
 
     // A read-only access to the event info.
-    const CAEN_DGTZ_EventInfo_t& getInfo() const {
+    [[nodiscard]] const CAEN_DGTZ_EventInfo_t& getInfo() const {
         return Info;
     }
 
@@ -429,22 +396,32 @@ class CAENWaveforms {
 
     ~CAENWaveforms() = default;
 
-    const uint32_t& getRecordLength() const { return _record_length; }
-    const std::size_t& getTotalSize() const { return _size; }
-    const std::size_t& getNumEnabledChannels() const { return _num_en_chs; }
-    const std::vector<std::size_t>& getEnabledChannels() const { return _en_chs; }
-    const CAEN_DGTZ_EventInfo_t& getInfo() const { return _info; }
+    [[nodiscard]] const uint32_t& getRecordLength() const {
+        return _record_length;
+    }
+    [[nodiscard]] const std::size_t& getTotalSize() const {
+        return _size;
+    }
+    [[nodiscard]] const std::size_t& getNumEnabledChannels() const {
+        return _num_en_chs;
+    }
+    [[nodiscard]] const std::vector<std::size_t>& getEnabledChannels() const {
+        return _en_chs;
+    }
+    [[nodiscard]] const CAEN_DGTZ_EventInfo_t& getInfo() const {
+        return _info;
+    }
 
     // Copies values from event into the internal buffer
     // Does not copy if record length does not match the size
-    void copy(const CAENEvent& event) {
-        const CAEN_DGTZ_UINT16_EVENT_t* data = event.getData();
+    void copy(const CAENEvent* event) {
+        const CAEN_DGTZ_UINT16_EVENT_t* data = event->getData();
 
         if (_en_chs.size() != _record_length) {
             return;
         }
 
-        _info = event.getInfo();
+        _info = event->getInfo();
         for (std::size_t ch_index = 0; ch_index < _en_chs.size(); ch_index++) {
             // We get the actual CAEN Channel number
             const auto& en_ch = _en_chs[ch_index];
@@ -460,10 +437,6 @@ class CAENWaveforms {
                 _data[_record_length*ch_index + i] = ch_data[i];
             }
         }
-    }
-
-    void copy(const CAENEvent* const event) {
-        copy(*event);
     }
 
     // Does not copy if both waveforms do not match in enabled channels,
@@ -532,11 +505,11 @@ class CAEN {
     // pointer Buffer is meant to be allocated using CAEN functions
     // after a setup(...) call.
     class CAENData {
-        Logger _logger;
+        Logger& _logger;
         CAEN_DGTZ_ErrorCode _err_code = CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Success;
 
         char* _caen_malloc(const int& handle) noexcept {
-            char* tmp_ptr = NULL;
+            char* tmp_ptr = nullptr;
             _err_code = CAEN_DGTZ_MallocReadoutBuffer(handle, &tmp_ptr,
                                                       &TotalSizeBuffer);
             return tmp_ptr;
@@ -544,13 +517,13 @@ class CAEN {
      public:
         // Unsafe C buffer. Only this class has access to CAENData
         // Therefore all the damage is limited to us not the user.
-        char* Buffer = NULL;
+        char* Buffer = nullptr;
         uint32_t TotalSizeBuffer = 0;
         uint32_t DataSize = 0;
         uint32_t NumEvents = 0;
 
         CAENData() = default;
-        CAENData(Logger logger, const int& handle) :
+        CAENData(Logger& logger, const int& handle) :
             _logger{logger},
             Buffer{_caen_malloc(handle)} { }
 
@@ -567,7 +540,7 @@ class CAEN {
         }
 
         ~CAENData() {
-            if(Buffer != NULL) {
+            if(Buffer != nullptr) {
                 _err_code = CAEN_DGTZ_FreeReadoutBuffer(&Buffer);
 
                 if(_err_code < 0) {
@@ -595,10 +568,11 @@ class CAEN {
     // Communicated with the outside world: errors, warnings and debug msgs
     // Assumes it is a pointer of any form and this class does not manage
     // its deletion
-    Logger _logger;
+    Logger& _logger;
 
     // This holds the latest raw CAEN data
-    CAENData _caen_raw_data;
+    // Unique_ptr because only this class should manage this resource;
+    std::unique_ptr<CAENData> _caen_raw_data;
     // Contains information about the configuration of the digitizer
     CAENGlobalConfig _global_config;
     // Contains information about all of the groups, see CAENGroupConfig
@@ -609,7 +583,11 @@ class CAEN {
     CAEN_DGTZ_BoardInfo_t _board_info;
     uint32_t _current_max_buffers = 0;
 
-    std::array<CAENEvent, EventBufferSize> _events;
+    // Unique_ptr because only this class should manage this resource;
+    using CAENEvent_ptr = std::unique_ptr<CAENEvent>;
+    std::array<CAENEvent_ptr, EventBufferSize> _events;
+    // shared_ptr as anyone can manage this resource even if CAEN
+    // is no longer in use.
     std::array<CAENWaveforms<uint16_t>, EventBufferSize> _waveforms;
 
     // Translates the connection info data to a single number that should
@@ -786,9 +764,9 @@ class CAEN {
                 "resources, what went wrong?");
 
             // Before closing, we clear all memory.
-            _caen_raw_data.~CAENData();
+            _caen_raw_data.reset();
             for(auto& event : _events) {
-                event.~CAENEvent();
+                event.reset();
             }
 
             _err_code = CAEN_DGTZ_CloseDigitizer(_caen_api_handle);
@@ -810,7 +788,7 @@ class CAEN {
     const auto& GetBoardInfo() { return _board_info; }
     const auto& GetGlobalConfiguration() { return _global_config; }
     const auto& GetGroupConfigurations() { return _group_configs; }
-    const auto& GetNumberOfEvents() { return _caen_raw_data.NumEvents; }
+    const auto& GetNumberOfEvents() { return _caen_raw_data->NumEvents; }
 
     void Setup(const CAENGlobalConfig&,
         const std::array<CAENGroupConfig, 8>&) noexcept;
@@ -863,19 +841,21 @@ class CAEN {
     // the last event. Use GetNumberOfevents() to check for the number
     // of events in memory
     CAENWaveforms<uint16_t> GetWaveform(const std::size_t& i) noexcept {
-        if (i > _caen_raw_data.NumEvents) {
-            return _waveforms[_caen_raw_data.NumEvents - 1];
+        if (i > _caen_raw_data->NumEvents) {
+            return _waveforms[_caen_raw_data->NumEvents - 1];
         }
 
         return _waveforms[i];
     }
 
+    // Returns a const pointer to CAENEvent. Its lifespans should
+    // be managed by CAEN
     const CAENEvent* GetEvent(const std::size_t& i) noexcept {
-        if (i > _caen_raw_data.NumEvents) {
-            return &_events[_caen_raw_data.NumEvents - 1];
+        if (i > _caen_raw_data->NumEvents) {
+            return _events[_caen_raw_data->NumEvents - 1].get();
         }
 
-        return &_events[i];
+        return _events[i].get();
     }
 
     const uint32_t& GetCurrentPossibleMaxBuffer() noexcept {
@@ -1181,17 +1161,17 @@ void CAEN<T, N>::EnableAcquisition() noexcept {
 
     int& handle = _caen_api_handle;
 
-    // By using equals for CAENData and CAENEvent we release memory, too.
-    // so by calling enable acquisition we also free memory and allocate mem.
+    // By using reset() for CAENData and CAENEvent we release memory, too.
+    // so by calling enable acquisition we also free memory and re-allocate.
 
     // We need a single data buffer to hold the incoming Data
-    _caen_raw_data = std::move(CAENData{_logger, handle});
-    _err_code = _caen_raw_data.getError();
+    _caen_raw_data.reset(new CAENData{_logger, handle});
+    _err_code = _caen_raw_data->getError();
     _print_if_err("CAENData", __FUNCTION__);
 
     // Allocates all the memory for the internal events buffer
     std::generate(_events.begin(), _events.end(), [h = handle](){
-        return CAENEvent(h);
+        return std::make_unique<CAENEvent>(h);
     });
 
     std::generate(_waveforms.begin(), _waveforms.end(),
@@ -1308,14 +1288,14 @@ void CAEN<T, N>::RetrieveData() noexcept {
     // UNSAFE CODE AHEAD
     _err_code = CAEN_DGTZ_ReadData(handle,
         CAEN_DGTZ_ReadMode_t::CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT,
-        _caen_raw_data.Buffer,
-        &_caen_raw_data.DataSize);
+        _caen_raw_data->Buffer,
+        &_caen_raw_data->DataSize);
     _print_if_err("CAEN_DGTZ_ReadData", __FUNCTION__);
 
     _err_code = CAEN_DGTZ_GetNumEvents(handle,
-                                       _caen_raw_data.Buffer,
-                                       _caen_raw_data.DataSize,
-                                       &_caen_raw_data.NumEvents);
+                                       _caen_raw_data->Buffer,
+                                       _caen_raw_data->DataSize,
+                                       &_caen_raw_data->NumEvents);
     // END OF UNSAFE CODE
     _print_if_err("CAEN_DGTZ_GetNumEvents", __FUNCTION__);
 }
@@ -1350,27 +1330,27 @@ bool CAEN<T, N>::RetrieveDataUntilNEvents(uint32_t& n, bool debug_info) noexcept
 
 template<typename T, size_t N>
 const CAENWaveforms<uint16_t>* CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
-    if (i > _caen_raw_data.NumEvents) {
-        return &_events[_caen_raw_data.NumEvents - 1];
+    if (i > _caen_raw_data->NumEvents) {
+        return &_events[_caen_raw_data->NumEvents - 1];
     }
 
     if (_has_error or not _is_connected) {
         return nullptr;
     }
 
-    _err_code = _events[i].getEventInfo(_caen_raw_data.Buffer,
-                                        _caen_raw_data.DataSize,
+    _err_code = _events[i]->getEventInfo(_caen_raw_data->Buffer,
+                                        _caen_raw_data->DataSize,
                                         i);
     _print_if_err("CAEN_DGTZ_GetEventInfo",
                   __FUNCTION__,
                   "at event " + std::to_string(i));
     // Cannot decode without getting event info
-    _err_code = _events[i].decodeEvent();
+    _err_code = _events[i]->decodeEvent();
     _print_if_err("CAEN_DGTZ_DecodeEvent",
                   __FUNCTION__,
                   "at event " + std::to_string(i));
 
-    _waveforms[i].copy(_events[i]);
+    _waveforms[i].copy(_events[i].get());
 
     return &_waveforms[i];
 }
@@ -1381,20 +1361,20 @@ void CAEN<T, N>::DecodeEvents() noexcept {
         return;
     }
 
-    for (uint32_t i = 0; i < _caen_raw_data.NumEvents; i++) {
-        _err_code = _events[i].getEventInfo(_caen_raw_data.Buffer,
-                                            _caen_raw_data.DataSize,
+    for (uint32_t i = 0; i < _caen_raw_data->NumEvents; i++) {
+        _err_code = _events[i]->getEventInfo(_caen_raw_data->Buffer,
+                                            _caen_raw_data->DataSize,
                                             i);
         _print_if_err("CAEN_DGTZ_GetEventInfo",
                       __FUNCTION__,
                       "at event " + std::to_string(i));
         // Cannot decode without getting event info
-        _err_code = _events[i].decodeEvent();
+        _err_code = _events[i]->decodeEvent();
         _print_if_err("CAEN_DGTZ_DecodeEvent",
                       __FUNCTION__,
                       "at event " + std::to_string(i));
 
-        _waveforms[i].copy(_events[i]);
+        _waveforms[i].copy(_events[i].get());
     }
 }
 
