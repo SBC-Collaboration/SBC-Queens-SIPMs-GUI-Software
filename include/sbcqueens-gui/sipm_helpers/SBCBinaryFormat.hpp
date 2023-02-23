@@ -90,7 +90,7 @@ struct DynamicWriter {
     /* TODO(Any): this writer is unsafe. It uses raw pointers.
      * maybe change it to take normal types and then internally
      * use spans? */
-    using tuple_type = std::tuple<const DataTypes*...>;
+    using tuple_type = std::tuple<std::span<DataTypes>...>;
     constexpr static std::size_t n_cols = sizeof...(DataTypes);
     constexpr static std::array<std::size_t, n_cols> size_of_types = { sizeof(DataTypes)... };
     constexpr static std::array<std::string_view, n_cols> parameters_types_str = { Tools::type_to_string<DataTypes>()... };
@@ -109,8 +109,6 @@ private:
     std::size_t _line_param_order = 0;
     std::size_t _line_buffer_loc = 0;
     std::string _line_buffer;
-
-    moodycamel::ConcurrentQueue<tuple_type> _queue;
 
     template<typename T>
     void _copy_number_to_buff(const T& num,
@@ -165,10 +163,10 @@ private:
             // + 1 for the ; character
             binary_header_size += parameters_types_str[i].length() + 1;
 
-            std::size_t total_rank_size = 0;
+            std::size_t total_rank_size = 1;
             for(std::size_t j = 0; j < column_rank; j ++) {
                 auto size = _sizes[total_ranks_so_far + j];
-                total_rank_size += size;
+                total_rank_size *= size;
                 // It is always + 1 because there is either a ',' or a ';'
                 binary_header_size += std::to_string(size).length() + 1;
             }
@@ -233,12 +231,21 @@ private:
                                                   0);
 
         const auto& size_index_start = total_rank_up_to_i;
-        const auto& total_size = std::accumulate(&_sizes[size_index_start],
+        const auto& expected_size = std::accumulate(&_sizes[size_index_start],
                                                  &_sizes[size_index_start + rank],
-                                                 0);
+                                                 1,
+                                                std::multiplies<std::size_t>());
 
-        std::memcpy(&_line_buffer[loc], item, total_size*sizeof(T));
-        loc += total_size*sizeof(T);
+        if (expected_size != item.size()) {
+            throw std::out_of_range("memory is out of range");
+        }
+
+//        std::memcpy(&_line_buffer[loc], item.data(), item.size_bytes());
+        auto item_bytes =  std::as_bytes(item);
+        for(std::size_t byte = 0; byte < item.size_bytes(); byte++) {
+            _line_buffer.at(loc + byte) = static_cast<char>(item_bytes[byte]);
+        }
+        loc += item.size_bytes();
     }
 
     // Think of t his function as a wrapper between _save_item
@@ -283,22 +290,8 @@ private:
         _stream.close();
     }
 
-    void add(const DataTypes* const... data) noexcept {
-        _queue.enqueue(std::make_tuple(data...));
-    }
-
-    bool save() noexcept {
-        auto approx_length = _queue.size_approx();
-        auto data = std::vector<tuple_type>(approx_length);
-        if (not _queue.try_dequeue_bulk(data.data(), approx_length)) {
-            return false;
-        }
-
-        for(const auto& event : data) {
-            _save_event(event);
-        }
-
-        return true;
+    void save(std::span<DataTypes>... data) {
+        _save_event(std::make_tuple(data...));
     }
 };
 
@@ -331,13 +324,16 @@ class SiPMDynamicWriter {
              "dc_corrections", "dc_range", "time_stamp", "trg_source", "data"};
 
 
-    double _sample_rate = 0.0;
-    const std::vector<std::uint8_t> _en_chs;
-    uint64_t _trigger_mask = 0;
+    double _sample_rate[1] = {0.0};
+    std::vector<std::uint8_t> _en_chs;
+    uint64_t _trigger_mask[1] = {0};
     std::vector<uint16_t> _thresholds;
     std::vector<uint16_t> _dc_offsets;
     std::vector<uint8_t> _dc_corrections;
     std::vector<float> _dc_ranges;
+
+    uint32_t _trigger_tag[1] = {0};
+    uint32_t _trigger_source[1] = {0};
 
     uint32_t _record_length;
     SiPMDW _streamer;
@@ -382,29 +378,28 @@ class SiPMDynamicWriter {
                 _dc_corrections.push_back(group.DCCorrections[ch % 8]);
             }
 
-            _trigger_mask |= (1 << ch);  // flip the bit at position ch
+            _trigger_mask[0] |= (1 << ch);  // flip the bit at position ch
             _thresholds.push_back(group.TriggerThreshold);
             _dc_offsets.push_back(group.DCOffset);
-            _dc_corrections.push_back(group.DCCorrections[ch % 8]);
             _dc_ranges.push_back(model_consts.VoltageRanges.at(group.DCRange));
         }
     }
 
     ~SiPMDynamicWriter() = default;
 
-    void save_waveform(const CAENWaveforms<uint16_t>& waveform) {
-        _streamer.add(&_sample_rate,
-                      &_en_chs[0],
-                      &_trigger_mask,
-                      &_thresholds[0],
-                      &_dc_offsets[0],
-                      &_dc_corrections[0],
-                      &_dc_ranges[0],
-                      &waveform.getInfo().TriggerTimeTag,
-                      &waveform.getInfo().Pattern,
-                      waveform.getData());
-
-        _streamer.save();
+    void save_waveform(std::shared_ptr<CAENWaveforms<uint16_t>> waveform) {
+        _trigger_tag[0] = waveform->getInfo().TriggerTimeTag;
+        _trigger_source[0] = waveform->getInfo().Pattern;
+        _streamer.save(_sample_rate,
+                      _en_chs,
+                      _trigger_mask,
+                      _thresholds,
+                      _dc_offsets,
+                      _dc_corrections,
+                      _dc_ranges,
+                      _trigger_tag,
+                      _trigger_source,
+                      waveform->getData());
     }
 
  private:

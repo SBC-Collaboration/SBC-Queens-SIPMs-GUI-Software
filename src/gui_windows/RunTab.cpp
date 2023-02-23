@@ -188,7 +188,7 @@ void RunTab::draw() {
         // Callback when tmp is true !
         [](SiPMAcquisitionData& caen_twin) {
             if(caen_twin.CurrentState == SiPMAcquisitionManagerStates::Acquisition) {
-                    caen_twin.CurrentState = SiPMAcquisitionManagerStates::Standby;
+                caen_twin.CurrentState = SiPMAcquisitionManagerStates::Standby;
             }
     });
 

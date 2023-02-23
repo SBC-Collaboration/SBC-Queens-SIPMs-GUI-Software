@@ -18,6 +18,7 @@
 #include <array>
 #include <stdexcept>
 #include <algorithm>
+#include <span>
 
 // C++ 3rd party includes
 #include <CAENComm.h>
@@ -380,7 +381,6 @@ class CAENWaveforms {
     std::vector<std::size_t> _en_chs = {};
     std::size_t _num_en_chs = 0;
     uint32_t _record_length = 0;
-    std::size_t _size = 0;
     CAEN_DGTZ_EventInfo_t _info = CAEN_DGTZ_EventInfo_t{};
  public:
     CAENWaveforms() = default;
@@ -390,8 +390,7 @@ class CAENWaveforms {
             _en_chs{_get_en_chs(model_constants, groups)},
             _num_en_chs{_en_chs.size()},
             _record_length{gp_config.RecordLength},
-            _size{_num_en_chs*_record_length},
-            _data{new DataType[_size]}
+            _data(_num_en_chs*_record_length)
     { }
 
     ~CAENWaveforms() = default;
@@ -400,7 +399,7 @@ class CAENWaveforms {
         return _record_length;
     }
     [[nodiscard]] const std::size_t& getTotalSize() const {
-        return _size;
+        return _data.size();
     }
     [[nodiscard]] const std::size_t& getNumEnabledChannels() const {
         return _num_en_chs;
@@ -417,7 +416,7 @@ class CAENWaveforms {
     void copy(const CAENEvent* event) {
         const CAEN_DGTZ_UINT16_EVENT_t* data = event->getData();
 
-        if (_en_chs.size() != _record_length) {
+        if (data->ChSize[0] != _record_length) {
             return;
         }
 
@@ -456,18 +455,18 @@ class CAENWaveforms {
 
         auto other_data = other.getData();
         _info = other.getInfo();
-        for(std::size_t i = 0; i < _size; i++) {
+        for(std::size_t i = 0; i < _data.size(); i++) {
             _data[i] = other_data[i];
         }
     }
 
-    [[nodiscard]] const DataType* getData() const noexcept {
-        return _data.get();
+    [[nodiscard]] std::span<DataType> getData() noexcept {
+        return std::span<DataType>(_data);
     }
 
  private:
     // Raw waveform data as one continuous 1-D array
-    std::shared_ptr<DataType[]> _data;
+    std::vector<DataType> _data;
     // Gets a vector with the numbers of the channels as per CAEN specification.
     // Takes into account if the digitizer has groups or not.
     std::vector<std::size_t> _get_en_chs(
@@ -588,7 +587,7 @@ class CAEN {
     std::array<CAENEvent_ptr, EventBufferSize> _events;
     // shared_ptr as anyone can manage this resource even if CAEN
     // is no longer in use.
-    std::array<CAENWaveforms<uint16_t>, EventBufferSize> _waveforms;
+    std::array<std::shared_ptr<CAENWaveforms<uint16_t>>, EventBufferSize> _waveforms;
 
     // Translates the connection info data to a single number that should
     // be unique.
@@ -830,7 +829,7 @@ class CAEN {
     // Decodes event i from the data retrieved by any call from RetrieveData
     // If i is out of bounds, returns the event at the end of the buffer.
     // if there is an error during acquisition, this returns a nullptr;
-    const CAENWaveforms<uint16_t>* DecodeEvent(const uint32_t& i) noexcept;
+    std::shared_ptr<CAENWaveforms<uint16_t>> DecodeEvent(const uint32_t& i) noexcept;
     // Decodes the latest acquired events.
     void DecodeEvents() noexcept;
     // Clears the digitizer buffer. It stops the acquisition and resumes it
@@ -840,7 +839,7 @@ class CAEN {
     // If i value is higher the latest acquired number of events, it returns
     // the last event. Use GetNumberOfevents() to check for the number
     // of events in memory
-    CAENWaveforms<uint16_t> GetWaveform(const std::size_t& i) noexcept {
+    std::shared_ptr<CAENWaveforms<uint16_t>> GetWaveform(const std::size_t& i) noexcept {
         if (i > _caen_raw_data->NumEvents) {
             return _waveforms[_caen_raw_data->NumEvents - 1];
         }
@@ -1178,7 +1177,7 @@ void CAEN<T, N>::EnableAcquisition() noexcept {
                   [constants = ModelConstants,
                    global = _global_config,
                    groups = _group_configs]() {
-                    return CAENWaveforms<uint16_t>(constants,
+                    return std::make_shared<CAENWaveforms<uint16_t>>(constants,
                                                    global,
                                                    groups);
     });
@@ -1329,7 +1328,7 @@ bool CAEN<T, N>::RetrieveDataUntilNEvents(uint32_t& n, bool debug_info) noexcept
 }
 
 template<typename T, size_t N>
-const CAENWaveforms<uint16_t>* CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
+std::shared_ptr<CAENWaveforms<uint16_t>> CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
     if (i > _caen_raw_data->NumEvents) {
         return &_events[_caen_raw_data->NumEvents - 1];
     }
@@ -1350,9 +1349,9 @@ const CAENWaveforms<uint16_t>* CAEN<T, N>::DecodeEvent(const uint32_t& i) noexce
                   __FUNCTION__,
                   "at event " + std::to_string(i));
 
-    _waveforms[i].copy(_events[i].get());
+    _waveforms[i]->copy(_events[i].get());
 
-    return &_waveforms[i];
+    return _waveforms[i];
 }
 
 template<typename T, size_t N>
@@ -1374,7 +1373,7 @@ void CAEN<T, N>::DecodeEvents() noexcept {
                       __FUNCTION__,
                       "at event " + std::to_string(i));
 
-        _waveforms[i].copy(_events[i].get());
+        _waveforms[i]->copy(_events[i].get());
     }
 }
 

@@ -339,8 +339,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         double y[1];
         y[0] = sin(i / 30.0);
 
-        foo.add(&x[0], &y[0]);
-        foo.save();
+        foo.save(x, y);
 
         change_state();
         return true;
@@ -506,10 +505,10 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             _doe.SoftwareTrigger = false;
         }
 //
-//        static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
-//                                       caen_port->ModelConstants,
-//                                       caen_port->GetGlobalConfiguration(),
-//                                       caen_port->GetGroupConfigurations());
+        static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
+                                       caen_port->ModelConstants,
+                                       caen_port->GetGlobalConfiguration(),
+                                       caen_port->GetGroupConfigurations());
 
         caen_port->RetrieveData();
         // GetNumberOfEvents gets the actual acquired events
@@ -531,7 +530,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             auto m = caen_event_to_armadillo(_osc_event, 64);
 
             auto waveform = caen_port->GetWaveform(0);
-//            _file.save_waveform(waveform);
+            _file.save_waveform(waveform);
 
             // spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
             // spdlog::info("Event counter: {0}", _osc_event->Info.EventCounter);
