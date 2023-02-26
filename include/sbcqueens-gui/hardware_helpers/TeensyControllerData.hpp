@@ -10,6 +10,7 @@
 #include "sbcqueens-gui/multithreading_helpers/Pipe.hpp"
 
 #include "sbcqueens-gui/imgui_helpers.hpp"
+#include "sbcqueens-gui/implot_helpers.hpp"
 
 namespace SBCQueens {
 
@@ -164,11 +165,8 @@ struct TeensyControllerData {
 
     std::string Port        = "COM4";
 
-    TeensyControllerStates CurrentState
-        = TeensyControllerStates::Standby;
-
-    TeensyCommands CommandToSend
-        = TeensyCommands::None;
+    TeensyControllerStates CurrentState = TeensyControllerStates::Standby;
+    TeensyCommands CommandToSend = TeensyCommands::None;
 
     TeensySystemPars SystemParameters;
 
@@ -185,6 +183,14 @@ struct TeensyControllerData {
 
     float PIDTempTripPoint = 5.0;
     PIDConfig PIDTempValues;
+
+    // Indicators
+    double RTD1Temp;
+    double RTD2Temp;
+    double RTD3Temp;
+
+    // Graph data
+    PlotDataBuffer<3> TemperatureData;
 
     // This API required items.
     bool Changed = false;

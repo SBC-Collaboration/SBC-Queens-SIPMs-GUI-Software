@@ -143,7 +143,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     }
 
     ~SiPMAcquisitionManager() {
-        _logger->info("Closing SiPMAcquisitionManager");
+        _logger->info("Closing SiPM Acquisition Manager");
     }
 
     void operator()() {
@@ -484,7 +484,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
 
         software_trigger(caen_port);
-//
+
         static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
                                        caen_port->ModelConstants,
                                        caen_port->GetGlobalConfiguration(),
@@ -548,11 +548,11 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
             // TODO: here be the filtering/software threshold routine
 
-            std::for_each(_waveforms.begin(),
-                          _waveforms.end(),
-                          [&](SiPMWaveforms_ptr& waveform) {
+            std::for_each_n(_waveforms.begin(),
+                            caen_port->GetNumberOfEvents(),
+                            [&](SiPMWaveforms_ptr& waveform) {
                                 _caen_file->save_waveform(waveform);
-                          }
+                            }
             );
 
             process_data_for_gui();

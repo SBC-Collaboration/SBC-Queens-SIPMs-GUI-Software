@@ -73,6 +73,7 @@ class DataFile {
     virtual ~DataFile() {
         // It is very likely that the stream is closed and freed when this
         // goes out of scope, but we are never too sure.
+        _stream.flush();
         _stream.close();
         _open = false;
     }
@@ -123,21 +124,20 @@ class DataFile {
         _stream.close();
     }
 
-    // Saves the contents of DataFile using three different methods depending on f:
-    //
-    // If f takes T (T& or const T) as an argument, it will write the return of
-    //      f for each data member in the vector.
-    // Else if f takes std::vector<T>& as argument, it will then use all the
-    //      information contained inside the vector before writing f.
-    // Else, write what f returns.
-    // Note: as long as the return type is compatible with the << operator
-    // for all of these cases.
+    /* Saves the contents of DataFile using three different methods depending on f:
+     * If f takes T (T& or const T) as an argument, it will write the return of
+     * f for each data member in the vector.
+     * Else if f takes std::vector<T>& as argument, it will then use all the
+     * information contained inside the vector before writing f.
+     * else: write what f returns.
+     * Note: as long as the return type is compatible with the << operator
+     * for all of these cases. */
     template<typename FormatFunc, typename... Args>
-    requires HasOutstreamOp<std::invoke_result<FormatFunc(T, Args...)>> or
-             HasOutstreamOp<std::invoke_result<FormatFunc(std::vector<T>, Args...)>> or
-             HasOutstreamOp<std::invoke_result<FormatFunc(Args...)>>
+    requires (std::is_invocable_v<FormatFunc(const T&, Args...)> or
+              std::is_invocable_v<FormatFunc(const std::vector<T>&, Args...)> or
+              std::is_invocable_v<FormatFunc(Args...)>)
     void save(FormatFunc&& f,  Args&&... args) noexcept {
-        if(not _open) {
+        if (not _open) {
             return;
         }
 
@@ -148,17 +148,14 @@ class DataFile {
         auto data = getData();
         // If FormatFunc takes the single item as an argument
         // We will call f for every item in TempData
-        if constexpr (
-                std::is_invocable_v<FormatFunc, T, Args...>         or
-                std::is_invocable_v<FormatFunc, const T&, Args...>  or
-                std::is_invocable_v<FormatFunc, T&, Args...>) {
+        if constexpr (std::is_invocable_v<FormatFunc, const T&, Args...>) {
             for (auto item : data) {
                 _stream << f(item, std::forward<Args>(args)...);
             }
 
             // If it takes the entire format, then apply it to all.
         } else if constexpr (std::is_invocable_v<FormatFunc,
-                std::vector<T>&, Args...>) {
+                const std::vector<T>&, Args...>) {
             _stream << f(data, std::forward<Args>(args)...);
 
             // if not, just save what f returns
@@ -167,6 +164,21 @@ class DataFile {
         }
 
         _stream.flush();
+    }
+
+    // Same as save(...) but allows to add more items while it is saving
+    // and avoids any race conditions.
+    template<typename FormatFunc, typename... Args>
+    requires (std::is_invocable_v<FormatFunc(const T&, Args...)> or
+              std::is_invocable_v<FormatFunc(const std::vector<T>&, Args...)> or
+              std::is_invocable_v<FormatFunc(Args...)>)
+    void async_save(FormatFunc&& f,  Args&&... args) noexcept {
+        std::jthread async_save_thread([&]() {
+            this->save(std::forward<FormatFunc>(f),
+                       std::forward<Args>(args)...);
+        });
+
+        async_save_thread.detach();
     }
 };
 

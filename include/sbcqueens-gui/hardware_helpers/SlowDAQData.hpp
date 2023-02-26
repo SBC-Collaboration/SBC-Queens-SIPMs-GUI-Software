@@ -61,6 +61,12 @@ struct SlowDAQData {
     PFEIFFERSingleGaugeSP PFEIFFERSingleGaugeUpdateSpeed
         = PFEIFFERSingleGaugeSP::SLOW;
 
+    // Indicators
+    double Vacuum = 0.0; // mbar
+
+    // Graph data
+    PlotDataBuffer<1> PressureData;
+
     // This API required items.
     bool Changed = false;
     SlowDAQPipeCallback Callback;

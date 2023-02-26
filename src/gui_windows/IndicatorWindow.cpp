@@ -26,6 +26,32 @@ void IndicatorWindow::draw() {
             ImGui::EndTabItem();
         }
 
+        if (ImGui::BeginTabItem("Sensors")) {
+            // Needs Teensy, and pressure sensors
+            ImGui::Text("Vacuum Sensors");
+            ImGui::Separator();
+            constexpr auto vacuum_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Vacuum">(SiPMGUIIndicators);
+            draw_indicator(vacuum_ind, _slowdaq_doe.Vacuum);
+
+            ImGui::Separator();
+            ImGui::Text("Temperature Sensors");
+            ImGui::Separator();
+            constexpr auto rtd1_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 1 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd1_temp_ind, _teensy_doe.RTD1Temp);
+
+            constexpr auto rtd2_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 2 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd2_temp_ind, _teensy_doe.RTD2Temp);
+
+            constexpr auto rtd3_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 3 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd3_temp_ind, _teensy_doe.RTD3Temp);
+
+            ImGui::EndTabItem();
+        }
+
         if (ImGui::BeginTabItem("CAEN digitizer Board Info")) {
             constexpr auto model_str = get_indicator<IndicatorTypes::String,
                     "Model Name">(SiPMGUIIndicators);
@@ -63,6 +89,22 @@ void IndicatorWindow::draw() {
         }
 
         if (ImGui::BeginTabItem("Other")) {
+            ImGui::Text("Teensy Information");
+
+            constexpr auto is_rtd_led = get_indicator<IndicatorTypes::LED,
+                    "Is RTD Only?">(SiPMGUIIndicators);
+            draw_indicator(is_rtd_led, _teensy_doe.SystemParameters.InRTDOnlyMode);
+
+            constexpr auto num_rtd_board_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Number RTD Boards">(SiPMGUIIndicators);
+            draw_indicator(num_rtd_board_ind, _teensy_doe.SystemParameters.NumRtdBoards);
+
+            constexpr auto num_rtd_per_board_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Number RTDs per Board">(SiPMGUIIndicators);
+            draw_indicator(num_rtd_per_board_ind, _teensy_doe.SystemParameters.NumRtdsPerBoard);
+
+            ImGui::Separator();
+
 
             ImGui::EndTabItem();
         }

@@ -24,6 +24,9 @@ void TeensyTab::init_tab(const toml::table& tb) {
     _teensy_doe.PIDTempValues.Kp = t_conf["PeltierTKp"].value_or(0.0f);
     _teensy_doe.PIDTempValues.Ti = t_conf["PeltierTTi"].value_or(0.0f);
     _teensy_doe.PIDTempValues.Td = t_conf["PeltierTTd"].value_or(0.0f);
+
+    std::size_t temp_plot_size = t_conf["PlotSize"].value_or(86400);
+    _teensy_doe.TemperatureData = PlotDataBuffer<3>(temp_plot_size);
 }
 
 void TeensyTab::draw() {

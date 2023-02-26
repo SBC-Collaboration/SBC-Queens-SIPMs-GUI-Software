@@ -313,6 +313,7 @@ struct DynamicWriter {
 
     ~DynamicWriter() {
         _open = false;
+        _stream.flush();
         _stream.close();
     }
 

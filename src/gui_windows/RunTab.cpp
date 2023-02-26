@@ -34,7 +34,7 @@ void RunTab::init_tab(const toml::table& cfg) {
 	_sipm_doe.RunDir = i_run_dir;
 	_slowdaq_doe.RunDir = i_run_dir;
 
-		// Teens stuff
+    // Teens stuff
     _teensy_doe.Port = t_conf["Port"].value_or("COM3");
 
     // CAEN Run stuff
@@ -53,6 +53,10 @@ void RunTab::init_tab(const toml::table& cfg) {
     // Other/slow daq stuff
     _slowdaq_doe.PFEIFFERPort
   		= other_conf["PFEIFFERSingleGauge"]["Port"].value_or("COM5");
+
+    std::size_t pressure_buffer_size
+        = other_conf["PFEIFFERSingleGauge"]["PlotSize"].value_or(86400);
+    _slowdaq_doe.PressureData = PlotDataBuffer<1>(pressure_buffer_size);
 }
 
 void RunTab::draw() {

@@ -167,6 +167,7 @@ constexpr static DrawingOptions StringDefault = DrawingOptions {
     .TextPosition = TextPositionEnum::Left
 };
 constexpr static DrawingOptions LEDDefault = DrawingOptions {
+    .TextPosition = TextPositionEnum::Left,
     .Color = InactiveMutedGreen,
     .ActiveColor = MutedGreen,
     .Size = Size_t{15.f, 15.f}

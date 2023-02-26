@@ -6,6 +6,7 @@ RunWaveforms = 200000
 GainWaveforms = 20000
 
 [Teensy]
+PlotSize = 86400
 Port = "/dev/ttyACM0"
 
 # RTD sampling period in ms
@@ -82,6 +83,9 @@ Port = "/dev/ttyUSB0"
 InitVoltage = 52.0
 
 [Other.PFEIFFERSingleGauge]
+# 1 count = 1second
+# so 86400 = 1 day
+PlotSize = 86400
 Port = "COM7"
 Enabled = false
 # 0 = 100ms, 1 = 1s, 2 = 1min

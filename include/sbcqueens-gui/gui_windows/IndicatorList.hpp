@@ -24,14 +24,14 @@ constexpr static auto SiPMGUIIndicators = std::make_tuple(
 	LEDIndicator<"Is Done Data Taking?">(""),
 	NumericalIndicator<"Number RTD Boards">(""),
 	NumericalIndicator<"Number RTDs per Board">(""),
-	LEDIndicator<"Is RTD Only">(""),
+	LEDIndicator<"Is RTD Only?">(""),
 	NumericalIndicator<"Temp Error">("K", ""),
 	LEDIndicator<"Is Temp Stable?">(""),
 	NumericalIndicator<"RTD 1 Temp">("K", ""),
 	NumericalIndicator<"RTD 2 Temp">("K", ""),
 	NumericalIndicator<"RTD 3 Temp">("K", ""),
 	NumericalIndicator<"Peltier Current">("A", ""),
-	NumericalIndicator<"Vacuum">("bar", ""),
+	NumericalIndicator<"Vacuum">("mbar", ""),
 
 	NumericalIndicator<"DMM Voltage">("V", ""),
 	NumericalIndicator<"DMM Current">("A", ""),
@@ -87,7 +87,39 @@ constexpr static auto GUIPlots = std::make_tuple(
 		.YAxisScales = {ImPlotScale_Linear, ImPlotScale_Linear},
 		.YAxisFlags = {ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_Opposite | ImPlotAxisFlags_AutoFit}
 	}, DrawingOptions{
-		.Size = Size_t{-1, -1}}),
+		.Size = Size_t{-1, -1}
+        }
+    ),
+    PlotIndicator<"Vacuum pressure", 1, 1>(
+        PlotOptions<1, 1>{
+            .PlotType = PlotTypeEnum::Line,
+            .PlotLabels = {"Pressure"},
+            .PlotGroupings = {PlotGroupingsEnum::One},
+            .XAxisLabel = "time ",
+            .XAxisUnit = "[Local Time]",
+            .YAxisLabels = {"Pressure"},
+            .YAxisUnits = {"[mbar]"},
+            .YAxisScales = {ImPlotScale_Log10},
+            .YAxisFlags = {ImPlotAxisFlags_AutoFit}
+        }, DrawingOptions{
+            .Size = Size_t{-1, -1}
+        }
+    ),
+    PlotIndicator<"Temperatures", 3, 1>(
+        PlotOptions<3, 1>{
+            .PlotType = PlotTypeEnum::Line,
+            .PlotLabels = {"RTD1", "RTD2", "RTD3"},
+            .PlotGroupings = {PlotGroupingsEnum::One},
+            .XAxisLabel = "time ",
+            .XAxisUnit = "[Local Time]",
+            .YAxisLabels = {"Temperature"},
+            .YAxisUnits = {"[K]"},
+            .YAxisScales = {ImPlotScale_Log10},
+            .YAxisFlags = {ImPlotAxisFlags_AutoFit}
+        }, DrawingOptions{
+            .Size = Size_t{-1, -1}
+        }
+    ),
 
 	PlotIndicator<"Group 0", 8, 1>(PlotOptions<8, 1>{
 		.PlotType = PlotTypeEnum::Line,

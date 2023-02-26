@@ -173,8 +173,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
     TeensyControllerPipeEnd<TeensyPipe_type, PipeEndType::Consumer> _teensy_pipe_end;
     TeensyControllerData& _doe;
 
-    // IndicatorSender<IndicatorNames> _indicator_sender;
-    // IndicatorSender<uint16_t> _plot_sender;
+    std::shared_ptr<spdlog::logger> _logger;
 
     double _init_time;
 
@@ -192,9 +191,14 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
         _teensy_pipe_end(pipes.TeensyPipe), _doe{_teensy_pipe_end.Data}
         // _indicator_sender(std::get<GeneralIndicatorQueue&>(_queues)),
         // _plot_sender(std::get<MultiplePlotQueue&>(_queues)) { }
-        { }
+    {
+        _logger = spdlog::get("log");
+        _logger->info("Initializing teensy thread");
+    }
 
-    ~TeensyControllerManager() {}
+    ~TeensyControllerManager() {
+        _logger->info("Closing Teensy Controller Manager");
+    }
 
     // Loop goes like this:
     // Initializes -> waits for action from GUI to connect
@@ -206,8 +210,6 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             [&](serial_ptr& p, const std::string& port_name) {
                 connect(p, port_name);
             });
-
-        spdlog::info("Initializing teensy thread");
 
         // Main loop lambda
         auto main_loop = [&]() -> bool {
@@ -237,7 +239,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                     break;
 
                 case TeensyControllerStates::Disconnected:
-                    spdlog::warn("Manually losing connection to "
+                    _logger->warn("Manually losing connection to "
                         "Teensy with port {}", _doe.Port);
 
                     disconnect(_port);
@@ -298,15 +300,15 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                                 _doe.RunDir
                                 + "/" + _run_name
                                 + "/BMEs.txt");
-                            s = _BMEs_file->isOpen()  && s;
+                            s = _BMEs_file->isOpen() && s;
 
 
                             if (!s) {
-                                spdlog::error("Failed to open files.");
+                                _logger->error("Failed to open files.");
                                 _doe.CurrentState =
                                     TeensyControllerStates::Standby;
                             } else {
-                                spdlog::info(
+                                _logger->info(
                                     "Connected to Teensy with port {}",
                                 _doe.Port);
 
@@ -317,7 +319,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                             }
 
                         } else {
-                            spdlog::error("Failed to connect to port {}",
+                            _logger->error("Failed to connect to port {}",
                                 _doe.Port);
 
                             _doe.CurrentState
@@ -332,7 +334,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                     break;
 
                 case TeensyControllerStates::Closing:
-                    spdlog::info("Going to close the Teensy thread.");
+                    _logger->info("Going to close the Teensy thread.");
                     disconnect(_port);
                     return false;
 
@@ -361,7 +363,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
     template <class T>
     void retrieve_data(const TeensyCommands& cmd, T&& f) {
         if (!send_teensy_cmd(cmd)) {
-            spdlog::warn("Failed to send {0} to Teensy.",
+            _logger->warn("Failed to send {0} to Teensy.",
                 cTeensyCommands.at(cmd));
             flush(_port);
             return;
@@ -370,7 +372,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
         auto msg_opt = retrieve_msg<std::string>(_port);
 
         if (!msg_opt.has_value()) {
-            spdlog::warn("Failed to retrieve data from {0} command.",
+            _logger->warn("Failed to retrieve data from {0} command.",
                 cTeensyCommands.at(cmd));
             flush(_port);
             return;
@@ -379,7 +381,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
         // if json_pck is empty or has the incorrect format this will fail
         json json_parse = json::parse(msg_opt.value(), nullptr, false);
         if (json_parse.is_discarded()) {
-            spdlog::warn("Invalid json string. "
+            _logger->warn("Invalid json string. "
                         "Message received from Teensy: {0}",
                         msg_opt.value());
             flush(_port);
@@ -414,19 +416,11 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
 
                 _doe.SystemParameters = system_pars;
 
-                spdlog::info("{0}, {1}, {2}", system_pars.NumRtdBoards,
+                _logger->info("{0}, {1}, {2}", system_pars.NumRtdBoards,
                     system_pars.NumRtdsPerBoard, system_pars.InRTDOnlyMode);
 
-                // _indicator_sender(IndicatorNames::NUM_RTD_BOARDS,
-                //     _doe.SystemParameters.NumRtdBoards);
-
-                // _indicator_sender(IndicatorNames::NUM_RTDS_PER_BOARD,
-                //     _doe.SystemParameters.NumRtdsPerBoard);
-
-                // _indicator_sender(IndicatorNames::IS_RTD_ONLY,
-                //     _doe.SystemParameters.InRTDOnlyMode);
             } catch (... ) {
-                spdlog::warn("Failed to parse system data from {0}. "
+                _logger->warn("Failed to parse system data from {0}. "
                     "Message received from Teensy: {1}",
                     cTeensyCommands.at(TeensyCommands::GetSystemParameters),
                     msg.value());
@@ -454,7 +448,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
 
                 _peltiers_file->add(pids);
             } catch (... ) {
-                spdlog::warn("Failed to parse latest data from {0}. "
+                _logger->warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetPeltiers),
                             msg.value());
@@ -475,32 +469,34 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                     const double temp = rtds.Temps[i];
                     // _plot_sender(i, rtds.time, temp);
 
-                    // switch (i) {
-                    //     case 0:
-                    //     _indicator_sender(IndicatorNames::LATEST_RTD1_TEMP,
-                    //         temp);
-                    //     break;
-                    //     case 1:
-                    //     _indicator_sender(IndicatorNames::LATEST_RTD2_TEMP,
-                    //         temp);
-                    //     break;
-                    //     case 2:
-                    //     _indicator_sender(IndicatorNames::LATEST_RTD3_TEMP,
-                    //         temp);
-                    //     break;
-                    // }
+                     switch (i) {
+                         case 0:
+                            _doe.RTD1Temp = temp;
+                         break;
+                         case 1:
+                             _doe.RTD2Temp = temp;
+                         break;
+                         case 2:
+                             _doe.RTD3Temp = temp;
+                         break;
+                     }
+
+
                 }
+
+                _doe.TemperatureData(get_current_time_epoch(),
+                                     rtds.Temps[0],
+                                     rtds.Temps[1],
+                                     rtds.Temps[2]);
 
                 double err = rtds.Temps[_doe.PidRTD]
                     - static_cast<double>(_doe.PIDTempValues.SetPoint) - 273.15;
                 _error_temp_cf.Add(err);
 
-                // _indicator_sender(IndicatorNames::PID_TEMP_ERROR,
-                //     arma::mean(_error_temp_cf.GetBuffer()));
 
                 _RTDs_file->add(rtds);
             } catch (... ) {
-                spdlog::warn("Failed to parse latest data from {0}. "
+                _logger->warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetRTDs),
                             msg.value());
@@ -523,7 +519,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
 
                 _pressures_file->add(press);
             } catch (... ) {
-                spdlog::warn("Failed to parse latest data from {0}. "
+                _logger->warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetPressures),
                             msg.value());
@@ -548,7 +544,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
 
                 _BMEs_file->add(bmes);
             } catch (... ) {
-                spdlog::warn("Failed to parse latest data from {0}. "
+                _logger->warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
                             cTeensyCommands.at(TeensyCommands::GetBMEs),
                             msg.value());
@@ -602,47 +598,48 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
         static auto save_files = make_total_timed_event(
             std::chrono::seconds(30),
             [&]() {
-                spdlog::info("Saving teensy data...");
+                _logger->info("Saving teensy data...");
 
-                // async_save(_RTDs_file,
-                //     [](const RawRTDs& rtds) {
-                //         std::ostringstream out;
-                //         for (std::size_t i = 0; i < rtds.RTDREGS.size(); i++) {
-                //             out << rtds.Resistances[i] << ","
-                //                 << rtds.Temps[i];
+                _RTDs_file->async_save([](const RawRTDs& rtds) {
+                    std::ostringstream out;
+                    for (std::size_t i = 0; i < rtds.RTDREGS.size(); i++) {
+                        out << rtds.Resistances[i] << ","
+                            << rtds.Temps[i];
 
-                //             if (i == rtds.RTDREGS.size() - 1) {
-                //                 out << '\n';
-                //             } else {
-                //                 out << ',';
-                //             }
-                //         }
+                        if (i == rtds.RTDREGS.size() - 1) {
+                            out << '\n';
+                        } else {
+                            out << ',';
+                        }
+                    }
 
-                //         return  std::to_string(rtds.time) + "," + out.str();
-                // });
+                    return  std::to_string(rtds.time) + "," + out.str();
+                });
+
 
                 if (!_doe.SystemParameters.InRTDOnlyMode){
-                    // async_save(_peltiers_file,
-                    //     [](const Peltiers& pid) {
-                    //         return  std::to_string(pid.time) + "," +
-                    //                 std::to_string(pid.PID.Current) + "\n";
-                    // });
+                    _peltiers_file->async_save(
+                        [](const Peltiers& pid) {
+                                 return  std::to_string(pid.time) + "," +
+                                         std::to_string(pid.PID.Current) + "\n";
+                        }
+                    );
 
-                    // async_save(_pressures_file,
-                    //     [](const Pressures& press) {
-                    //         return  std::to_string(press.time) + "," +
-                    //                 std::to_string(press.Vacuum.Pressure) + "\n";
+                    _pressures_file->async_save(
+                        [](const Pressures& press) {
+                             return  std::to_string(press.time) + "," +
+                                     std::to_string(press.Vacuum.Pressure) + "\n";
+                        }
+                    );
 
-                    // });
-
-                    // async_save(_BMEs_file,
-                    //     [](const BMEs& bme) {
-                    //         return  std::to_string(bme.time) + "," +
-                    //                 std::to_string(bme.LocalBME.Temperature) + "," +
-                    //                 std::to_string(bme.LocalBME.Pressure) + "," +
-                    //                 std::to_string(bme.LocalBME.Humidity) + "\n";
-
-                    // });
+                    _BMEs_file->async_save(
+                        [](const BMEs& bme) {
+                             return  std::to_string(bme.time) + "," +
+                                     std::to_string(bme.LocalBME.Temperature) + "," +
+                                     std::to_string(bme.LocalBME.Pressure) + "," +
+                                     std::to_string(bme.LocalBME.Humidity) + "\n";
+                        }
+                    );
                 }
             });
 
@@ -742,7 +739,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             && cmd != TeensyCommands::GetRawRTDs
             && cmd != TeensyCommands::GetPeltiers
             && cmd != TeensyCommands::GetPressures) {
-            spdlog::info("Sending command {0} to teensy!", str_cmd);
+            _logger->info("Sending command {0} to teensy!", str_cmd);
         }
 
         // Always add the ;\n at the end!

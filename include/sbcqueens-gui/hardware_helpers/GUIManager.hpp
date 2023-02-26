@@ -143,13 +143,11 @@ class GUIManager : public ThreadManager<Pipes> {
             state.CurrentState = TeensyControllerStates::Closing;
         };
 
-        // CAENQueue& cq = std::get<CAENQueue&>(_queues);
         _sipm_doe.Changed = true;
         _sipm_doe.Callback = [](SiPMAcquisitionData& state) {
             state.CurrentState = SiPMAcquisitionManagerStates::Closing;
         };
 
-        // SlowDAQQueue& oq = std::get<SlowDAQQueue&>(_queues);
         _slowdaq_doe.Changed = true;
         _slowdaq_doe.Callback = [](SlowDAQData& state) {
             state.PFEIFFERState = PFEIFFERSSGState::Closing;
