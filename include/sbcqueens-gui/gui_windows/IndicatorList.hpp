@@ -30,6 +30,12 @@ constexpr static auto SiPMGUIIndicators = std::make_tuple(
 	NumericalIndicator<"RTD 1 Temp">("K", ""),
 	NumericalIndicator<"RTD 2 Temp">("K", ""),
 	NumericalIndicator<"RTD 3 Temp">("K", ""),
+    NumericalIndicator<"RTD 4 Temp">("K", ""),
+    NumericalIndicator<"RTD 5 Temp">("K", ""),
+    NumericalIndicator<"RTD 6 Temp">("K", ""),
+    NumericalIndicator<"RTD 7 Temp">("K", ""),
+    NumericalIndicator<"RTD 8 Temp">("K", ""),
+    NumericalIndicator<"RTD 9 Temp">("K", ""),
 	NumericalIndicator<"Peltier Current">("A", ""),
 	NumericalIndicator<"Vacuum">("mbar", ""),
 
@@ -105,11 +111,11 @@ constexpr static auto GUIPlots = std::make_tuple(
             .Size = Size_t{-1, -1}
         }
     ),
-    PlotIndicator<"Temperatures", 3, 1>(
-        PlotOptions<3, 1>{
+    PlotIndicator<"Temperatures", 9, 1>(
+        PlotOptions<9, 1>{
             .PlotType = PlotTypeEnum::Line,
-            .PlotLabels = {"RTD1", "RTD2", "RTD3"},
-            .PlotGroupings = {PlotGroupingsEnum::One},
+            .PlotLabels = {"RTD1", "RTD2", "RTD3", "RTD4", "RTD5", "RTD6", "RTD7", "RTD8", "RTD9"},
+            .PlotGroupings = fill_same<9>(PlotGroupingsEnum::One),
             .XAxisLabel = "time ",
             .XAxisUnit = "[Local Time]",
             .YAxisLabels = {"Temperature"},

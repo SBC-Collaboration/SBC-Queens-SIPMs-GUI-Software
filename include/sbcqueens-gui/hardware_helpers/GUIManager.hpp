@@ -204,8 +204,20 @@ class GUIManager : public ThreadManager<Pipes> {
 
         ImGui::Begin("Test");
         if (ImGui::BeginTabBar("Other Plots")) {
-            constexpr auto test_plot = get_plot<"I-V", 2, 2>(GUIPlots);
-            Plot(test_plot, _sipm_doe.IVData);
+
+            if (ImGui::BeginTabItem("Temperature")) {
+                constexpr auto temp_plot = get_plot<"Temperatures", 9, 1>(GUIPlots);
+                Plot(temp_plot, _teensy_doe.TemperatureData);
+
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Pressure")) {
+                constexpr auto press_plot = get_plot<"Vacuum pressure", 1, 1>(GUIPlots);
+                Plot(press_plot, _slowdaq_doe.PressureData);
+
+                ImGui::EndTabItem();
+            }
 
             ImGui::EndTabBar();
         }

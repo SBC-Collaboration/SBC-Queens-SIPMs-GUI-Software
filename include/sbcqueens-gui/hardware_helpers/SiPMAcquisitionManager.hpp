@@ -322,23 +322,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
     // Does nothing other than wait 1000ms to avoid clogging PC resources.
     bool standby() {
-        static double i = 0;
-
-        _doe.IVData(i, cos(i/30.0), sin(i/30.0));
-        i += 1.0;
-
-        static BinaryFormat::DynamicWriter<double, double> foo("./out.bin",
-            {"x", "y"},
-            {1, 1},
-            {1, 1});
-
-        double x[1];
-        x[0] = cos(i/30.0);
-        double y[1];
-        y[0] = sin(i / 30.0);
-
-        foo.save(x, y);
-
         change_state();
         return true;
     }

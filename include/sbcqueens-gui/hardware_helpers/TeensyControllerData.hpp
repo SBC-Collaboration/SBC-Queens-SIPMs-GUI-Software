@@ -185,12 +185,10 @@ struct TeensyControllerData {
     PIDConfig PIDTempValues;
 
     // Indicators
-    double RTD1Temp;
-    double RTD2Temp;
-    double RTD3Temp;
+    std::array<double, 9> RTDTemps;
 
     // Graph data
-    PlotDataBuffer<3> TemperatureData;
+    PlotDataBuffer<9> TemperatureData;
 
     // This API required items.
     bool Changed = false;

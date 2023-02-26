@@ -467,27 +467,19 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 // Send them to GUI to draw them
                 for (uint16_t i = 0; i < rtds.Temps.size(); i++) {
                     const double temp = rtds.Temps[i];
-                    // _plot_sender(i, rtds.time, temp);
-
-                     switch (i) {
-                         case 0:
-                            _doe.RTD1Temp = temp;
-                         break;
-                         case 1:
-                             _doe.RTD2Temp = temp;
-                         break;
-                         case 2:
-                             _doe.RTD3Temp = temp;
-                         break;
-                     }
-
-
+                    _doe.RTDTemps[i] = temp;
                 }
 
                 _doe.TemperatureData(get_current_time_epoch(),
                                      rtds.Temps[0],
                                      rtds.Temps[1],
-                                     rtds.Temps[2]);
+                                     rtds.Temps[2],
+                                     rtds.Temps[3],
+                                     rtds.Temps[4],
+                                     rtds.Temps[5],
+                                     rtds.Temps[6],
+                                     rtds.Temps[7],
+                                     rtds.Temps[8]);
 
                 double err = rtds.Temps[_doe.PidRTD]
                     - static_cast<double>(_doe.PIDTempValues.SetPoint) - 273.15;

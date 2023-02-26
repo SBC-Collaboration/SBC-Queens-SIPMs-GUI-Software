@@ -39,15 +39,40 @@ void IndicatorWindow::draw() {
             ImGui::Separator();
             constexpr auto rtd1_temp_ind = get_indicator<IndicatorTypes::Numerical,
                     "RTD 1 Temp">(SiPMGUIIndicators);
-            draw_indicator(rtd1_temp_ind, _teensy_doe.RTD1Temp);
+            draw_indicator(rtd1_temp_ind, _teensy_doe.RTDTemps[0]);
 
             constexpr auto rtd2_temp_ind = get_indicator<IndicatorTypes::Numerical,
                     "RTD 2 Temp">(SiPMGUIIndicators);
-            draw_indicator(rtd2_temp_ind, _teensy_doe.RTD2Temp);
+            draw_indicator(rtd2_temp_ind, _teensy_doe.RTDTemps[1]);
 
             constexpr auto rtd3_temp_ind = get_indicator<IndicatorTypes::Numerical,
                     "RTD 3 Temp">(SiPMGUIIndicators);
-            draw_indicator(rtd3_temp_ind, _teensy_doe.RTD3Temp);
+            draw_indicator(rtd3_temp_ind, _teensy_doe.RTDTemps[2]);
+
+            constexpr auto rtd4_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 4 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd4_temp_ind, _teensy_doe.RTDTemps[3]);
+
+            constexpr auto rtd5_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 5 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd5_temp_ind, _teensy_doe.RTDTemps[4]);
+
+            constexpr auto rtd6_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 6 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd6_temp_ind, _teensy_doe.RTDTemps[5]);
+
+            constexpr auto rtd7_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 7 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd7_temp_ind, _teensy_doe.RTDTemps[6]);
+
+            constexpr auto rtd8_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 8 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd8_temp_ind, _teensy_doe.RTDTemps[7]);
+
+            constexpr auto rtd9_temp_ind = get_indicator<IndicatorTypes::Numerical,
+                    "RTD 9 Temp">(SiPMGUIIndicators);
+            draw_indicator(rtd9_temp_ind, _teensy_doe.RTDTemps[8]);
+
 
             ImGui::EndTabItem();
         }
