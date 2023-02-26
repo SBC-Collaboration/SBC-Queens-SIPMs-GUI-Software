@@ -178,12 +178,13 @@ void RunTab::draw() {
 
             caen_twin.RunDir = run_dir;
             caen_twin.CurrentState = SiPMAcquisitionManagerStates::Acquisition;
+            caen_twin.AcquisitionState = SiPMAcquisitionStates::Oscilloscope;
     });
     ImGui::SameLine();
 
-    constexpr auto disconnect_caen = get_control<ControlTypes::Button,
+    constexpr auto disconnect_caen_btn = get_control<ControlTypes::Button,
                                         "Disconnect##CAEN">(SiPMGUIControls);
-    draw_control(disconnect_caen, _sipm_doe,
+    draw_control(disconnect_caen_btn, _sipm_doe,
         tmp, [&](){ return tmp; },
         // Callback when tmp is true !
         [](SiPMAcquisitionData& caen_twin) {

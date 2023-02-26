@@ -16,49 +16,62 @@ void IndicatorWindow::init_window(const toml::table&) {
 }
 
 void IndicatorWindow::draw() {
-    constexpr auto file_stats = get_indicator<IndicatorTypes::Numerical,
-                                        "File Statistics">(SiPMGUIIndicators);
-    draw_indicator(file_stats, _sipm_doe.FileStatistics);
+    if (ImGui::BeginTabBar("##Indicators")) {
 
-    ImGui::Separator();
+        if (ImGui::BeginTabItem("Statistics")) {
+            constexpr auto file_stats = get_indicator<IndicatorTypes::Numerical,
+                    "File Statistics">(SiPMGUIIndicators);
+            draw_indicator(file_stats, _sipm_doe.FileStatistics);
 
-    ImGui::Text("CAEN Digitizer Board info");
+            ImGui::EndTabItem();
+        }
 
-    ImGui::Separator();
+        if (ImGui::BeginTabItem("CAEN digitizer Board Info")) {
+            constexpr auto model_str = get_indicator<IndicatorTypes::String,
+                    "Model Name">(SiPMGUIIndicators);
+            draw_indicator(model_str, _sipm_doe.CAENBoardInfo.ModelName);
 
-    constexpr auto model_str = get_indicator<IndicatorTypes::String,
-                                        "Model Name">(SiPMGUIIndicators);
-    draw_indicator(model_str, _sipm_doe.CAENBoardInfo.ModelName);
+            constexpr auto fam_code = get_indicator<IndicatorTypes::Numerical,
+                    "Family Code">(SiPMGUIIndicators);
+            draw_indicator(fam_code, _sipm_doe.CAENBoardInfo.FamilyCode);
 
-    constexpr auto fam_code = get_indicator<IndicatorTypes::Numerical,
-                                        "Family Code">(SiPMGUIIndicators);
-    draw_indicator(fam_code, _sipm_doe.CAENBoardInfo.FamilyCode);
+            constexpr auto ch_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Channels">(SiPMGUIIndicators);
+            draw_indicator(ch_ind, _sipm_doe.CAENBoardInfo.Channels);
 
-    constexpr auto ch_ind = get_indicator<IndicatorTypes::Numerical,
-                                        "Channels">(SiPMGUIIndicators);
-    draw_indicator(ch_ind, _sipm_doe.CAENBoardInfo.Channels);
+            constexpr auto serial_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Serial Number">(SiPMGUIIndicators);
+            draw_indicator(serial_ind, _sipm_doe.CAENBoardInfo.SerialNumber);
 
-    constexpr auto serial_ind = get_indicator<IndicatorTypes::Numerical,
-                                        "Serial Number">(SiPMGUIIndicators);
-    draw_indicator(serial_ind, _sipm_doe.CAENBoardInfo.SerialNumber);
+            constexpr auto adc_bits_ind = get_indicator<IndicatorTypes::Numerical,
+                    "ADC Bits">(SiPMGUIIndicators);
+            draw_indicator(adc_bits_ind, _sipm_doe.CAENBoardInfo.ADC_NBits);
 
-    constexpr auto adc_bits_ind = get_indicator<IndicatorTypes::Numerical,
-                                        "ADC Bits">(SiPMGUIIndicators);
-    draw_indicator(adc_bits_ind, _sipm_doe.CAENBoardInfo.ADC_NBits);
+            constexpr auto roc_form_str = get_indicator<IndicatorTypes::String,
+                    "ROC Firmware">(SiPMGUIIndicators);
+            draw_indicator(roc_form_str, _sipm_doe.CAENBoardInfo.ROC_FirmwareRel);
 
-    constexpr auto roc_form_str = get_indicator<IndicatorTypes::String,
-                                        "ROC Firmware">(SiPMGUIIndicators);
-    draw_indicator(roc_form_str, _sipm_doe.CAENBoardInfo.ROC_FirmwareRel);
+            constexpr auto amc_form_str = get_indicator<IndicatorTypes::String,
+                    "AMC Firmware">(SiPMGUIIndicators);
+            draw_indicator(amc_form_str, _sipm_doe.CAENBoardInfo.AMC_FirmwareRel);
 
-    constexpr auto amc_form_str = get_indicator<IndicatorTypes::String,
-                                        "AMC Firmware">(SiPMGUIIndicators);
-    draw_indicator(amc_form_str, _sipm_doe.CAENBoardInfo.AMC_FirmwareRel);
+            constexpr auto license_str = get_indicator<IndicatorTypes::String,
+                    "License">(SiPMGUIIndicators);
+            draw_indicator(license_str, _sipm_doe.CAENBoardInfo.License);
 
-    constexpr auto license_str = get_indicator<IndicatorTypes::String,
-                                        "License">(SiPMGUIIndicators);
-    draw_indicator(license_str, _sipm_doe.CAENBoardInfo.License);
+            ImGui::EndTabItem();
+        }
 
-    ImGui::Separator();
+        if (ImGui::BeginTabItem("Other")) {
+
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
+
+
+
     //     StringIndicator<"Model Name">("", ""),
     // NumericalIndicator<"Family Code">("", ""),
     // NumericalIndicator<"Channels">(" chs", ""),

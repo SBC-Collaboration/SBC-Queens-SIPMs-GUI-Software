@@ -14,6 +14,7 @@ void SiPMControlWindow::init_window(const toml::table& tb) {
     auto other_conf = tb["Other"];
     auto file_conf = tb["File"];
 
+    _sipm_data.SiPMOutputName = other_conf["SiPM Default Output Name"].value_or("test");
     _sipm_data.SiPMVoltageSysSupplyEN = false;
     _sipm_data.SiPMVoltageSysPort
         = other_conf["SiPMVoltageSystem"]["Port"].value_or("COM6");
@@ -28,34 +29,60 @@ void SiPMControlWindow::init_window(const toml::table& tb) {
 }
 
 void SiPMControlWindow::draw()  {
-    bool tmp;
+    static bool tmp;
+    constexpr auto start_meas_routine_btn = get_control<ControlTypes::Button,
+            "START##CAEN">(SiPMGUIControls);
+    draw_control(start_meas_routine_btn, _sipm_data,
+                 tmp, [&](){ return tmp; },
+            // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& doe_twin) {
+                     if (doe_twin.CurrentState != SiPMAcquisitionManagerStates::Acquisition) {
+                         return;
+                     }
 
-    constexpr auto reset_caen = get_control<ControlTypes::Button,
-                                            "Reset CAEN">(SiPMGUIControls);
-    draw_control(reset_caen, _sipm_data, tmp,
-        [&](){ return tmp; },
-        // Callback when IsItemEdited !
-        [&](SiPMAcquisitionData& doe_twin) {
-            if (doe_twin.AcquisitionState == SiPMAcquisitionStates::OscilloscopeMode ||
-            doe_twin.AcquisitionState == SiPMAcquisitionStates::AcquisitionMode) {
-                // Setting it to AttemptConnection will force it to reset
-                doe_twin = _sipm_data;
-                doe_twin.SiPMVoltageSysChange = false;
-                doe_twin.AcquisitionState = SiPMAcquisitionStates::Reset;
-            }
-    });
-    // ImGui::PopStyleColor(3);
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Resets the CAEN digitizer with new "
-            "values found in the control tabs.");
-    }
+                     if (doe_twin.AcquisitionState == SiPMAcquisitionStates::Oscilloscope) {
+                         doe_twin.AcquisitionState = SiPMAcquisitionStates::EndlessAcquisition;
 
+//                if (doe_twin.SiPMVoltageSysSupplyEN) {
+//                    doe_twin.LatestTemperature = _teensy_data.PIDTempValues.SetPoint;
+//                } else {
+//                    spdlog::warn("Gain calculation cannot start without "
+//                        "enabling the power supply.");
+//                }
+                     }
+                 }
+    );
+
+    ImGui::SameLine();
+
+    constexpr auto cancel_meas_routine_btn = get_control<ControlTypes::Button,
+            "STOP##CAEN">(SiPMGUIControls);
+    draw_control(cancel_meas_routine_btn, _sipm_data,
+                 tmp, [&](){ return tmp; },
+            // Callback when IsItemEdited !
+                 [](SiPMAcquisitionData& doe_twin) {
+                     if (doe_twin.AcquisitionState == SiPMAcquisitionStates::EndlessAcquisition) {
+                         doe_twin.AcquisitionState = SiPMAcquisitionStates::Oscilloscope;
+                     }
+                 }
+    );
     ImGui::Separator();
     ImGui::PushItemWidth(120);
 
-    constexpr auto sipm_id = get_control<ControlTypes::InputInt, "SiPM ID">(SiPMGUIControls);
-    draw_control(sipm_id, _sipm_data, _sipm_data.SiPMID,
+    constexpr auto sipm_out_filename_it = get_control<ControlTypes::InputText, "SiPM Output File Name">(SiPMGUIControls);
+    draw_control(sipm_out_filename_it,
+                 _sipm_data,
+                 _sipm_data.SiPMOutputName,
+                 ImGui::IsItemEdited,
+                 // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& doe_twin) {
+                     doe_twin.SiPMOutputName = _sipm_data.SiPMOutputName;
+                 });
+
+    constexpr auto sipm_id_it = get_control<ControlTypes::InputInt, "SiPM ID">(SiPMGUIControls);
+    draw_control(sipm_id_it,
+                 _sipm_data,
+                 _sipm_data.SiPMID,
         ImGui::IsItemEdited,
         // Callback when IsItemEdited !
         [&](SiPMAcquisitionData& doe_twin) {
@@ -108,39 +135,6 @@ void SiPMControlWindow::draw()  {
 
     ImGui::Separator();
     //  VBD mode controls
-    constexpr auto start_meas_routine = get_control<ControlTypes::Button,
-                                    "Run Measurement Routine">(SiPMGUIControls);
-    draw_control(start_meas_routine, _sipm_data,
-        tmp, [&](){ return tmp; },
-        // Callback when IsItemEdited !
-        [&](SiPMAcquisitionData& doe_twin) {
-            if (doe_twin.AcquisitionState == SiPMAcquisitionStates::OscilloscopeMode) {
-                doe_twin.AcquisitionState = SiPMAcquisitionStates::AcquisitionMode;
-
-                if (doe_twin.SiPMVoltageSysSupplyEN) {
-                    doe_twin.LatestTemperature = _teensy_data.PIDTempValues.SetPoint;
-                } else {
-                    spdlog::warn("Gain calculation cannot start without "
-                        "enabling the power supply.");
-                }
-            }
-    });
-
-    ImGui::SameLine();
-
-    constexpr auto cancel_meas_routine = get_control<ControlTypes::Button,
-                                "Cancel Measurement Routine">(SiPMGUIControls);
-    draw_control(cancel_meas_routine, _sipm_data,
-        tmp, [&](){ return tmp; },
-        // Callback when IsItemEdited !
-        [](SiPMAcquisitionData& doe_twin) {
-            if (doe_twin.AcquisitionState == SiPMAcquisitionStates::AcquisitionMode) {
-                doe_twin.CancelMeasurements = true;
-            }
-    });
-
-    //  end VBD mode controls
-    ImGui::Separator();
 }
 
 } // namespace SBCQueens

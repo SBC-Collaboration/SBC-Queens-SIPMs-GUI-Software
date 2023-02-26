@@ -67,11 +67,12 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
     using SiPMCAEN = CAEN<std::shared_ptr<spdlog::logger>>;
     using SiPMCAEN_ptr = std::unique_ptr<SiPMCAEN>;
-    SiPMAcquisitionStates _acq_state = SiPMAcquisitionStates::OscilloscopeMode;
 
-    using SiPMCAENFile = DataFile<const CAENEvent*>;
-    using SiPMCAENFile_ptr = std::unique_ptr<SiPMCAENFile>;
+    using SiPMCAENFile_ptr = std::unique_ptr<BinaryFormat::SiPMDynamicWriter>;
     SiPMCAENFile_ptr _caen_file = nullptr;
+
+    using SiPMWaveforms_ptr = std::shared_ptr<CAENWaveforms<uint16_t>>;
+    std::vector<SiPMWaveforms_ptr> _waveforms;
 
     // Files
     std::string _run_name;
@@ -95,8 +96,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     const CAENEvent* _osc_event = nullptr;
     // 1024 because the caen can only hold 1024 no matter what model (so far)
     std::array<const CAENEvent*, 1024> _processing_evts = {nullptr};
-
-
 
     // Analysis
     // std::unique_ptr<BreakdownRoutine> _vbd_routine = nullptr;
@@ -287,7 +286,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         _doe.CurrentState = newState;
         switch (_doe.CurrentState) {
             case SiPMAcquisitionManagerStates::Acquisition:
-                _acq_state = SiPMAcquisitionStates::OscilloscopeMode;
                 main_loop_state = acquisition_state;
             break;
 
@@ -318,7 +316,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             switch_state(_doe.CurrentState);
         }
 
-        // Send the current state to the GUI to update him
+        // Send the current state to the GUI to update
         _sipm_pipe_end.send();
     }
 
@@ -361,16 +359,27 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // 3.- Any other condition under acquisition mode. Such as number of
         //     samples but it can always ran to go forever
         while (not caen_res->HasError()) {
-            switch(_acq_state) {
-                case SiPMAcquisitionStates::OscilloscopeMode:
+            switch(_doe.AcquisitionState) {
+                case SiPMAcquisitionStates::Oscilloscope:
+                    if(_caen_file) {
+                        _caen_file.reset();
+                    }
+
                     caen_res = oscilloscope(std::move(caen_res));
                     break;
 
-                case SiPMAcquisitionStates::AcquisitionMode:
+                case SiPMAcquisitionStates::EndlessAcquisition:
+                    caen_res = acquisition_endless(std::move(caen_res));
+                    break;
+
+                case SiPMAcquisitionStates::NumberedAcquisition:
                     break;
 
                 // Resets the setup information without freeing the CAEN resource
                 case SiPMAcquisitionStates::Reset:
+                    if(_caen_file) {
+                        _caen_file.reset();
+                    }
                     caen_res = setup_and_prepare(std::move(caen_res));
                     break;
             }
@@ -385,6 +394,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         // Once we go out of scope, we release/disconnect the CAEN
         caen_res.reset();
+        _caen_file.reset();
         return true;
     }
 
@@ -441,17 +451,13 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             return caen_port;
         }
 
-        // Trying to call once will initialize the port
-        // but really this call is not important
-        // _sipm_volt_sys.get([=](serial_ptr& port) -> std::optional<double> {
-        //     return {};
-        // });
-        // std::generate(_processing_evts.begin(), _processing_evts.end(),
-        // [&](){
-        //     return std::make_shared<caenEvent>(_caen_port->Handle);
-        // });
+        // Given its a pointer _osc_event will always point to the first
+        // even in the buffer
+        _osc_event = caen_port->GetEvent(0);
 
-        // Allocate memory for events
+        for(std::size_t i = 0; i < caen_port->GetCurrentPossibleMaxBuffer(); i++) {
+            _waveforms.push_back(caen_port->GetWaveform(i));
+        }
 
         // These lines get today's date and creates a folder under that date
         // There is a similar code in the Teensy interface file
@@ -464,30 +470,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         std::filesystem::create_directory(_doe.RunDir
                                           + "/" + _run_name);
 
-//        sipm_file(
-//             _doe.RunDir + "/" + _run_name + "/SaveInfo.txt");
-//
-//        if (not sipm_file.isOpen()) {
-//            spdlog::error("Failed to open SaveInfo.txt");
-//            switch_state(SiPMAcquisitionManagerStates::Standby);
-//        }
-
-//        spdlog::info("Trying to open file {0}", _doe.RunDir
-//                                                + "/" + _run_name
-//                                                + "/SiPMIV.txt");
-//        open_file(_voltages_file, _doe.RunDir
-//                             + "/" + _run_name
-//                             + "/SiPMIV.txt");
-
-//        s = _voltages_file > 0;
-//        if (!s) {
-//            spdlog::error("Failed to open voltage file");
-//        }
-
-        std::filesystem::create_directory(_doe.RunDir
-                                          + "/" + _run_name);
-
         _logger->info("CAEN Setup complete!");
+        _doe.AcquisitionState = SiPMAcquisitionStates::Oscilloscope;
         return caen_port;
     }
 
@@ -496,14 +480,10 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // as a mode in where the user can see what is happening.
     // Similar to an oscilloscope
     SiPMCAEN_ptr oscilloscope(SiPMCAEN_ptr caen_port) {
-        auto events = caen_port->GetEventsInBuffer();
+        auto n_events = caen_port->GetEventsInBuffer();
         // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
 
-        if (_doe.SoftwareTrigger) {
-            _logger->info("Sending a software trigger");
-            caen_port->SoftwareTrigger();
-            _doe.SoftwareTrigger = false;
-        }
+        software_trigger(caen_port);
 //
         static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
                                        caen_port->ModelConstants,
@@ -519,14 +499,14 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // events instead of ..->Data.NumEvents is a better number to use
             // to approximate the actual number of waveforms acquired.
             // Specially because the buffer is cleared.
-            TriggeredWaveforms += events;
+            TriggeredWaveforms += n_events;
             // spdlog::info("Total size buffer: {0}",  _caen_port->Data.TotalSizeBuffer);
             // spdlog::info("Data size: {0}", _caen_port->Data.DataSize);
             // spdlog::info("Num events: {0}", _caen_port->Data.NumEvents);
 
             // Decode events
             caen_port->DecodeEvents();
-            _osc_event = caen_port->GetEvent(0);
+
             auto m = caen_event_to_armadillo(_osc_event, 64);
 
             auto waveform = caen_port->GetWaveform(0);
@@ -546,151 +526,48 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         return caen_port;
     }
 
-    // Does the SiPM pulse processing but no file saving
-    // is done. Serves more for the user to know
-    // how things are changing.
-//    bool measurement_routine_mode() {
-//        if (not _vbd_routine) {
-//            _vbd_routine = std::make_unique<BreakdownRoutine>(
-//                _caen_port, _doe, _run_name, _saveinfo_file = nullptr);
-//
-//            // // Reset all indicators for this section
-//            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, false);
-//            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING,
-//            //     false);
-//            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING,
-//                // false);
-//        }
-//
-//        _vbd_routine->update();
-//
-//        if(_vbd_routine->hasVoltageChanged()) {
-//            _doe.SiPMVoltageSysVoltage = _vbd_routine->getCurrentVoltage();
-//            _doe.SiPMVoltageSysChange = true;
-//        }
-//
-//        _processing_evts = _vbd_routine->getLatestEvents();
-//        rdm_extract_for_gui();
-//
-//        // GUI related stuff
-//        TriggeredWaveforms += static_cast<uint64_t>(
-//            _vbd_routine->getLatestNumEvents());
-//        SavedWaveforms = _vbd_routine->getTotalAcquiredEvents();
-//        // _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
-//
-//        switch (_vbd_routine->getCurrentState()) {
-//        case BreakdownRoutineState::Finished:
-//            switch_state(SiPMAcquisitionStates::OscilloscopeMode);
-//
-//            // _indicator_sender(IndicatorNames::FINISHED_ROUTINE, true);
-//
-//            // Set back to 52 just in case.
-//            _doe.SiPMVoltageSysVoltage = *_vbd_routine->GainVoltages.cbegin();
-//            _doe.SiPMVoltageSysChange = true;
-//            // Clean resources and get the port back
-//            // _caen_port = _vbd_routine->retrieveCAEN();
-//            _vbd_routine = nullptr;
-//            break;
-//        case BreakdownRoutineState::GainMeasurements:
-//            // _indicator_sender(IndicatorNames::BREAKDOWN_ROUTINE_ONGOING, true);
-//        case BreakdownRoutineState::CalculateBreakdownVoltage:
-//            if (_vbd_routine->hasNewGainMeasurement())
-//            {
-//                // auto pars = _vbd_routine->getAnalysisLatestValues();
-//                // _indicator_sender(IndicatorNames::GAIN_VS_VOLTAGE,
-//                //     _doe.LatestMeasure.Volt, pars.SPEParameters(1));
-//                // _indicator_sender(IndicatorNames::SPE_GAIN_MEAN,
-//                // pars.SPEParameters(1));
-//
-//                // _indicator_sender(IndicatorNames::SPE_EFFICIENCTY,
-//                //     pars.SPEEfficiency);
-//                // _indicator_sender(IndicatorNames::INTEGRAL_THRESHOLD,
-//                //     pars.IntegralThreshold);
-//
-//                // _indicator_sender(IndicatorNames::OFFSET,
-//                //     pars.SPEParameters(2));
-//
-//                // _indicator_sender(IndicatorNames::RISE_TIME,
-//                //     pars.SPEParameters(3));
-//
-//                // _indicator_sender(IndicatorNames::FALL_TIME,
-//                //     pars.SPEParameters(4));
-//            }
-//            break;
-//        case BreakdownRoutineState::Acquisition:
-//            // _indicator_sender(IndicatorNames::MEASUREMENT_ROUTINE_ONGOING, true);
-//            if (_vbd_routine->hasNewBreakdownVoltage()) {
-//               // auto values = _vbd_routine->getBreakdownVoltage();
-//
-//                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE,
-//                //     values.BreakdownVoltage);
-//                // _indicator_sender(IndicatorNames::BREAKDOWN_VOLTAGE_ERR,
-//                //     values.BreakdownVoltageError);
-//            }
-//
-//            break;
-//        default:
-//        break;
-//        }
-//
-//        // Cancel button routine
-//        if (_doe.CancelMeasurements && _vbd_routine) {
-//            switch_state(SiPMAcquisitionStates::OscilloscopeMode);
-//
-//            // _caen_port = _vbd_routine->retrieveCAEN();
-//            _vbd_routine = nullptr;
-//            _doe.CancelMeasurements = false;
-//        }
-//
-//        change_state();
-//        return true;
-//    }
+    SiPMCAEN_ptr acquisition_endless(SiPMCAEN_ptr caen_port) {
+        if(not _caen_file) {
+            _caen_file = std::make_unique<BinaryFormat::SiPMDynamicWriter>(
+                    _doe.RunDir + "/" + _run_name + "/" + _doe.SiPMOutputName,
+                    caen_port->ModelConstants,
+                    caen_port->GetGlobalConfiguration(),
+                    caen_port->GetGroupConfigurations());
+        }
 
-    // bool run_mode() {
-    //     if (not _acq_routine) {
-    //         _indicator_sender(IndicatorNames::DONE_DATA_TAKING, false);
-    //         _acq_routine = std::make_unique<AcquisitionRoutine> (
-    //             _caen_port, _doe, _run_name, _saveinfo_file = nullptr,
-    //             _latest_breakdown_voltage);
-    //     }
+        software_trigger(caen_port);
 
-    //     _acq_routine->update();
+        auto n_events = caen_port->GetEventsInBuffer();
+        caen_port->RetrieveData();
 
-    //     if(_acq_routine->hasVoltageChanged()) {
-    //         _doe.SiPMVoltageSysVoltage = _acq_routine->getCurrentVoltage();
-    //         _doe.SiPMVoltageSysChange = true;
-    //     }
+        if (caen_port->GetNumberOfEvents() > 0) {
+            TriggeredWaveforms += n_events;
 
-    //     _processing_evts = _acq_routine->getLatestEvents();
-    //     rdm_extract_for_gui();
+            // This should update the values under _waveforms
+            caen_port->DecodeEvents();
 
-    //     // GUI related stuff
-    //     TriggeredWaveforms = _acq_routine->getLatestNumEvents();
-    //     SavedWaveforms = _acq_routine->getTotalAcquiredEvents();
-    //     _indicator_sender(IndicatorNames::SAVED_WAVEFORMS, SavedWaveforms);
+            // TODO: here be the filtering/software threshold routine
 
-    //     // It finished, we move back to OscilloscopeMode
-    //     if (_acq_routine->hasFinished()) {
-    //         switch_state(SiPMAcquisitionStates::OscilloscopeMode);
+            std::for_each(_waveforms.begin(),
+                          _waveforms.end(),
+                          [&](SiPMWaveforms_ptr& waveform) {
+                                _caen_file->save_waveform(waveform);
+                          }
+            );
 
-    //         // _caen_port = _acq_routine->retrieveCAEN();
-    //         _acq_routine = nullptr;
+            process_data_for_gui();
+        }
 
-    //         _indicator_sender(IndicatorNames::DONE_DATA_TAKING, true);
-    //     }
+        return caen_port;
+    }
 
-    //     // Cancel button routine
-    //     if (_doe.CancelMeasurements && _acq_routine) {
-    //         switch_state(SiPMAcquisitionStates::OscilloscopeMode);
-
-    //         // _caen_port = _acq_routine->retrieveCAEN();
-    //         _acq_routine = nullptr;
-    //         _doe.CancelMeasurements = false;
-    //     }
-
-    //     change_state();
-    //     return true;
-    // }
+    void software_trigger(SiPMCAEN_ptr& caen_port) {
+        if (_doe.SoftwareTrigger) {
+            _logger->info("Sending a software trigger");
+            caen_port->SoftwareTrigger();
+            _doe.SoftwareTrigger = false;
+        }
+    }
 
     // Only mode that stops the main_loop and frees all resources
     bool closing_mode() {
@@ -734,7 +611,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         }
 
         for (std::size_t i = 0; i < size; i++) {
-            for(std::size_t group = 0; group < 4; group ++) {
+            for(std::size_t group = 0; group < _doe.GroupData.size(); group ++) {
                 auto offset = group*8;
                 _doe.GroupData.at(group).add_at(i, i,
                                          all_chs[offset + 0] == nullptr ? 0 : all_chs[offset + 0][i],

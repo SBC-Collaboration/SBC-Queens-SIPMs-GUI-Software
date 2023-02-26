@@ -13,7 +13,6 @@
 
 #include "sbcqueens-gui/gui_windows/ControlList.hpp"
 
-
 namespace SBCQueens {
 
 void CAENPerGroupConfigTab::init_tab(const toml::table& cfg) {
@@ -84,7 +83,9 @@ void CAENPerGroupConfigTab::draw() {
    	auto& channel = _sipm_data.GroupConfigs[channel_to_modify];
    	auto& channel_tgm = channel.TriggerMask;
    	auto& channel_acq = channel.AcquisitionMask;
+    auto& channel_corrections = channel.DCCorrections;
 
+    ImGui::PushItemWidth(100);
     constexpr auto dc_offset  =
         get_control<ControlTypes::InputUINT32, "DC Offset">(SiPMGUIControls);
    	draw_control(dc_offset,
@@ -108,35 +109,15 @@ void CAENPerGroupConfigTab::draw() {
         		= channel.TriggerThreshold;
         }
     );
+    ImGui::PopItemWidth();
 
-    constexpr auto trg0  =
-        get_control<ControlTypes::Checkbox, "TRG0">(SiPMGUIControls);
-  	draw_control(trg0,
-   		_sipm_data,
-        channel_tgm[0],
-        ImGui::IsItemEdited,
-        // Callback when IsItemEdited !
-        [&](SiPMAcquisitionData& twin) {
-        	auto& t = twin.GroupConfigs[channel_to_modify].TriggerMask[0];
-        	t = channel_tgm[0];
-        }
-    );
+    ImGui::Separator();
+    ImGui::Text("Per Channel configuration:");
+    ImGui::Separator();
 
-    ImGui::SameLine();
-
-    constexpr auto acq0  =
-        get_control<ControlTypes::Checkbox, "ACQ0">(SiPMGUIControls);
-  	draw_control(acq0,
-   		_sipm_data,
-        channel_acq[0],
-        ImGui::IsItemEdited,
-        // Callback when IsItemEdited !
-        [&](SiPMAcquisitionData& twin) {
-        	auto& t = twin.GroupConfigs[channel_to_modify].AcquisitionMask[0];
-        	t = channel_acq[0];
-        }
-    );
-
+    _expand_controls(_sipm_data,
+                     channel_to_modify,
+                     std::make_index_sequence<8>{});
 }
 
 } // namespace SBCQueens

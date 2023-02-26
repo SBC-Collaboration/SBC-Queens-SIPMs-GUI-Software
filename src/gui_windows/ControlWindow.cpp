@@ -9,10 +9,10 @@
 namespace SBCQueens {
 
 void ControlWindow::init_window(const toml::table& tb) {
-    auto t_conf = tb["Teensy"];
-    auto CAEN_conf = tb["CAEN"];
+//    auto t_conf = tb["Teensy"];
+//    auto CAEN_conf = tb["CAEN"];
     auto other_conf = tb["Other"];
-    auto file_conf = tb["File"];
+//    auto file_conf = tb["File"];
 
 
     /// Teensy config

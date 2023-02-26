@@ -62,11 +62,11 @@ constexpr static Color_t HSV(const float& h, const float& s, const float& v) {
 constexpr static Color_t Red{1.0f, 0.0f, 0.0f, 1.0f};
 constexpr static Color_t Green{0.0f, 1.0f, 0.0f, 1.0f};
 constexpr static Color_t MutedGreen{0.24, 0.61f, 0.26f, 1.0f};
+constexpr static Color_t ActiveMutedGreen{0.45, 0.79f, 0.47f, 1.0f};
 constexpr static Color_t InactiveMutedGreen{0.12, 0.27f, 0.11f, 1.0f};
 constexpr static Color_t Blue{0.0f, 0.0f, 1.0f, 1.0f};
 constexpr static Color_t White{1.0f, 1.0f, 1.0f, 1.0f};
 constexpr static Color_t Black{0.0f, 0.0f, 0.0f, 1.0f};
-
 
 using Size_t = ImVec2;
 using TextPosition_t = enum class TextPositionEnum {
@@ -104,6 +104,34 @@ enum class ControlTypes { InputText, Button, Checkbox, InputInt, InputFloat,
     InputDouble, ComboBox, InputINT8, InputUINT8, InputINT16, InputUINT16,
     InputINT32, InputUINT32, InputINT64, InputUINT64, Switch };
 
+constexpr static DrawingOptions INTDefault = DrawingOptions {
+    .Size = Size_t{50, 0}, .Format = "%d",
+};
+constexpr static DrawingOptions ButtonDefault = DrawingOptions {
+    .Color = MutedGreen,
+    .HoveredColor = ActiveMutedGreen,
+    .ActiveColor = InactiveMutedGreen
+};
+
+template<ControlTypes ControlType>
+constexpr DrawingOptions get_draw_defaults() {
+    switch (ControlType) {
+        case ControlTypes::Button:
+            return ButtonDefault;
+        case ControlTypes::InputINT8:
+        case ControlTypes::InputINT16:
+        case ControlTypes::InputINT32:
+        case ControlTypes::InputINT64:
+        case ControlTypes::InputUINT8:
+        case ControlTypes::InputUINT16:
+        case ControlTypes::InputUINT32:
+        case ControlTypes::InputUINT64:
+            return INTDefault;
+        default:
+            return DrawingOptions{};
+    }
+}
+
 template<ControlTypes ControlType, StringLiteral list>
 struct Control {
     const std::string_view Label = "";
@@ -115,7 +143,7 @@ struct Control {
     constexpr Control() = default;
     constexpr Control(
         const std::string_view& text, const std::string_view& help_text,
-        const DrawingOptions& draw_opts = DrawingOptions{}) :
+        const DrawingOptions& draw_opts = get_draw_defaults<ControlType>()) :
         Label{list.value},
         Text{text},
         HelpText{help_text},

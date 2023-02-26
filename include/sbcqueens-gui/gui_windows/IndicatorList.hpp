@@ -143,7 +143,40 @@ constexpr static auto GUIPlots = std::make_tuple(
 		.YAxisUnits = {""},
 		.YAxisScales = {ImPlotScale_Linear},
 		.YAxisFlags = {ImPlotAxisFlags_AutoFit}
-	})
+	}),
+    PlotIndicator<"Group 5", 8, 1>(PlotOptions<8, 1>{
+            .PlotType = PlotTypeEnum::Line,
+            .PlotLabels = {"41", "42", "43", "44", "45", "46", "47", "48"},
+            .PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
+            .XAxisLabel = "time ",
+            .XAxisUnit = "[sp]",
+            .YAxisLabels = {"Counts"},
+            .YAxisUnits = {""},
+            .YAxisScales = {ImPlotScale_Linear},
+            .YAxisFlags = {ImPlotAxisFlags_AutoFit}
+    }),
+    PlotIndicator<"Group 6", 8, 1>(PlotOptions<8, 1>{
+            .PlotType = PlotTypeEnum::Line,
+            .PlotLabels = {"49", "50", "51", "52", "53", "54", "55", "56"},
+            .PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
+            .XAxisLabel = "time ",
+            .XAxisUnit = "[sp]",
+            .YAxisLabels = {"Counts"},
+            .YAxisUnits = {""},
+            .YAxisScales = {ImPlotScale_Linear},
+            .YAxisFlags = {ImPlotAxisFlags_AutoFit}
+    }),
+    PlotIndicator<"Group 7", 8, 1>(PlotOptions<8, 1>{
+            .PlotType = PlotTypeEnum::Line,
+            .PlotLabels = {"57", "58", "59", "60", "61", "62", "63", "64"},
+            .PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
+            .XAxisLabel = "time ",
+            .XAxisUnit = "[sp]",
+            .YAxisLabels = {"Counts"},
+            .YAxisUnits = {""},
+            .YAxisScales = {ImPlotScale_Linear},
+            .YAxisFlags = {ImPlotAxisFlags_AutoFit}
+    })
 );
 
 } // namespace SBCQueens

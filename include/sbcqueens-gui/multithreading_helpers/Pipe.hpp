@@ -67,14 +67,15 @@ struct PipeEnd {
 
     void send() {
         if constexpr (type == PipeEndType::GUI) {
-            Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
+            Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
         } else {
-            Data.Changed = !Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
+            Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
         }
     }
 
     void send_if_changed() {
         if (Data.Changed) {
+            Data.Changed = false;
             send();
         }
     }

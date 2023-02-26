@@ -218,8 +218,38 @@ class GUIManager : public ThreadManager<Pipes> {
             constexpr auto group_zero_plot = get_plot<"Group 0", 8, 1>(GUIPlots);
             Plot(group_zero_plot, _sipm_doe.GroupData[0]);
 
+            ImGui::SameLine();
+
             constexpr auto group_one_plot = get_plot<"Group 1", 8, 1>(GUIPlots);
             Plot(group_one_plot, _sipm_doe.GroupData[1]);
+
+            ImGui::SameLine();
+
+            constexpr auto group_two_plot = get_plot<"Group 2", 8, 1>(GUIPlots);
+            Plot(group_two_plot, _sipm_doe.GroupData[2]);
+
+            ImGui::SameLine();
+
+            constexpr auto group_three_plot = get_plot<"Group 3", 8, 1>(GUIPlots);
+            Plot(group_three_plot, _sipm_doe.GroupData[3]);
+
+            constexpr auto group_four_plot = get_plot<"Group 4", 8, 1>(GUIPlots);
+            Plot(group_four_plot, _sipm_doe.GroupData[4]);
+
+            ImGui::SameLine();
+
+            constexpr auto group_five_plot = get_plot<"Group 5", 8, 1>(GUIPlots);
+            Plot(group_five_plot, _sipm_doe.GroupData[5]);
+
+            ImGui::SameLine();
+
+            constexpr auto group_six_plot = get_plot<"Group 6", 8, 1>(GUIPlots);
+            Plot(group_six_plot, _sipm_doe.GroupData[6]);
+
+            ImGui::SameLine();
+
+            constexpr auto group_seven_plot = get_plot<"Group 7", 8, 1>(GUIPlots);
+            Plot(group_seven_plot, _sipm_doe.GroupData[7]);
 
             ImGui::EndTabBar();
         }

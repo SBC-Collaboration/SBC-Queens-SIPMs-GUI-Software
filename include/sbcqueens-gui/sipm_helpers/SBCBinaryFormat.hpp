@@ -13,7 +13,7 @@
 // C 3rd party includes
 // C++ STD includes
 #include <bit>
-#include <inttypes.h>
+#include <cinttypes>
 #include <numeric>
 #include <fstream>
 #include <type_traits>
@@ -29,8 +29,7 @@
 #include "sbcqueens-gui/file_helpers.hpp"
 #include "sbcqueens-gui/caen_helper.hpp"
 
-namespace SBCQueens {
-namespace BinaryFormat {
+namespace SBCQueens::BinaryFormat {
 namespace Tools {
 
     // The BinaryFormat only accepts arithmethic pointers.
@@ -84,18 +83,31 @@ namespace Tools {
 
 } // namespace Tools
 
+/*  SBC Binary Header description:
+ * Header of a binary format is divided in 4 parts:
+ * 1.- Edianess            - always 4 bits long (uint32_t)
+ * 2.- Data Header size    - always 2 bits long (uint16_t)
+ * and is the length of the next bit of data
+ * 3.- Data Header         - is data header long.
+ * Contains the structure of each line. It is always found as a raw
+ * string in the form "{name_col};{type_col};{size1},{size2}...;...;
+ * Cannot be longer than 65536 bytes.
+ * 4.- Number of lines     - always 4 bits long (int32_t)
+ * Number of lines in the file. If 0, it is indefinitely long.
+*/
 template<typename... DataTypes>
 requires Tools::is_arithmetic_ptr_unpack<DataTypes...>
 struct DynamicWriter {
-    /* TODO(Any): this writer is unsafe. It uses raw pointers.
-     * maybe change it to take normal types and then internally
-     * use spans? */
+    //TODO(Any): make it possible to take both normal arithmetic types
+    //  - and their corresponding array types Ex: int and int[]
+    //  - that is to assume that if int is passed, it mean we want a scalar
+    //  - and int[] would mean an array.
     using tuple_type = std::tuple<std::span<DataTypes>...>;
     constexpr static std::size_t n_cols = sizeof...(DataTypes);
     constexpr static std::array<std::size_t, n_cols> size_of_types = { sizeof(DataTypes)... };
     constexpr static std::array<std::string_view, n_cols> parameters_types_str = { Tools::type_to_string<DataTypes>()... };
 
-private:
+ private:
     const std::string _file_name;
     const std::array<std::string, n_cols> _names;
     const std::array<std::size_t, n_cols> _ranks;
@@ -103,7 +115,7 @@ private:
 
     std::size_t total_ranks = 0;
     bool _open = false;
-    std::ofstream _stream;
+    std::fstream _stream;
 
     std::size_t _line_byte_size = 0;
     std::size_t _line_param_order = 0;
@@ -130,20 +142,7 @@ private:
         loc += source.length();
     }
 
-    void _create_file() {
-
-        /*  SBC Binary Header description:
-         * Header of a binary format is divided in 4 parts:
-         * 1.- Edianess            - always 4 bits long (uint32_t)
-         * 2.- Data Header size    - always 2 bits long (uint16_t)
-         * and is the length of the next bit of data
-         * 3.- Header              - is data header long.
-         * Contains the structure of each line. It is always found as a raw
-         * string in the form "{name_col};{type_col};{size1},{size2}...;...;
-         * Cannot be longer than 65536 bytes.
-         * 4.- Number of lines     - always 4 bits long (int32_t)
-         * Number of lines in the file. If 0, it is indefinitely long.
-        */
+    std::string _build_header() {
         // Edianess first
         uint32_t endianess = 0x01020304;
         if constexpr (std::endian::native == std::endian::big) {
@@ -152,8 +151,10 @@ private:
             endianess = 0x01020304;
         }
 
+        // calculates
         std::size_t total_header_size = 0;
         // has to be uint16_t because we are saving it to the file later
+
         uint16_t binary_header_size = 0;
         std::size_t total_ranks_so_far = 0;
         for (std::size_t i = 0; i < n_cols; i++) {
@@ -174,8 +175,8 @@ private:
             total_ranks_so_far += column_rank;
             _line_byte_size += size_of_types[i]*total_rank_size;
         }
-        // We also calculate the line size very useful when we start data saving
 
+        // We also calculate the line size very useful when we start data saving
         total_header_size += sizeof(uint32_t); // 1.
         total_header_size += sizeof(uint16_t); // 2.
         total_header_size += binary_header_size; // 3.
@@ -212,18 +213,17 @@ private:
             total_ranks_so_far += column_rank;
         }
 
-        int32_t j = 0x00000000;
-        _copy_number_to_buff(j, buffer, buffer_loc); // 4.
-
-        // save to file.
-        _stream << buffer;
+        // For dynamic files, this is always 0!
+        const int32_t num_lines = 0x00000000;
+        _copy_number_to_buff(num_lines, buffer, buffer_loc); // 4.
+        // Done!
+        return buffer;
     }
 
     // Save item from tuple in position i
     template<std::size_t i>
     void _save_item(const tuple_type& items, std::size_t& loc) {
         auto item = std::get<i>(items);
-        using T = decltype(item);
 
         auto rank = _ranks[i];
         auto total_rank_up_to_i = std::accumulate(_ranks.begin(),
@@ -231,7 +231,7 @@ private:
                                                   0);
 
         const auto& size_index_start = total_rank_up_to_i;
-        const auto& expected_size = std::accumulate(&_sizes[size_index_start],
+        const std::size_t expected_size = std::accumulate(&_sizes[size_index_start],
                                                  &_sizes[size_index_start + rank],
                                                  1,
                                                 std::multiplies<std::size_t>());
@@ -274,13 +274,39 @@ private:
         total_ranks = std::accumulate(columns_ranks.begin(),
                                       columns_ranks.end(), 0);
 
-        _stream.open(_file_name,
-                     std::ofstream::app | std::ofstream::binary);
-
-        if (_stream.is_open()) {
-            _open = true;
+        if (std::filesystem::exists(file_name)) {
             if (std::filesystem::is_empty(file_name)) {
-                _create_file();
+                // If file is empty or does not exist, then we
+                // open it and write to it.
+                _stream.open(_file_name, std::ios::app | std::ofstream::binary);
+                if (_stream.is_open()) {
+                    _open = true;
+                    _stream << _build_header();
+                }
+            } else {
+                std::ifstream peeker(_file_name, std::ofstream::binary);
+
+                std::string header = _build_header();
+                std::string current_file_header(header.length(), '\0');
+                peeker.seekg(0);
+                peeker.read(&current_file_header[0], header.length());
+
+                if (current_file_header != header) {
+                    throw std::runtime_error("File being written to has an "
+                                             "incompatible header format. "
+                                             "Details:\n\t File = " + _file_name);
+                }
+
+                // We do not write anything.
+                _stream.open(_file_name, std::ios::app | std::ofstream::binary);
+                _open = _stream.is_open();
+
+            }
+        } else {
+            _stream.open(_file_name, std::ios::app | std::ofstream::binary);
+            if (_stream.is_open()) {
+                _open = true;
+                _stream << _build_header();
             }
         }
     }
@@ -291,7 +317,9 @@ private:
     }
 
     void save(std::span<DataTypes>... data) {
-        _save_event(std::make_tuple(data...));
+        if(_open) {
+            _save_event(std::make_tuple(data...));
+        }
     }
 };
 
@@ -319,7 +347,7 @@ class SiPMDynamicWriter {
     constexpr static std::size_t num_cols = 10;
     constexpr static std::array<std::size_t, num_cols> sipm_ranks =
                                     {1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
-    const inline static std::array<std::string, num_cols> sipm_names =
+    const inline static std::array<std::string, num_cols> column_names =
             {"sample_rate", "en_chs", "trg_mask", "thresholds", "dc_offsets",
              "dc_corrections", "dc_range", "time_stamp", "trg_source", "data"};
 
@@ -366,7 +394,7 @@ class SiPMDynamicWriter {
         _sample_rate{model_consts.AcquisitionRate},
         _en_chs{_get_en_chs(model_consts, group_configs)},
         _record_length{global_config.RecordLength},
-        _streamer{file_name, sipm_names,  sipm_ranks, _form_sizes(global_config)}
+        _streamer{file_name, column_names,  sipm_ranks, _form_sizes(global_config)}
     {
         for(auto ch : _en_chs) {
             CAENGroupConfig group;
@@ -381,13 +409,14 @@ class SiPMDynamicWriter {
             _trigger_mask[0] |= (1 << ch);  // flip the bit at position ch
             _thresholds.push_back(group.TriggerThreshold);
             _dc_offsets.push_back(group.DCOffset);
-            _dc_ranges.push_back(model_consts.VoltageRanges.at(group.DCRange));
+            _dc_ranges.push_back(static_cast<float>(
+                    model_consts.VoltageRanges.at(group.DCRange)));
         }
     }
 
     ~SiPMDynamicWriter() = default;
 
-    void save_waveform(std::shared_ptr<CAENWaveforms<uint16_t>> waveform) {
+    void save_waveform(const std::shared_ptr<CAENWaveforms<uint16_t>>& waveform) {
         _trigger_tag[0] = waveform->getInfo().TriggerTimeTag;
         _trigger_source[0] = waveform->getInfo().Pattern;
         _streamer.save(_sample_rate,
@@ -441,7 +470,6 @@ class SiPMDynamicWriter {
 
 };
 
-} // namespace BinaryFormat
-} // namespace SBCQueens
+} // namespace SBCQueens::BinaryFormat
 
 #endif //SBCBINARYFORMAT_H

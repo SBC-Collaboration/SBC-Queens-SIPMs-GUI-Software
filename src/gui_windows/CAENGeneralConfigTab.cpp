@@ -36,6 +36,35 @@ void CAENGeneralConfigTab::init_tab(const toml::table& tb) {
 void CAENGeneralConfigTab::draw() {
     ImGui::PushItemWidth(120);
 
+    static bool tmp;
+    constexpr auto soft_trigg = get_control<ControlTypes::Button,
+            "Software Trigger">(SiPMGUIControls);
+    draw_control(soft_trigg, _sipm_doe,
+                 tmp, [&](){ return tmp; },
+            // Callback when tmp is true !
+                 [](SiPMAcquisitionData& caen_twin) {
+                     caen_twin.SoftwareTrigger = true;
+                 }
+    );
+
+    ImGui::SameLine(0.0f, 50.0f);
+
+    constexpr auto reset_caen = get_control<ControlTypes::Button,
+            "Reset##CAEN">(SiPMGUIControls);
+    draw_control(reset_caen, _sipm_doe, tmp,
+                 [&](){ return tmp; },
+                 // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& doe_twin) {
+                     if (doe_twin.AcquisitionState != SiPMAcquisitionStates::Reset) {
+
+                         doe_twin = _sipm_doe;
+                         doe_twin.AcquisitionState = SiPMAcquisitionStates::Reset;
+                     }
+                 }
+    );
+
+    ImGui::Separator();
+
     constexpr auto caen_model_cb =
         get_control<ControlTypes::ComboBox, "CAEN Model">(SiPMGUIControls);
     draw_control(caen_model_cb, _sipm_doe,
@@ -126,16 +155,6 @@ void CAENGeneralConfigTab::draw() {
         },
         io_level_map
     );
-
-    bool tmp;
-    constexpr auto soft_trigg = get_control<ControlTypes::Button,
-                                    "Software Trigger">(SiPMGUIControls);
-    draw_control(soft_trigg, _sipm_doe,
-        tmp, [&](){ return tmp; },
-        // Callback when tmp is true !
-        [](SiPMAcquisitionData& caen_twin) {
-            caen_twin.SoftwareTrigger = true;
-    });
 
     ImGui::PopItemWidth();
 }

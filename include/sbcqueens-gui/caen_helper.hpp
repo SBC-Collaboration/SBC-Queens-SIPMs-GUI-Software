@@ -193,25 +193,44 @@ struct CAENGlobalConfig {
     bool EXTAsGate = false;
 
     // External Trigger Mode
-    // see caen_helper.cpp setup(...) to see a description of these enums
+    // Trigger Mode comes in four flavors:
+    // CAEN_DGTZ_TRGMODE_DISABLED
+    //    is disabled
+    // CAEN_DGTZ_TRGMODE_EXTOUT_ONLY
+    //    is used to generate the trigger output
+    // CAEN_DGTZ_TRGMODE_ACQ_ONLY
+    //    is used to generate the acquisition trigger
+    // CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT
+    //    is used to generate the acquisition trigger and trigger
     CAEN_DGTZ_TriggerMode_t EXTTriggerMode
         = CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY;
 
     // Software Trigger Mode
-    // see caen_helper.cpp setup(...) to see a description of these enums
+    // see External Trigger Mode for description
     CAEN_DGTZ_TriggerMode_t SWTriggerMode
         = CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY;
 
     // Channel Trigger Mode
-    // see caen_helper.cpp setup(...) to see a description of these enums
+    // see External Trigger Mode for description
     CAEN_DGTZ_TriggerMode_t CHTriggerMode
         = CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_ACQ_ONLY;
 
-    // Acquisition mode
+    /* Acquisition mode comes in four flavors:
+     * - CAEN_DGTZ_SW_CONTROLLED
+     *  Start/stop of the run takes place on software
+     *  command (by calling CAEN_DGTZ_SWStartAcquisition )
+     * - CAEN_DGTZ_FIRST_TRG_CONTROLLED
+     *  Run starts on the first trigger pulse (rising edge on
+     *  TRG-IN) actual triggers start from the second pulse from there
+     * - CAEN_DGTZ_S_IN_CONTROLLED
+     *  S-IN/GPI controller (depends on the board). Acquisition
+     *  starts on edge of the GPI/S-IN
+     *  CAEN_DGTZ_LVDS_CONTROLLED
+     VME ONLY, like S_IN_CONTROLLER but uses LVDS. */
     CAEN_DGTZ_AcqMode_t AcqMode
         = CAEN_DGTZ_AcqMode_t::CAEN_DGTZ_SW_CONTROLLED;
 
-    // Voltage i/o level for the digital channels
+    // Voltage I/O level for the digital channels
     CAEN_DGTZ_IOLevel_t IOLevel
         = CAEN_DGTZ_IOLevel_t::CAEN_DGTZ_IOLevel_NIM;
 
@@ -229,6 +248,15 @@ struct CAENGlobalConfig {
     // 1L/CAEN_DGTZ_TriggerOnFallingEdge -> Falling edge
     CAEN_DGTZ_TriggerPolarity_t TriggerPolarity =
         CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge;
+
+    // From CAEN API: For a MajorityLevel, m, the trigger fires when at
+    // least m+1 of the enabled trigger requests are over-threshold inside
+    // the majority coincidence window. Max is 7.
+    uint32_t MajorityLevel = 0;
+    // In units of trigger clock. Only 4 LSB bits are counted.
+    uint32_t MajorityCoincidenceWindow = 0;
+
+    // TODO(Any): there are also majority values for TRG-OUT
 };
 
 // Help structure to link an array of booleans to a single uint8_t
@@ -250,7 +278,7 @@ struct ChannelsMask {
         return CH[iter];
     }
 
-    const bool& at(const std::size_t& iter) const {
+    [[nodiscard]] const bool& at(const std::size_t& iter) const {
         if(iter > kNumCHs) {
             throw std::invalid_argument("iter is higher than 8.");
         }
@@ -551,6 +579,7 @@ class CAEN {
         }
     };
 
+    //TODO(Any): change this to be a global variable probably inside a namespace
     static inline std::unordered_map<int, bool> _connection_info_map;
 
     // THis is a number that the CAEN API uses to manage its own resources.
@@ -569,25 +598,41 @@ class CAEN {
     // its deletion
     Logger& _logger;
 
-    // This holds the latest raw CAEN data
-    // Unique_ptr because only this class should manage this resource;
-    std::unique_ptr<CAENData> _caen_raw_data;
+    using CAENData_ptr = std::unique_ptr<CAENData>;
+    // This holds the latest raw digitizer data.
+    // unique_ptr because only this class should manage this resource;
+    // Its lifetime is the same as the acquisition is enabled.
+    // Only 1 required at a time.
+    // TODO(Any): for multiprocessing of data this is where I would start.
+    //  - adding a circular buffer of CAEN data will allow to further
+    //  - acquire more CAENData while the previous CAENData is being
+    //  - processed
+    CAENData_ptr _caen_raw_data;
     // Contains information about the configuration of the digitizer
     CAENGlobalConfig _global_config;
-    // Contains information about all of the groups, see CAENGroupConfig
-    // for more information. Currently it is only possible to have up to
+    // Contains information about all of the groups, see CAENGroupConfig struct
+    // for more information. Currently, it is only possible to have up to
     // 8 groups from any digitizer.
     std::array<CAENGroupConfig, 8> _group_configs;
 
-    CAEN_DGTZ_BoardInfo_t _board_info;
+    // BoardInfo obtained during setup(...). It is a CAEN API struct.
+    // Contains information about the digitizer such as firmware version,
+    // family, and others.
+    CAEN_DGTZ_BoardInfo_t _board_info = {};
+    // Local variable that holds the current max buffers given the current
+    // setup. Read directly from CAEN API.
     uint32_t _current_max_buffers = 0;
 
-    // Unique_ptr because only this class should manage this resource;
+    // unique_ptr because only this class should manage this resource;
+    // Its life-time is as long as acquisition is enabled.
     using CAENEvent_ptr = std::unique_ptr<CAENEvent>;
+    // There can only be a max of 1024 of events at a time, but this
+    // can be tweeked in teh future.
     std::array<CAENEvent_ptr, EventBufferSize> _events;
     // shared_ptr as anyone can manage this resource even if CAEN
-    // is no longer in use.
-    std::array<std::shared_ptr<CAENWaveforms<uint16_t>>, EventBufferSize> _waveforms;
+    // is no longer in use. Its lifetime is independent of CAEN
+    using CAENWaveforms_ptr = std::shared_ptr<CAENWaveforms<uint16_t>>;
+    std::array<CAENWaveforms_ptr, EventBufferSize> _waveforms;
 
     // Translates the connection info data to a single number that should
     // be unique.
@@ -596,6 +641,8 @@ class CAEN {
         uint64_t id = static_cast<uint64_t>(addr & 0x0000FFFF) << 32;
         id |= (cn & 0x000000FF) << 16;
         id |= (ln & 0x000000FF) << 8;
+
+        // TODO(Any): missing enum cases
         switch (ct) {
         case CAENConnectionType::A4818:
             id |= 1;
@@ -615,8 +662,8 @@ class CAEN {
                        std::string_view extra_msg = "") noexcept {
 
         const std::string expression_str =
-            "{} at {} in CAEN function named {} with CAEN message {}. "
-            "Additional info: {}";
+            "{} at {} in CAEN API function named {} with CAEN API message: {}. "
+            "Additional message: {}";
 
         switch (_err_code) {
         case CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Success:
@@ -641,6 +688,7 @@ class CAEN {
         }
     }
 
+    // Gets the family given a model.
     CAENDigitizerFamilies _get_family(const CAENDigitizerModel& model) {
         switch(model) {
         case CAENDigitizerModel::DT5740D:
@@ -668,16 +716,16 @@ class CAEN {
     //
     const uint32_t VMEBaseAddress;
 
-    // Creation of this class attempts a connection to CAEN
-    // which will take the resource and IsConnected will say if its connected
-    // Its up to the user if they would like a more pointer approach
-    // or just if-else statements.
+    // Creation of this class attempts a connection to CAEN.
+    // If succesful, it will take the resource and other attempts
+    // will fail.
+    // Use IsConnected() member function will indicate if its connected
     //
     // Description of parameters:
-    // logger -> logger used to print information (debug, warning, etc)
-    //  defaults iostream_wrapper but can be user configured.
-    // ct -> Physical communication channel. CAEN_DGTZ_USB,
-    //  CAEN_DGTZ_PCI_OpticalLink being the most expected options
+    // logger ->    logger used to print information (debug, warning, etc)
+    //              defaults iostream_wrapper but can be user configured.
+    // ct ->        Physical communication channel. CAEN_DGTZ_USB,
+    //              CAEN_DGTZ_PCI_OpticalLink being the most expected options
     // ln -> Link number. In the case of USB is the link number assigned by the
     //  PC when you connect the cable to the device. 0 for the first device and
     //  so on. There is no fix correspondence between the USB port and the
@@ -703,8 +751,8 @@ class CAEN {
             throw std::invalid_argument("Logger is not an existing resource.");
         }
 
-        /// We turn Connection type, linknum, conectnode and VMEBaseAddress
-        /// into a single container so we know we are not repeating connections
+        // We turn Connection type, linknum, conectnode and VMEBaseAddress
+        // into a single container so we know we are not repeating connections.
         auto id = _hash_connection_info(ct, ln, cn, addr);
 
         // C++17 way to check if the item exists
@@ -720,25 +768,26 @@ class CAEN {
 
         // If the item exists, pass on the creation
         switch (ct) {
-            case CAENConnectionType::A4818:
-                _err_code = CAEN_DGTZ_OpenDigitizer(
-                    CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB_A4818,
-                    ln, 0, addr, &_caen_api_handle);
-            break;
+        case CAENConnectionType::A4818:
+            _err_code = CAEN_DGTZ_OpenDigitizer(
+                CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB_A4818,
+                ln, cn, addr, &_caen_api_handle);
+        break;
 
-            case CAENConnectionType::USB:
-            default:
-                _err_code = CAEN_DGTZ_OpenDigitizer(
-                    CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
-                    ln, cn, 0, &_caen_api_handle);
-            break;
+        case CAENConnectionType::USB:
+        default:
+            _err_code = CAEN_DGTZ_OpenDigitizer(
+                CAEN_DGTZ_ConnectionType::CAEN_DGTZ_USB,
+                ln, 0, 0, &_caen_api_handle);
+        break;
         }
 
-        _is_connected = (_err_code == CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Success) and (_caen_api_handle >= 0);
+        _is_connected = (_err_code == CAEN_DGTZ_ErrorCode::CAEN_DGTZ_Success)
+                        and (_caen_api_handle >= 0);
         if (not _is_connected) {
             _caen_api_handle = -1;
             _has_error = true;
-            _print_if_err("CAEN_DGTZ_OpenDigitizer", __FUNCTION__, "Failed"
+            _print_if_err("CAEN_DGTZ_OpenDigitizer", __FUNCTION__, "Failed "
                 "to open the port to the digitizer.");
         } else {
             _logger->info("Connected resource with handle {0} with "
@@ -775,90 +824,95 @@ class CAEN {
         // Everything should be cleared by their own destructors!
     }
 
-    // Public members
     // Check whenever the port is connected
     bool IsConnected() noexcept { return _is_connected; }
-
+    // Check if it has error.
     bool HasError() noexcept { return _has_error; }
-
+    // Resets warning flag
     void ResetWarning() noexcept { _has_warning = false; }
+    // CHeck if it has warning
     bool HasWarning() noexcept { return _has_warning; }
 
-    const auto& GetBoardInfo() { return _board_info; }
-    const auto& GetGlobalConfiguration() { return _global_config; }
-    const auto& GetGroupConfigurations() { return _group_configs; }
-    const auto& GetNumberOfEvents() { return _caen_raw_data->NumEvents; }
+    const auto& GetBoardInfo() noexcept { return _board_info; }
+    const auto& GetGlobalConfiguration() noexcept { return _global_config; }
+    const auto& GetGroupConfigurations() noexcept { return _group_configs; }
+    const auto& GetNumberOfEvents() noexcept {
+        return _caen_raw_data->NumEvents;
+    }
+    const auto& GetCurrentPossibleMaxBuffer() noexcept {
+        return _current_max_buffers;
+    }
 
+    // Using CAENGlobalConfig and the array of CAENGroupConfig
+    // the digitizer is setup to specification. No memory allocation is done
+    // during this step.
     void Setup(const CAENGlobalConfig&,
         const std::array<CAENGroupConfig, 8>&) noexcept;
-    // Reset. Returns all internal registers to defaults.
-    // Does not reset if resource is null.
+    // Reset. Returns all internal registers to defaults. It also releases
+    // any dynamic memory.
     void Reset() noexcept;
     // Enables the acquisition and allocates the memory for the acquired data.
-    // Does not enable acquisitoin if resource is null or there are errors.
+    // Does not enable acquisition if there are errors.
     void EnableAcquisition() noexcept;
-    // Disables the acquisition and frees up memory
-    // Does not disables acquisition if resource is null.
+    // Disables the acquisition.
+    // Does not disables acquisition if resource there are errors.
     void DisableAcquisition() noexcept;// Writes to register ADDR with VALUE
-    // Does write to register if resource is null or there are errors.
-    void WriteRegister(uint32_t&& addr, const uint32_t& value) noexcept;
+    // Does write to register if there are errors.
+    void WriteRegister(const uint32_t& addr, const uint32_t& value) noexcept;
     // Reads contents of register ADDR into value
-    // Does not modify value if resource is null or there are errors.
-    void ReadRegister(uint32_t&& addr, uint32_t& value) noexcept;
+    // Does not modify value if there are errors.
+    void ReadRegister(const uint32_t& addr, uint32_t& value) noexcept;
     // Write arbitrary bits of any length at any position,
     // Keeps the other bits unchanged,
     // Following instructions at
     // https://stackoverflow.com/questions/11815894/how-to-read-write-arbitrary-bits-in-c-c
-    void WriteBits(uint32_t&& addr,
+    void WriteBits(const uint32_t& addr,
         const uint32_t& value, uint8_t pos, uint8_t len = 1) noexcept;
     // Forces a software trigger in the digitizer.
-    // Does not trigger if resource is null or there are errors.
+    // Does not trigger if there are errors.
     void SoftwareTrigger() noexcept;
     // Asks CAEN how many events are in the buffer
-    // Returns 0 if resource is null or there are errors.
+    // Returns 0 if there are errors.
     uint32_t GetEventsInBuffer() noexcept;
     // Runs a bunch of commands to retrieve the buffer and process it
     // using CAEN functions.
-    // Does not retrieve data if resource is null or there are errors.
+    // Does not retrieve data if there are errors or is not acquiring.
     void RetrieveData() noexcept;
     // Returns true if data was read successfully
-    // Does not retrieve data if resource is null, there are errors,
+    // Does not retrieve data if there are errors, is not acquiring,
     // or events in buffer are less than n.
     // n cannot be bigger than the max number of buffers allowed
-    bool RetrieveDataUntilNEvents(uint32_t& n, bool debug_info = false) noexcept;
+    bool RetrieveDataUntilNEvents(const uint32_t& n) noexcept;
     // Decodes event i from the data retrieved by any call from RetrieveData
     // If i is out of bounds, returns the event at the end of the buffer.
     // if there is an error during acquisition, this returns a nullptr;
-    std::shared_ptr<CAENWaveforms<uint16_t>> DecodeEvent(const uint32_t& i) noexcept;
+    auto DecodeEvent(const uint32_t& i) noexcept;
     // Decodes the latest acquired events.
+    // If there are errors it does nothing.
     void DecodeEvents() noexcept;
     // Clears the digitizer buffer. It stops the acquisition and resumes it
-    // after clearing the data.
+    // after clearing the data without doing any reallocation of memory.
     void ClearData() noexcept;
     // Returns a const pointer to the event held @ index i.
     // If i value is higher the latest acquired number of events, it returns
     // the last event. Use GetNumberOfevents() to check for the number
     // of events in memory
-    std::shared_ptr<CAENWaveforms<uint16_t>> GetWaveform(const std::size_t& i) noexcept {
-        if (i > _caen_raw_data->NumEvents) {
-            return _waveforms[_caen_raw_data->NumEvents - 1];
+    auto GetWaveform(const std::size_t& i) noexcept {
+        if (i >= _current_max_buffers) {
+            return _waveforms[_current_max_buffers - 1];
         }
 
         return _waveforms[i];
     }
 
-    // Returns a const pointer to CAENEvent. Its lifespans should
-    // be managed by CAEN
+    // Returns a const pointer to CAENEvent. Its lifespans its
+    // managed by CAEN
     const CAENEvent* GetEvent(const std::size_t& i) noexcept {
-        if (i > _caen_raw_data->NumEvents) {
-            return _events[_caen_raw_data->NumEvents - 1].get();
+        if (i >= _current_max_buffers) {
+            return _events[_current_max_buffers - 1].get();
         }
 
         return _events[i].get();
-    }
-
-    const uint32_t& GetCurrentPossibleMaxBuffer() noexcept {
-        return _current_max_buffers;
     }
 
     uint32_t GetCommTransferRate() noexcept {
@@ -920,6 +974,11 @@ void CAEN<T, N>::Reset() noexcept {
 
     _err_code = CAEN_DGTZ_Reset(_caen_api_handle);
     _print_if_err("CAEN_DGTZ_Reset", __FUNCTION__);
+
+    _caen_raw_data.reset();
+    for(auto& event : _events){
+        event.reset();
+    }
 }
 
 template<typename T, size_t N>
@@ -935,7 +994,7 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
     // Second, we put the digitizer in a known state.
     Reset();
 
-    int &handle = _caen_api_handle;
+    int& handle = _caen_api_handle;
 
     // Now, global configuration
     // Global config
@@ -962,41 +1021,19 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
 
     // So far, all digitizer have the register 0x800C point to the
     // exponent of the number of buffers currently used.
-    // TODO(Any): check if 0x800C is the register for all
+    // TODO(Any): check if 0x800C is the register for all families
     ReadRegister(0x800C, _current_max_buffers);
     _current_max_buffers = std::exp2(_current_max_buffers);
 
     _err_code = CAEN_DGTZ_SetPostTriggerSize(handle, _global_config.PostTriggerPorcentage);
     _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
 
-    // Trigger Mode comes in four flavors:
-    // CAEN_DGTZ_TRGMODE_DISABLED
-    //    is disabled
-    // CAEN_DGTZ_TRGMODE_EXTOUT_ONLY
-    //    is used to generate the trigger output
-    // CAEN_DGTZ_TRGMODE_ACQ_ONLY
-    //    is used to generate the acquisition trigger
-    // CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT
-    //    is used to generate the acquisition trigger and trigger
-    // output
     _err_code = CAEN_DGTZ_SetSWTriggerMode(handle, _global_config.SWTriggerMode);
     _print_if_err("CAEN_DGTZ_SetSWTriggerMode", __FUNCTION__);
 
     _err_code = CAEN_DGTZ_SetExtTriggerInputMode(handle, _global_config.EXTTriggerMode);
     _print_if_err("CAEN_DGTZ_SetExtTriggerInputMode", __FUNCTION__);
 
-    // Acquisition mode comes in four flavors:
-    // CAEN_DGTZ_SW_CONTROLLED
-    //    Start/stop of the run takes place on software
-    //    command (by calling CAEN_DGTZ_SWStartAcquisition )
-    // CAEN_DGTZ_FIRST_TRG_CONTROLLED
-    //    Run starts on the first trigger pulse (rising edge on
-    // TRG-IN)    actual triggers start from the second pulse from there
-    // CAEN_DGTZ_S_IN_CONTROLLED
-    //    S-IN/GPI controller (depends on the board). Acquisition
-    //    starts on edge of the GPI/S-IN
-    // CAEN_DGTZ_LVDS_CONTROLLED
-    //    VME ONLY, like S_IN_CONTROLLER but uses LVDS.
     _err_code = CAEN_DGTZ_SetAcquisitionMode(handle, _global_config.AcqMode);
     _print_if_err("CAEN_DGTZ_SetAcquisitionMode", __FUNCTION__);
 
@@ -1016,6 +1053,12 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
     WriteBits(0x8000, _global_config.TriggerOverlappingEn, 1);
 
     WriteBits(0x8100, _global_config.MemoryFullModeSelection, 5);
+
+    // Global Trigger mask. So far seems to be applicable for digitizers
+    // with and without groups, huh!
+    constexpr uint32_t kGlobalTriggerMaskAddr = 0x810C;
+    WriteBits(kGlobalTriggerMaskAddr, _global_config.MajorityCoincidenceWindow, 20, 4);
+    WriteBits(kGlobalTriggerMaskAddr, _global_config.MajorityLevel, 24, 3);
 
     // Channel stuff
     _group_configs = gr_configs;
@@ -1123,10 +1166,11 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
         }
 
         bool trg_out = false;
-
+        // TODO(Any): these configuration bits look like more complex than they
+        //  - are, maybe they should be expanded to be its own struct?
         // For 740, to use TRG-IN as Gate / anti-veto
         if (_global_config.EXTAsGate) {
-            WriteBits(0x810C, 1, 27);  // TRG-IN AND internal trigger,
+            WriteBits(kGlobalTriggerMaskAddr, 1, 27);  // TRG-IN AND internal trigger,
             // and to serve as gate
             WriteBits(0x811C, 1, 10);  // TRG-IN as gate
         }
@@ -1214,27 +1258,31 @@ void CAEN<T, N>::DisableAcquisition() noexcept {
 }
 
 template<typename T, size_t N>
-void CAEN<T, N>::WriteRegister(uint32_t&& addr, const uint32_t& value) noexcept {
+void CAEN<T, N>::WriteRegister(const uint32_t& addr, const uint32_t& value) noexcept {
     if (_has_error or not _is_connected) {
         return;
     }
 
     _err_code = CAEN_DGTZ_WriteRegister(_caen_api_handle, addr, value);
-    _print_if_err("CAEN_DGTZ_WriteRegister", __FUNCTION__);
+    _print_if_err("CAEN_DGTZ_WriteRegister", __FUNCTION__, "Failed to write "
+                                                           "register " +
+                                                           std::to_string(addr));
 }
 
 template<typename T, size_t N>
-void CAEN<T, N>::ReadRegister(uint32_t&& addr, uint32_t& value) noexcept {
+void CAEN<T, N>::ReadRegister(const uint32_t& addr, uint32_t& value) noexcept {
     if (_has_error or not _is_connected) {
         return;
     }
 
     _err_code = CAEN_DGTZ_ReadRegister(_caen_api_handle, addr, &value);
-    _print_if_err("CAEN_DGTZ_ReadRegister", __FUNCTION__);
+    _print_if_err("CAEN_DGTZ_ReadRegister", __FUNCTION__, "Failed to read "
+                                                          "register " +
+                                                          std::to_string(addr));
 }
 
 template<typename T, size_t N>
-void CAEN<T, N>::WriteBits(uint32_t&& addr,
+void CAEN<T, N>::WriteBits(const uint32_t& addr,
     const uint32_t& value, uint8_t pos, uint8_t len) noexcept {
     if (_has_error or not _is_connected) {
         return;
@@ -1243,7 +1291,9 @@ void CAEN<T, N>::WriteBits(uint32_t&& addr,
     // First read the register
     uint32_t read_word = 0;
     _err_code = CAEN_DGTZ_ReadRegister(_caen_api_handle, addr, &read_word);
-    _print_if_err("CAEN_DGTZ_ReadRegister", __FUNCTION__);
+    _print_if_err("CAEN_DGTZ_ReadRegister", __FUNCTION__, "Failed to read "
+                                                          "register " +
+                                                          std::to_string(addr));
 
     uint32_t bit_mask = ~(((1 << len) - 1) << pos);
     read_word = read_word & bit_mask; //mask the register value
@@ -1252,7 +1302,9 @@ void CAEN<T, N>::WriteBits(uint32_t&& addr,
     uint32_t value_bits = (value & ((1 << len) - 1)) << pos;
     // Combine masked value read from register with new bits
     _err_code = CAEN_DGTZ_WriteRegister(_caen_api_handle, addr, read_word | value_bits);
-    _print_if_err("CAEN_DGTZ_WriteRegister", __FUNCTION__);
+    _print_if_err("CAEN_DGTZ_WriteRegister", __FUNCTION__, "Failed to write "
+                                                           "register " +
+                                                           std::to_string(addr));
 }
 
 template<typename T, size_t N>
@@ -1267,6 +1319,10 @@ void CAEN<T, N>::SoftwareTrigger() noexcept {
 
 template<typename T, size_t N>
 uint32_t CAEN<T, N>::GetEventsInBuffer() noexcept {
+    if (_has_error or not _is_connected) {
+        return 0;
+    }
+
     uint32_t events = 0;
     // For 5730 it is the register 0x812C
     // TODO(Any): expand to include any registers depending on the model
@@ -1300,7 +1356,7 @@ void CAEN<T, N>::RetrieveData() noexcept {
 }
 
 template<typename T, size_t N>
-bool CAEN<T, N>::RetrieveDataUntilNEvents(uint32_t& n, bool debug_info) noexcept {
+bool CAEN<T, N>::RetrieveDataUntilNEvents(const uint32_t& n) noexcept {
     int& handle = _caen_api_handle;
 
     if (_has_error or not _is_connected or not _is_acquiring) {
@@ -1328,13 +1384,13 @@ bool CAEN<T, N>::RetrieveDataUntilNEvents(uint32_t& n, bool debug_info) noexcept
 }
 
 template<typename T, size_t N>
-std::shared_ptr<CAENWaveforms<uint16_t>> CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
+auto CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
     if (i > _caen_raw_data->NumEvents) {
-        return &_events[_caen_raw_data->NumEvents - 1];
+        return _waveforms[_caen_raw_data->NumEvents - 1];
     }
 
     if (_has_error or not _is_connected) {
-        return nullptr;
+        return _waveforms[_caen_raw_data->NumEvents - 1];;
     }
 
     _err_code = _events[i]->getEventInfo(_caen_raw_data->Buffer,

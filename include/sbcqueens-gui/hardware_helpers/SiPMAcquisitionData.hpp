@@ -28,8 +28,9 @@ enum class SiPMAcquisitionManagerStates {
 };
 
 enum class SiPMAcquisitionStates {
-    OscilloscopeMode,
-    AcquisitionMode,
+    Oscilloscope,
+    NumberedAcquisition,
+    EndlessAcquisition,
     Reset
 };
 
@@ -69,8 +70,9 @@ struct SiPMAcquisitionData {
     int PortNum = 0;
     uint32_t VMEAddress = 0;
 
+    std::string SiPMOutputName = "";
     SiPMAcquisitionManagerStates CurrentState = SiPMAcquisitionManagerStates::Standby;
-    SiPMAcquisitionStates AcquisitionState = SiPMAcquisitionStates::OscilloscopeMode;
+    SiPMAcquisitionStates AcquisitionState = SiPMAcquisitionStates::Oscilloscope;
 
     bool SoftwareTrigger = false;
     bool ResetCaen = false;
@@ -100,13 +102,12 @@ struct SiPMAcquisitionData {
 
     // Shared plot data
     PlotDataBuffer<2> IVData;
-    std::array<PlotDataBuffer<8>, 4> GroupData;
+    std::array<PlotDataBuffer<8>, 8> GroupData;
 
     // This API required items.
     bool Changed = false;
     SiPMAcquisitionDataPipeCallback Callback;
 };
-
 
 // Control and indicators
 template<ControlTypes ControlType, StringLiteral Label>
