@@ -475,20 +475,19 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
 
                 // Send them to GUI to draw them
                 for (uint16_t i = 0; i < rtds.Temps.size(); i++) {
-                    const double temp = rtds.Temps[i];
-                    _doe.RTDTemps[i] = temp;
+                    _doe.RTDTemps[i] = rtds.Temps[i];
                 }
 
                 _doe.TemperatureData(get_current_time_epoch() / 1000.0,
-                                     rtds.Temps[0],
-                                     rtds.Temps[1],
-                                     rtds.Temps[2],
-                                     rtds.Temps[3],
-                                     rtds.Temps[4],
-                                     rtds.Temps[5],
-                                     rtds.Temps[6],
-                                     rtds.Temps[7],
-                                     rtds.Temps[8]);
+                                     _doe.RTDTemps[0],
+                                     _doe.RTDTemps[1],
+                                     _doe.RTDTemps[2],
+                                     _doe.RTDTemps[3],
+                                     _doe.RTDTemps[4],
+                                     _doe.RTDTemps[5],
+                                     _doe.RTDTemps[6],
+                                     _doe.RTDTemps[7],
+                                     _doe.RTDTemps[8]);
 
                 double err = rtds.Temps[_doe.PidRTD]
                     - static_cast<double>(_doe.PIDTempValues.SetPoint) - 273.15;
@@ -499,7 +498,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             } catch (... ) {
                 _logger->warn("Failed to parse latest data from {0}. "
                             "Message received from Teensy: {1}",
-                            cTeensyCommands.at(TeensyCommands::GetRTDs),
+                            cTeensyCommands.at(TeensyCommands::GetRawRTDs),
                             msg.value());
                 flush(_port);
             }

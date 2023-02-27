@@ -527,9 +527,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         software_trigger(caen_port);
 
         auto n_events = caen_port->GetEventsInBuffer();
-        caen_port->RetrieveData();
 
-        if (caen_port->GetNumberOfEvents() > 0) {
+        if (caen_port->RetrieveDataUntilNEvents(0.5*caen_port->GetCurrentPossibleMaxBuffer())) {
             TriggeredWaveforms += n_events;
 
             // This should update the values under _waveforms
@@ -543,7 +542,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                                 _caen_file->save_waveform(waveform);
                             }
             );
-
+//JVW5K
             process_data_for_gui();
         }
 
