@@ -1025,14 +1025,14 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
     ReadRegister(0x800C, _current_max_buffers);
     _current_max_buffers = std::exp2(_current_max_buffers);
 
-//    _err_code = CAEN_DGTZ_SetPostTriggerSize(handle, _global_config.PostTriggerPorcentage);
-//    _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
-uint32_t posttrigval = 0.01*_global_config.PostTriggerPorcentage * _global_config.RecordLength;
-    WriteRegister(0x8114, posttrigval);
-
-    uint32_t percent = 0;
-    _err_code = CAEN_DGTZ_GetPostTriggerSize(handle, &percent);
-    _logger->info("PTS : {} {}", percent, _global_config.PostTriggerPorcentage);
+    if (Model == CAENDigitizerModel::V1740D) {
+        _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
+        uint32_t posttrigval = 0.01*_global_config.PostTriggerPorcentage * _global_config.RecordLength;
+        WriteRegister(0x8114, posttrigval);
+    } else {
+        _err_code = CAEN_DGTZ_SetPostTriggerSize(handle, _global_config.PostTriggerPorcentage);
+        _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
+    }
 
     _err_code = CAEN_DGTZ_SetSWTriggerMode(handle, _global_config.SWTriggerMode);
     _print_if_err("CAEN_DGTZ_SetSWTriggerMode", __FUNCTION__);
@@ -1151,8 +1151,7 @@ uint32_t posttrigval = 0.01*_global_config.PostTriggerPorcentage * _global_confi
 
             // Set acquisition mask
             auto acq_mask = gr_config.AcquisitionMask.get();
-            WriteBits(0x10A8 | (grp_n << 8),
-                       acq_mask, 0, 8);
+            WriteBits(0x10A8 | (grp_n << 8), acq_mask, 0, 8);
 
             // DCCorrections should be of length
             // NumberofChannels / NumberofGroups.
@@ -1186,7 +1185,7 @@ uint32_t posttrigval = 0.01*_global_config.PostTriggerPorcentage * _global_confi
             WriteBits(0x811C, 0b00, 16, 2);  // TRG-OUT based
             // on internal signal
         }
-        WriteBits( 0x811C, 0b01, 21, 2);
+        WriteBits(0x811C, 0b01, 21, 2);
 
         // read_register(res, 0x8110, word);
         // word |= 1; // enable group 0 to participate in GPO
