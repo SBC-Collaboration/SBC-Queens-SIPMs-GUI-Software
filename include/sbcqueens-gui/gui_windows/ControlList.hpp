@@ -132,7 +132,7 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
     SiPMAcquisitionControl<ControlTypes::Checkbox, "ACQ6">{""},
     SiPMAcquisitionControl<ControlTypes::Checkbox, "ACQ7">{""},
 
-    SiPMAcquisitionControl<ControlTypes::InputUINT8, "Correction 0">{""},
+    SiPMAcquisitionControl<ControlTypes::InputUINT8, "Correction 0">{"",},
     SiPMAcquisitionControl<ControlTypes::InputUINT8, "Correction 1">{""},
     SiPMAcquisitionControl<ControlTypes::InputUINT8, "Correction 2">{""},
     SiPMAcquisitionControl<ControlTypes::InputUINT8, "Correction 3">{""},

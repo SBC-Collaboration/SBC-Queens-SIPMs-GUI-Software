@@ -40,7 +40,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
 
     std::shared_ptr<DataFile<PFEIFFERSingleGaugeData>> _pfeiffer_file;
 
-    // IndicatorSender<IndicatorNames> _plot_sender;
+    std::string _run_name;
 
     // PFEIFFER Single Gauge port
     serial_ptr _pfeiffers_port;
@@ -101,10 +101,25 @@ class SlowDAQManager : public ThreadManager<Pipes> {
 
                     if (_pfeiffers_port) {
                         if (_pfeiffers_port->isOpen()) {
+
+                            // These lines get today's date and creates a folder
+                            // under that date
+                            // There is a similar code in the CAEN
+                            // interface file
+                            std::ostringstream out;
+                            auto today = date::year_month_day{
+                                date::floor<date::days>(
+                                    std::chrono::system_clock::now())};
+                            out << today;
+                            _run_name = out.str();
+
+                            std::filesystem::create_directory(_slowdaq_doe.RunDir
+                                + "/" + _run_name);
+
                             _init_time = get_current_time_epoch();
                             _pfeiffer_file = std::make_shared<DataFile<PFEIFFERSingleGaugeData>>(
                                 _slowdaq_doe.RunDir
-                                + "/" + _slowdaq_doe.RunName
+                                + "/" + _run_name
                                 + "/PFEIFFERSSPressures.txt");
                             bool s = _pfeiffer_file->isOpen();
 

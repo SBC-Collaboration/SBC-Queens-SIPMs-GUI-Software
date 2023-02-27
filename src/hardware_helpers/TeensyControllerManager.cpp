@@ -21,6 +21,7 @@
 
 namespace SBCQueens {
 
+double __res_to_temperature(const double& res);
 // I have no reason to use it in the future. I am adding
 // it just in case
 void to_json(json& j, const Peltiers& p) {
@@ -59,7 +60,7 @@ void from_json(const json& j, RawRTDs& p) {
         p.Resistances[i] = p.RTDREGS[i] /  32768.0;
         p.Resistances[i] *= kRESREFERENCE;
 
-        p.Temps[i] = register_to_T90(p.Resistances[i]);
+        p.Temps[i] = __res_to_temperature(p.Resistances[i]);
     }
 }
 

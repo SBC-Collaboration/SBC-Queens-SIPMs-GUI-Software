@@ -1025,8 +1025,14 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
     ReadRegister(0x800C, _current_max_buffers);
     _current_max_buffers = std::exp2(_current_max_buffers);
 
-    _err_code = CAEN_DGTZ_SetPostTriggerSize(handle, _global_config.PostTriggerPorcentage);
-    _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
+//    _err_code = CAEN_DGTZ_SetPostTriggerSize(handle, _global_config.PostTriggerPorcentage);
+//    _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
+uint32_t posttrigval = _global_config.PostTriggerPorcentage * _global_config.RecordLength;
+    WriteRegister(0x8114, posttrigval);
+
+    uint32_t percent = 0;
+    _err_code = CAEN_DGTZ_GetPostTriggerSize(handle, &percent);
+    _logger->info("PTS : {} {}", percent, _global_config.PostTriggerPorcentage);
 
     _err_code = CAEN_DGTZ_SetSWTriggerMode(handle, _global_config.SWTriggerMode);
     _print_if_err("CAEN_DGTZ_SetSWTriggerMode", __FUNCTION__);
