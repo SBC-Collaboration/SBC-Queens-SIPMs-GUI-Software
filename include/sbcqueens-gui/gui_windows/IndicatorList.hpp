@@ -103,6 +103,7 @@ constexpr static auto GUIPlots = std::make_tuple(
             .PlotGroupings = {PlotGroupingsEnum::One},
             .XAxisLabel = "time ",
             .XAxisUnit = "[Local Time]",
+            .XAxisScale = ImPlotScale_Time,
             .YAxisLabels = {"Pressure"},
             .YAxisUnits = {"[mbar]"},
             .YAxisScales = {ImPlotScale_Log10},
@@ -118,6 +119,7 @@ constexpr static auto GUIPlots = std::make_tuple(
             .PlotGroupings = fill_same<9>(PlotGroupingsEnum::One),
             .XAxisLabel = "time ",
             .XAxisUnit = "[Local Time]",
+            .XAxisScale = ImPlotScale_Time,
             .YAxisLabels = {"Temperature"},
             .YAxisUnits = {"[K]"},
             .YAxisScales = {ImPlotScale_Log10},
@@ -129,7 +131,7 @@ constexpr static auto GUIPlots = std::make_tuple(
 
 	PlotIndicator<"Group 0", 8, 1>(PlotOptions<8, 1>{
 		.PlotType = PlotTypeEnum::Line,
-		.PlotLabels = {"1", "2", "3", "4", "5", "6", "7", "8"},
+		.PlotLabels = {"0", "1", "2", "3", "4", "5", "6", "7"},
 		.PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
 		.XAxisLabel = "time ",
 		.XAxisUnit = "[sp]",
@@ -140,7 +142,7 @@ constexpr static auto GUIPlots = std::make_tuple(
 	}),
 	PlotIndicator<"Group 1", 8, 1>(PlotOptions<8, 1>{
 		.PlotType = PlotTypeEnum::Line,
-		.PlotLabels = {"9", "10", "11", "12", "13", "14", "15", "16"},
+		.PlotLabels = {"8", "9", "10", "11", "12", "13", "14", "15"},
 		.PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
 		.XAxisLabel = "time ",
 		.XAxisUnit = "[sp]",
@@ -151,7 +153,7 @@ constexpr static auto GUIPlots = std::make_tuple(
 	}),
 	PlotIndicator<"Group 2", 8, 1>(PlotOptions<8, 1>{
 		.PlotType = PlotTypeEnum::Line,
-		.PlotLabels = {"17", "18", "19", "20", "21", "22", "23", "24"},
+		.PlotLabels = {"16", "17", "18", "19", "20", "21", "22", "23"},
 		.PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
 		.XAxisLabel = "time ",
 		.XAxisUnit = "[sp]",
@@ -162,7 +164,7 @@ constexpr static auto GUIPlots = std::make_tuple(
 	}),
 	PlotIndicator<"Group 3", 8, 1>(PlotOptions<8, 1>{
 		.PlotType = PlotTypeEnum::Line,
-		.PlotLabels = {"25", "26", "27", "28", "29", "30", "31", "32"},
+		.PlotLabels = {"24", "25", "26", "27", "28", "29", "30", "31"},
 		.PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
 		.XAxisLabel = "time ",
 		.XAxisUnit = "[sp]",
@@ -173,7 +175,7 @@ constexpr static auto GUIPlots = std::make_tuple(
 	}),
 	PlotIndicator<"Group 4", 8, 1>(PlotOptions<8, 1>{
 		.PlotType = PlotTypeEnum::Line,
-		.PlotLabels = {"33", "34", "35", "36", "37", "38", "39", "40"},
+		.PlotLabels = {"32", "33", "34", "35", "36", "37", "38", "39"},
 		.PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
 		.XAxisLabel = "time ",
 		.XAxisUnit = "[sp]",
@@ -184,7 +186,7 @@ constexpr static auto GUIPlots = std::make_tuple(
 	}),
     PlotIndicator<"Group 5", 8, 1>(PlotOptions<8, 1>{
             .PlotType = PlotTypeEnum::Line,
-            .PlotLabels = {"41", "42", "43", "44", "45", "46", "47", "48"},
+            .PlotLabels = {"40", "41", "42", "43", "44", "45", "46", "47"},
             .PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
             .XAxisLabel = "time ",
             .XAxisUnit = "[sp]",
@@ -195,7 +197,7 @@ constexpr static auto GUIPlots = std::make_tuple(
     }),
     PlotIndicator<"Group 6", 8, 1>(PlotOptions<8, 1>{
             .PlotType = PlotTypeEnum::Line,
-            .PlotLabels = {"49", "50", "51", "52", "53", "54", "55", "56"},
+            .PlotLabels = {"48", "49", "50", "51", "52", "53", "54", "55"},
             .PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
             .XAxisLabel = "time ",
             .XAxisUnit = "[sp]",
@@ -206,7 +208,7 @@ constexpr static auto GUIPlots = std::make_tuple(
     }),
     PlotIndicator<"Group 7", 8, 1>(PlotOptions<8, 1>{
             .PlotType = PlotTypeEnum::Line,
-            .PlotLabels = {"57", "58", "59", "60", "61", "62", "63", "64"},
+            .PlotLabels = {"56", "57", "58", "59", "60", "61", "62", "63"},
             .PlotGroupings = fill_same<8>(PlotGroupingsEnum::One),
             .XAxisLabel = "time ",
             .XAxisUnit = "[sp]",

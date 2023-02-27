@@ -74,6 +74,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
             if (_slowdaq_pipe_end.retrieve(new_task)) {
                 new_task.Callback(_slowdaq_doe);
             }
+            _slowdaq_pipe_end.send();
             // End Communication with the GUI
 
             if (!_slowdaq_doe.PFEIFFERSingleGaugeEnable) {
@@ -214,7 +215,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
                 double pressure = std::stod(split_msg[1]);
 
                 _slowdaq_doe.Vacuum = pressure;
-                _slowdaq_doe.PressureData(get_current_time_epoch(), pressure);
+                _slowdaq_doe.PressureData(get_current_time_epoch()/1000.0, pressure);
 
                 PFEIFFERSingleGaugeData d;
                 d.Pressure = pressure;

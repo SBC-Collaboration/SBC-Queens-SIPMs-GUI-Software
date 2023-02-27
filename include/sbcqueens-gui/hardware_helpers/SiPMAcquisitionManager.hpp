@@ -468,10 +468,10 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         software_trigger(caen_port);
 
-        static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
-                                       caen_port->ModelConstants,
-                                       caen_port->GetGlobalConfiguration(),
-                                       caen_port->GetGroupConfigurations());
+//        static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
+//                                       caen_port->ModelConstants,
+//                                       caen_port->GetGlobalConfiguration(),
+//                                       caen_port->GetGroupConfigurations());
 
         caen_port->RetrieveData();
         // GetNumberOfEvents gets the actual acquired events
@@ -493,7 +493,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             auto m = caen_event_to_armadillo(_osc_event, 64);
 
             auto waveform = caen_port->GetWaveform(0);
-            _file.save_waveform(waveform);
+//            _file.save_waveform(waveform);
 
             // spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
             // spdlog::info("Event counter: {0}", _osc_event->Info.EventCounter);

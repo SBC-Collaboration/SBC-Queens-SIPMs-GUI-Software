@@ -222,6 +222,8 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             if (_teensy_pipe_end.retrieve(new_task)) {
                 new_task.Callback(_doe);
             }
+
+            _teensy_pipe_end.send();
             // End Communication with the GUI
 
             // This will send a command only if its not none
@@ -470,7 +472,7 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                     _doe.RTDTemps[i] = temp;
                 }
 
-                _doe.TemperatureData(get_current_time_epoch(),
+                _doe.TemperatureData(get_current_time_epoch() / 1000.0,
                                      rtds.Temps[0],
                                      rtds.Temps[1],
                                      rtds.Temps[2],

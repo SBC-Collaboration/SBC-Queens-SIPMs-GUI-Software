@@ -101,16 +101,18 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
         "ID of the group to modify. If the digitizer does not support groups "
         "this is the channel number.",
         DrawingOptions{.StepSize = 1, .Format = "%d"}},
+    SiPMAcquisitionControl<ControlTypes::Checkbox, "Group Enable">{"",
+            "Enables or disables this group."},
 
     SiPMAcquisitionControl<ControlTypes::InputUINT32, "DC Offset">{"",
         "",
-        DrawingOptions{.StepSize = 1, .Format = "%X"}},
+        DrawingOptions{.StepSize = 1, .Format = "%d"}},
     SiPMAcquisitionControl<ControlTypes::InputUINT16, "DC Correction">{"",
         "",
-        DrawingOptions{.StepSize = 1, .Format = "%X"}},
+        DrawingOptions{.StepSize = 1, .Format = "%d"}},
     SiPMAcquisitionControl<ControlTypes::InputUINT32, "Threshold">{"",
         "",
-        DrawingOptions{.StepSize = 1, .Format = "%X"}},
+        DrawingOptions{.StepSize = 1, .Format = "%d"}},
 
     SiPMAcquisitionControl<ControlTypes::Checkbox, "TRG0">{""},
     SiPMAcquisitionControl<ControlTypes::Checkbox, "TRG1">{""},

@@ -86,6 +86,17 @@ void CAENPerGroupConfigTab::draw() {
     auto& channel_corrections = channel.DCCorrections;
 
     ImGui::PushItemWidth(100);
+    constexpr auto group_en_cb = get_control<ControlTypes::Checkbox, "Group Enable">(SiPMGUIControls);
+   	draw_control(group_en_cb,
+   		_sipm_data,
+        channel.Enabled,
+        ImGui::IsItemEdited,
+        // Callback when IsItemEdited !
+        [&](SiPMAcquisitionData& twin) {
+        	twin.GroupConfigs[channel_to_modify].Enabled = channel.Enabled;
+        }
+    );
+
     constexpr auto dc_offset  =
         get_control<ControlTypes::InputUINT32, "DC Offset">(SiPMGUIControls);
    	draw_control(dc_offset,
