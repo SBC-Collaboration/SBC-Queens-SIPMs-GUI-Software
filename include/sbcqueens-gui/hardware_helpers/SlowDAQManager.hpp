@@ -63,6 +63,13 @@ class SlowDAQManager : public ThreadManager<Pipes> {
         _logger->info("Initializing slow DAQ thread...");
         _logger->info("Slow DAQ components: PFEIFFERSingleGauge");
 
+        auto send_data_tt = make_total_timed_event(
+                std::chrono::milliseconds(200),
+                [&]() {
+                    _slowdaq_pipe_end.send();
+                }
+        );
+
         auto main_loop = [&]() -> bool {
 
             SlowDAQData new_task;
@@ -74,7 +81,7 @@ class SlowDAQManager : public ThreadManager<Pipes> {
             if (_slowdaq_pipe_end.retrieve(new_task)) {
                 new_task.Callback(_slowdaq_doe);
             }
-            _slowdaq_pipe_end.send();
+            send_data_tt();
             // End Communication with the GUI
 
             if (!_slowdaq_doe.PFEIFFERSingleGaugeEnable) {

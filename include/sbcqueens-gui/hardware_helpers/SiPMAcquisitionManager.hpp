@@ -316,8 +316,14 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             switch_state(_doe.CurrentState);
         }
 
+        static auto send_data_tt = make_total_timed_event(
+                std::chrono::milliseconds(200),
+                [&]() {
+                    _sipm_pipe_end.send();
+                }
+        );
         // Send the current state to the GUI to update
-        _sipm_pipe_end.send();
+        send_data_tt();
     }
 
     // Does nothing other than wait 1000ms to avoid clogging PC resources.

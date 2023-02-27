@@ -48,7 +48,10 @@ void from_json(const json& j, RawRTDs& p) {
     p.time = get_current_time_epoch() / 1000.0;
     j.at("RTDR").get_to(p.RTDREGS);
 
-    const double kRESREFERENCE = 350.0;
+    // for my setup is 350
+    // const double kRESREFERENCE = 350.0;
+    // for the boards we made, R = 120
+    const double kRESREFERENCE = 120.0;
 
     p.Resistances = std::vector<double>(p.RTDREGS.size());
     p.Temps = std::vector<double>(p.RTDREGS.size());

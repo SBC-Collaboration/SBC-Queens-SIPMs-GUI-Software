@@ -67,26 +67,44 @@ struct PipeEnd {
 
     void send() {
         if constexpr (type == PipeEndType::GUI) {
-            Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
+            if(not _has_gui_value) {
+                Pipe.Queue->try_enqueue(*Pipe.GUIToken, Data);
+                _has_gui_value = true;
+                Data.Changed = false;
+            }
         } else {
-            Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
+            if (not _has_thread_value) {
+                Pipe.Queue->try_enqueue(*Pipe.ThreadToken, Data);
+                _has_thread_value = true;
+                Data.Changed = false;
+            }
         }
     }
 
     void send_if_changed() {
         if (Data.Changed) {
-            Data.Changed = false;
             send();
         }
     }
 
     bool retrieve(PipeData& out) {
         if constexpr (type == PipeEndType::GUI) {
-            return Pipe.Queue->try_dequeue_from_producer(*Pipe.ThreadToken, out);
+            if (Pipe.Queue->try_dequeue_from_producer(*Pipe.ThreadToken, out)) {
+                _has_thread_value = false;
+                return true;
+            }
         } else {
-            return Pipe.Queue->try_dequeue_from_producer(*Pipe.GUIToken, out);
+            if (Pipe.Queue->try_dequeue_from_producer(*Pipe.GUIToken, out)) {
+                _has_gui_value = false;
+                return true;
+            }
         }
+
+        return false;
     }
+private:
+    std::atomic_bool _has_gui_value = false;
+    std::atomic_bool _has_thread_value = false;
 };
 
 } // namespace SBCQueens

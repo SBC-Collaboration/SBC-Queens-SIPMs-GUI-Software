@@ -211,6 +211,13 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
                 connect(p, port_name);
             });
 
+        auto send_data_tt = make_total_timed_event(
+                std::chrono::milliseconds(200),
+                [&]() {
+                    _teensy_pipe_end.send();
+                }
+        );
+
         // Main loop lambda
         auto main_loop = [&]() -> bool {
             TeensyControllerData new_task;
@@ -222,8 +229,8 @@ class TeensyControllerManager : public ThreadManager<Pipes> {
             if (_teensy_pipe_end.retrieve(new_task)) {
                 new_task.Callback(_doe);
             }
+            send_data_tt();
 
-            _teensy_pipe_end.send();
             // End Communication with the GUI
 
             // This will send a command only if its not none

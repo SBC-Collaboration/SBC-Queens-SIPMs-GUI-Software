@@ -93,7 +93,7 @@ struct DrawingOptions {
     Size_t Size = Size_t{0, 0};
 
     // Numeric indicator/controls specific
-    double StepSize = 0.0;
+    double StepSize = 1.0;
     // Numeric indicator/controls specific - Follows printf conventions
     // example: %h is hexadecimal output, and %.3f prints a flow with 3
     // decimal precision
@@ -306,11 +306,12 @@ bool InputScalar(const Control<ControlType, Label>& control, T& out) {
         type = ImGuiDataType_U64;
     }
 
-    const void* step = &control.DrawOptions.StepSize;
+    T step = static_cast<T>(control.DrawOptions.StepSize);
+    const void* step_void = reinterpret_cast<const void*>(&step);
     // const void* big_step = &(100*control.DrawOptions.StepSize);
     return ImGui::InputScalar(Label.value, type, &out,
-        step,
-        step,
+                              step_void,
+                              step_void,
         std::string(control.DrawOptions.Format).c_str());
 }
 
