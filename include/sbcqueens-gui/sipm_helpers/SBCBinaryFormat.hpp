@@ -311,6 +311,8 @@ struct DynamicWriter {
         }
     }
 
+    bool isOpen() { return _open; }
+
     ~DynamicWriter() {
         _open = false;
         _stream.flush();
@@ -416,6 +418,8 @@ class SiPMDynamicWriter {
     }
 
     ~SiPMDynamicWriter() = default;
+
+    bool isOpen() { return _streamer.isOpen(); }
 
     void save_waveform(const std::shared_ptr<CAENWaveforms<uint16_t>>& waveform) {
         _trigger_tag[0] = waveform->getInfo().TriggerTimeTag;

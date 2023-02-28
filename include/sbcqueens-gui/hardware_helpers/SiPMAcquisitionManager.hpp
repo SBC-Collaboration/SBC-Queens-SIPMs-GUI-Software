@@ -517,11 +517,20 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
     SiPMCAEN_ptr acquisition_endless(SiPMCAEN_ptr caen_port) {
         if(not _caen_file) {
-            _caen_file = std::make_unique<BinaryFormat::SiPMDynamicWriter>(
-                    _doe.RunDir + "/" + _run_name + "/" + _doe.SiPMOutputName,
-                    caen_port->ModelConstants,
-                    caen_port->GetGlobalConfiguration(),
-                    caen_port->GetGroupConfigurations());
+            try {
+                _caen_file = std::make_unique<BinaryFormat::SiPMDynamicWriter>(
+                        _doe.RunDir + "/" + _run_name + "/" + _doe.SiPMOutputName + ".bin",
+                        caen_port->ModelConstants,
+                        caen_port->GetGlobalConfiguration(),
+                        caen_port->GetGroupConfigurations());
+            } catch(std::runtime_error err) {
+                if (not _caen_file->isOpen()) {
+                    _logger->error("SiPM file saving was not created with error: {}",
+                                   err.what());
+                    _doe.AcquisitionState = SiPMAcquisitionStates::Oscilloscope;
+                    return caen_port;
+                }
+            }
         }
 
         software_trigger(caen_port);

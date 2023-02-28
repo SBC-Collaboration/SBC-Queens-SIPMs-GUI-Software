@@ -80,6 +80,8 @@ void CAENPerGroupConfigTab::draw() {
         }
     );
 
+    channel_to_modify = channel_to_modify < 8 ? channel_to_modify : 7;
+
    	auto& channel = _sipm_data.GroupConfigs[channel_to_modify];
    	auto& channel_tgm = channel.TriggerMask;
    	auto& channel_acq = channel.AcquisitionMask;
