@@ -1,5 +1,5 @@
 [File]
-RunDir = "/hdd/SBC-Queens-SiPMs-Runs"
+RunDir = "/home/sbc/Runs/"
 # Number of waveforms to take and save to file when in run mode
 RunWaveforms = 200000
 # Number of waveforms to take and save to file when in breakdown voltage mode
@@ -31,9 +31,9 @@ ConnectionType = "A4818"
 # if applicable
 VMEAddress = 0x0
 # 0 = not allowed
-RecordLength = 100
+RecordLength = 350
 MaxEventsPerRead = 500
-PostBufferPorcentage = 90
+PostBufferPorcentage = 50
 OverlappingRejection = false
 TRGINasGate = false
 # 0 = disabled, 1 = ACQ only, 2 = ext mode only, 3 = both
@@ -51,31 +51,61 @@ IOLevel = 0
 Enabled = true
 # Trigger Enable Mask
 # TrgMask = 7
-TrgMask = 0b11111111
+TrgMask = 0b00000111
 # Acquisition Enable Mask
-AcqMask = 0b11111111
+AcqMask = 0b00000111
 # Group offset
 Offset = 0x8000
 # Individual corrections to offset
-Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
+Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
 
 Range = 0
-Threshold = 0x0800
+Threshold = 1850
 
 [CAEN.group1]
 Enabled = true
 # Trigger Enable Mask
 # TrgMask = 7
-TrgMask = 0b11111111
+TrgMask = 0b00000001
 # Acquisition Enable Mask
-AcqMask = 0b11111111
+AcqMask = 0b00000001
 # Group offset
 Offset = 0x8000
 # Individual corrections to offset
-Corrections = [5, 0, 6, 0, 0, 0, 0, 0]
+Corrections = [0, 0, 0, 0, 0, 0, 0, 0]
 
 Range = 0
-Threshold = 0x0800
+Threshold = 1850
+
+[CAEN.group2]
+Enabled = true
+Threshold = 0
+AcqMask = 0b00000001
+
+[CAEN.group3]
+Enabled = true
+Threshold = 0
+AcqMask = 0b00000001
+
+[CAEN.group4]
+Enabled = true
+Threshold = 0
+AcqMask = 0b00000001
+
+[CAEN.group5]
+Enabled = true
+Threshold = 0
+AcqMask = 0b00000001
+
+[CAEN.group6]
+Enabled = true
+Threshold = 0
+AcqMask = 0b00000001
+
+[CAEN.group7]
+Enabled = true
+Threshold = 0
+AcqMask = 0b00000001
 
 [Other]
 [Other.SiPMVoltageSystem]
@@ -86,7 +116,7 @@ InitVoltage = 52.0
 # 1 count = 1second
 # so 86400 = 1 day
 PlotSize = 86400
-Port = "COM7"
-Enabled = false
+Port = "/dev/ttyUSB0"
+Enabled = true
 # 0 = 100ms, 1 = 1s, 2 = 1min
 Rate = 1
