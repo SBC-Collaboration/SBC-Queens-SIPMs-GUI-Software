@@ -1362,8 +1362,6 @@ void CAEN<T, N>::RetrieveData() noexcept {
 
 template<typename T, size_t N>
 bool CAEN<T, N>::RetrieveDataUntilNEvents(const uint32_t& n) noexcept {
-    int& handle = _caen_api_handle;
-
     if (_has_error or not _is_connected or not _is_acquiring) {
         return false;
     }

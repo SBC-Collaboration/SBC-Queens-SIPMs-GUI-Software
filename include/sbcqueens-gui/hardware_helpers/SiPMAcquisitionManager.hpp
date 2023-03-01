@@ -448,6 +448,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             _waveforms.push_back(caen_port->GetWaveform(i));
         }
 
+        _doe.MaxPossibleBuffers = caen_port->GetCurrentPossibleMaxBuffer();
+
         // These lines get today's date and creates a folder under that date
         // There is a similar code in the Teensy interface file
         std::ostringstream out;
@@ -471,7 +473,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     SiPMCAEN_ptr oscilloscope(SiPMCAEN_ptr caen_port) {
         auto n_events = caen_port->GetEventsInBuffer();
         // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
-
+        _doe.NumEventsInBuffer = n_events;
         software_trigger(caen_port);
 
 //        static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
@@ -481,7 +483,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         caen_port->RetrieveData();
         // GetNumberOfEvents gets the actual acquired events
-        // while GetEventsInBuffer gets the events in CAEN buffer
+        // while GetEventsInBuffer gets the events in CAEN buffer before acquiring
         if (caen_port->GetNumberOfEvents() > 0) {
             // TriggeredWaveforms += _caen_port->Data.NumEvents;
             // Due to the slow rate oscilloscope mode is happening, using
@@ -495,8 +497,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
             // Decode events
             caen_port->DecodeEvents();
-
-            auto m = caen_event_to_armadillo(_osc_event, 64);
 
             auto waveform = caen_port->GetWaveform(0);
 //            _file.save_waveform(waveform);
@@ -523,7 +523,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                         caen_port->ModelConstants,
                         caen_port->GetGlobalConfiguration(),
                         caen_port->GetGroupConfigurations());
-            } catch(std::runtime_error err) {
+            } catch(std::runtime_error& err) {
                 if (not _caen_file->isOpen()) {
                     _logger->error("SiPM file saving was not created with error: {}",
                                    err.what());
@@ -535,9 +535,10 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
         software_trigger(caen_port);
 
-        auto n_events = caen_port->GetEventsInBuffer();
-
         if (caen_port->RetrieveDataUntilNEvents(0.5*caen_port->GetCurrentPossibleMaxBuffer())) {
+            auto n_events = caen_port->GetNumberOfEvents();
+            _doe.NumEventsInBuffer = n_events;
+            _doe.FileStatistics += n_events;
             TriggeredWaveforms += n_events;
 
             // This should update the values under _waveforms
@@ -546,12 +547,11 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // TODO: here be the filtering/software threshold routine
 
             std::for_each_n(_waveforms.begin(),
-                            caen_port->GetNumberOfEvents(),
+                            n_events,
                             [&](SiPMWaveforms_ptr& waveform) {
                                 _caen_file->save_waveform(waveform);
                             }
             );
-//JVW5K
             process_data_for_gui();
         }
 

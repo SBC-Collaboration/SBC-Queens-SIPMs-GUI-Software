@@ -23,6 +23,14 @@ void IndicatorWindow::draw() {
                     "File Statistics">(SiPMGUIIndicators);
             draw_indicator(file_stats, _sipm_doe.FileStatistics);
 
+            constexpr auto trig_rate_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Trigger Rate">(SiPMGUIIndicators);
+            draw_indicator(trig_rate_ind, _sipm_doe.TriggeredRate);
+
+            constexpr auto event_in_buff_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Events in buffer">(SiPMGUIIndicators);
+            draw_indicator(event_in_buff_ind, _sipm_doe.NumEventsInBuffer);
+
             ImGui::EndTabItem();
         }
 
@@ -109,6 +117,10 @@ void IndicatorWindow::draw() {
             constexpr auto license_str = get_indicator<IndicatorTypes::String,
                     "License">(SiPMGUIIndicators);
             draw_indicator(license_str, _sipm_doe.CAENBoardInfo.License);
+
+            constexpr auto max_possible_evts_buffer_ind = get_indicator<IndicatorTypes::Numerical,
+                    "Max Possible Events in Buffer">(SiPMGUIIndicators);
+            draw_indicator(max_possible_evts_buffer_ind, _sipm_doe.MaxPossibleBuffers);
 
             ImGui::EndTabItem();
         }

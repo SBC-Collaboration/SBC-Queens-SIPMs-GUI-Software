@@ -50,6 +50,7 @@ constexpr static auto SiPMGUIIndicators = std::make_tuple(
 
 	NumericalIndicator<"DMM Voltage">("V", ""),
 	NumericalIndicator<"DMM Current">("A", ""),
+    NumericalIndicator<"Max Possible Events in Buffer">("Events", ""),
 	NumericalIndicator<"Events in buffer">("Events", ""),
 	NumericalIndicator<"Trigger Rate">("Waveforms / s", ""),
 	NumericalIndicator<"1SPE Gain Mean">("arb.", ""),

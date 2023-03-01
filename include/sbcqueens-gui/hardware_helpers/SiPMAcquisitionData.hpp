@@ -96,6 +96,8 @@ struct SiPMAcquisitionData {
     BreakdownVoltageConfigData VBDData;
 
     // Indicator/"Out" data members
+    uint32_t NumEventsInBuffer = 0;
+    uint32_t MaxPossibleBuffers = 0;
     uint32_t FileStatistics = 0;
     double TriggeredRate = 0;
     CAEN_DGTZ_BoardInfo_t CAENBoardInfo;
