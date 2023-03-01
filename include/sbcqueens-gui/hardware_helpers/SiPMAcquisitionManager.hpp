@@ -444,6 +444,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         // even in the buffer
         _osc_event = caen_port->GetEvent(0);
 
+        _waveforms.clear();
         for(std::size_t i = 0; i < caen_port->GetCurrentPossibleMaxBuffer(); i++) {
             _waveforms.push_back(caen_port->GetWaveform(i));
         }
