@@ -441,7 +441,7 @@ class CAENWaveforms {
 
     // Copies values from event into the internal buffer
     // Does not copy if record length does not match the size
-    void copy(const CAENEvent* event) {
+    void copy(const std::unique_ptr<CAENEvent>& event) {
         const CAEN_DGTZ_UINT16_EVENT_t* data = event->getData();
 
         if (data->ChSize[0] != _record_length) {
@@ -1393,7 +1393,7 @@ auto CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
     }
 
     if (_has_error or not _is_connected) {
-        return _waveforms[_caen_raw_data->NumEvents - 1];;
+        return _waveforms[_caen_raw_data->NumEvents - 1];
     }
 
     _err_code = _events[i]->getEventInfo(_caen_raw_data->Buffer,
@@ -1408,7 +1408,7 @@ auto CAEN<T, N>::DecodeEvent(const uint32_t& i) noexcept {
                   __FUNCTION__,
                   "at event " + std::to_string(i));
 
-    _waveforms[i]->copy(_events[i].get());
+    _waveforms[i]->copy(_events[i]);
 
     return _waveforms[i];
 }
@@ -1432,7 +1432,7 @@ void CAEN<T, N>::DecodeEvents() noexcept {
                       __FUNCTION__,
                       "at event " + std::to_string(i));
 
-        _waveforms[i]->copy(_events[i].get());
+        _waveforms[i]->copy(_events[i]);
     }
 }
 
