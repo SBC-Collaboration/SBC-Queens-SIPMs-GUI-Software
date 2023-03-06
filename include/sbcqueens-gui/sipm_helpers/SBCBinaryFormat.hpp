@@ -352,7 +352,7 @@ class SiPMDynamicWriter {
                                     {1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
     const inline static std::array<std::string, num_cols> column_names =
             {"sample_rate", "en_chs", "trg_mask", "thresholds", "dc_offsets",
-             "dc_corrections", "dc_range", "time_stamp", "trg_source", "data"};
+             "dc_corrections", "dc_range", "time_stamp", "trg_source", "sipm_traces"};
 
 
     double _sample_rate[1] = {0.0};
