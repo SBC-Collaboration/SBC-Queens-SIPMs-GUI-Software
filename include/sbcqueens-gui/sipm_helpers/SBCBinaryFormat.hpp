@@ -409,12 +409,12 @@ class SiPMDynamicWriter {
                 _dc_corrections.push_back(group.DCCorrections[ch % 8]);
             }
 
-            _trigger_mask[0] |= (1 << ch);  // flip the bit at position ch
             _thresholds.push_back(group.TriggerThreshold);
             _dc_offsets.push_back(group.DCOffset);
             _dc_ranges.push_back(static_cast<float>(
                     model_consts.VoltageRanges.at(group.DCRange)));
         }
+        // _trigger_mask[0] is set in _get_en_chs
     }
 
     ~SiPMDynamicWriter() = default;
@@ -425,15 +425,15 @@ class SiPMDynamicWriter {
         _trigger_tag[0] = waveform->getInfo().TriggerTimeTag;
         _trigger_source[0] = waveform->getInfo().Pattern;
         _streamer.save(_sample_rate,
-                      _en_chs,
-                      _trigger_mask,
-                      _thresholds,
-                      _dc_offsets,
-                      _dc_corrections,
-                      _dc_ranges,
-                      _trigger_tag,
-                      _trigger_source,
-                      waveform->getData());
+                       _en_chs,
+                       _trigger_mask,
+                       _thresholds,
+                       _dc_offsets,
+                       _dc_corrections,
+                       _dc_ranges,
+                       _trigger_tag,
+                       _trigger_source,
+                       waveform->getData());
     }
 
  private:
@@ -457,15 +457,16 @@ class SiPMDynamicWriter {
             }
 
             // If the digitizer does not support groups, group_num = ch
-            if(model_constants.NumberOfGroups == 0) {
+            if (model_constants.NumberOfGroups == 0) {
                 out.push_back(group_num);
                 continue;
             }
 
             // Othewise, calculate using the AcquisitionMask
-            for(std::size_t ch = 0; ch < model_constants.NumChannelsPerGroup; ch++) {
-                if(group.AcquisitionMask.at(ch)) {
+            for (std::size_t ch = 0; ch < model_constants.NumChannelsPerGroup; ch++) {
+                if (group.AcquisitionMask.at(ch)) {
                     out.push_back(ch + model_constants.NumChannelsPerGroup * group_num);
+                    _trigger_mask[0] |= (1 << out.back());
                 }
             }
         }
