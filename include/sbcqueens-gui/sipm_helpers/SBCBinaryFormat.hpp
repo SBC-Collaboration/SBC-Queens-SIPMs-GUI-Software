@@ -405,7 +405,7 @@ class SiPMDynamicWriter {
                 group = group_configs[ch];
                 _dc_corrections.push_back(group.DCCorrections[0]);
             } else {
-                group =  group_configs[ch % 8];
+                group = group_configs[ch % 8];
                 _dc_corrections.push_back(group.DCCorrections[ch % 8]);
             }
 
@@ -467,6 +467,11 @@ class SiPMDynamicWriter {
                 if (group.AcquisitionMask.at(ch)) {
                     out.push_back(ch + model_constants.NumChannelsPerGroup * group_num);
                     _trigger_mask[0] |= (1 << out.back());
+                }
+
+                if (group.TriggerMask.at(ch)) {
+                    auto g_ch = ch + model_constants.NumChannelsPerGroup * group_num;
+                    _trigger_mask[0] |= (1 << g_ch);
                 }
             }
         }
