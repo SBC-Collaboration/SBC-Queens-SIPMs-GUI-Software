@@ -32,6 +32,7 @@ ConnectionType = "A4818"
 VMEAddress = 0x0
 # 0 = not allowed
 RecordLength = 350
+DecimationFactor = 2
 MaxEventsPerRead = 500
 PostBufferPorcentage = 50
 OverlappingRejection = false

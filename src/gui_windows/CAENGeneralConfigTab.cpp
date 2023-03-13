@@ -17,6 +17,8 @@ void CAENGeneralConfigTab::init_tab(const toml::table& tb) {
         = CAEN_conf["MaxEventsPerRead"].value_or(512Lu);
     _sipm_doe.GlobalConfig.RecordLength
         = CAEN_conf["RecordLength"].value_or(2048Lu);
+    _sipm_doe.GlobalConfig.DecimationFactor
+        = CAEN_conf["DecimationFactor"].value_or<uint16_t>(1);
     _sipm_doe.GlobalConfig.PostTriggerPorcentage
         = CAEN_conf["PostBufferPorcentage"].value_or(50u);
     _sipm_doe.GlobalConfig.TriggerOverlappingEn
