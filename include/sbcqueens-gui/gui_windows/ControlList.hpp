@@ -49,8 +49,8 @@ constexpr static auto SiPMGUIControls = std::make_tuple(
     SiPMAcquisitionControl<ControlTypes::ComboBox, "Software Trigger Mode">{""},
     SiPMAcquisitionControl<ControlTypes::ComboBox, "Trigger Polarity">{""},
     SiPMAcquisitionControl<ControlTypes::ComboBox, "I/O Level">{""},
-    SiPMAcquisitionControl<ControlTypes::InputUINT16, "Decimation Factor">{
-        "Only available for x740 and x724 digitizer families"},
+    SiPMAcquisitionControl<ControlTypes::InputUINT16, "Decimation Factor">{"",
+        "Only available for x740 and x724 digitizer families. Must be a multiple of 2 (up to 128)"},
     SiPMAcquisitionControl<ControlTypes::Button, "Software Trigger">{"",
         "Forces a trigger in the digitizer if the feature is enabled",
         DrawingOptions{

@@ -78,15 +78,49 @@ void CAENGeneralConfigTab::draw() {
         CAENDigitizerModelsMap
     );
 
-    ImGui::InputScalar("Max Events Per Read", ImGuiDataType_U32,
-        &_sipm_doe.GlobalConfig.MaxEventsPerRead);
-    ImGui::InputScalar("Record Length [counts]", ImGuiDataType_U32,
-        &_sipm_doe.GlobalConfig.RecordLength);
-    ImGui::InputScalar("Decimation Factor", ImGuiDataType_U16,
-                       &_sipm_doe.GlobalConfig.DecimationFactor);
-    ImGui::InputScalar("Post-Trigger buffer %", ImGuiDataType_U32,
-        &_sipm_doe.GlobalConfig.PostTriggerPorcentage);
+    constexpr auto max_events_int =
+        get_control<ControlTypes::InputUINT32, "Max Events Per Read">(SiPMGUIControls);
+    draw_control(max_events_int, _sipm_doe,
+                 _sipm_doe.GlobalConfig.MaxEventsPerRead,
+                 ImGui::IsItemDeactivatedAfterEdit,
+                 // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& caen_twin) {
+                     caen_twin.GlobalConfig.MaxEventsPerRead = _sipm_doe.GlobalConfig.MaxEventsPerRead;
+                 }
+    );
 
+    constexpr auto record_len_int =
+            get_control<ControlTypes::InputUINT32, "Record Length [sp]">(SiPMGUIControls);
+    draw_control(record_len_int, _sipm_doe,
+                 _sipm_doe.GlobalConfig.RecordLength,
+                 ImGui::IsItemDeactivatedAfterEdit,
+            // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& caen_twin) {
+                     caen_twin.GlobalConfig.RecordLength = _sipm_doe.GlobalConfig.RecordLength;
+                 }
+    );
+
+    constexpr auto dec_fact_int =
+            get_control<ControlTypes::InputUINT16, "Decimation Factor">(SiPMGUIControls);
+    draw_control(dec_fact_int, _sipm_doe,
+                 _sipm_doe.GlobalConfig.DecimationFactor,
+                 ImGui::IsItemDeactivatedAfterEdit,
+            // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& caen_twin) {
+                     caen_twin.GlobalConfig.DecimationFactor = _sipm_doe.GlobalConfig.DecimationFactor;
+                 }
+    );
+
+    constexpr auto post_trig_buff_int =
+            get_control<ControlTypes::InputUINT32, "Post-Trigger Buffer [%]">(SiPMGUIControls);
+    draw_control(post_trig_buff_int, _sipm_doe,
+                 _sipm_doe.GlobalConfig.PostTriggerPorcentage,
+                 ImGui::IsItemDeactivatedAfterEdit,
+            // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& caen_twin) {
+                     caen_twin.GlobalConfig.PostTriggerPorcentage = _sipm_doe.GlobalConfig.PostTriggerPorcentage;
+                 }
+    );
     // ImGui::Checkbox("Overlapping Rejection",
     //     &_sipm_doe.GlobalConfig.TriggerOverlappingEn);
     // if (ImGui::IsItemHovered()) {
@@ -94,8 +128,17 @@ void CAENGeneralConfigTab::draw() {
     //         "is disabled which leads to a non-constant record length. "
     //         "HIGHLY UNSTABLE FEATURE, DO NOT ENABLE.");
     // }
-
-    ImGui::Checkbox("TRG-IN as Gate", &_sipm_doe.GlobalConfig.EXTAsGate);
+    constexpr auto tri_in_gate_cb =
+            get_control<ControlTypes::Checkbox, "TRG-IN as Gate">(SiPMGUIControls);
+    draw_control(tri_in_gate_cb, _sipm_doe,
+                 _sipm_doe.GlobalConfig.EXTAsGate,
+                 ImGui::IsItemDeactivatedAfterEdit,
+            // Callback when IsItemEdited !
+                 [&](SiPMAcquisitionData& caen_twin) {
+                     caen_twin.GlobalConfig.EXTAsGate = _sipm_doe.GlobalConfig.EXTAsGate;
+                 }
+    );
+//    ImGui::Checkbox("TRG-IN as Gate", &_sipm_doe.GlobalConfig.EXTAsGate);
 
     const std::unordered_map<CAEN_DGTZ_TriggerMode_t, std::string> tgg_mode_map = {
         {CAEN_DGTZ_TriggerMode_t::CAEN_DGTZ_TRGMODE_DISABLED, "Disabled"},
