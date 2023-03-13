@@ -391,6 +391,7 @@ class SiPMDynamicWriter {
     */
 
     SiPMDynamicWriter(std::string_view file_name,
+                      const CAENDigitizerFamilies& fam,
                       const CAENDigitizerModelConstants& model_consts,
                       const CAENGlobalConfig& global_config,
                       const std::array<CAENGroupConfig, 8>& group_configs) :
@@ -399,6 +400,11 @@ class SiPMDynamicWriter {
         _record_length{global_config.RecordLength},
         _streamer{file_name, column_names,  sipm_ranks, _form_sizes(global_config)}
     {
+        // Only for these families there is a decimation factor
+        if (fam == CAENDigitizerFamilies::x740 or fam == CAENDigitizerFamilies::x724) {
+            _sample_rate[0] /= global_config.DecimationFactor;
+        }
+
         for(auto ch : _en_chs) {
             CAENGroupConfig group;
             if (model_consts.NumberOfGroups == 0) {
@@ -464,11 +470,13 @@ class SiPMDynamicWriter {
 
             // Othewise, calculate using the AcquisitionMask
             for (std::size_t ch = 0; ch < model_constants.NumChannelsPerGroup; ch++) {
-                if (group.AcquisitionMask.at(ch)) {
+                // If the acq mask or trigg mask is enabled that means we are saving that ch
+                // to the file.
+                if (group.AcquisitionMask.at(ch) or group.TriggerMask.at(ch)) {
                     out.push_back(ch + model_constants.NumChannelsPerGroup * group_num);
-                    _trigger_mask[0] |= (1 << out.back());
                 }
 
+                // However, only trg mask ones are saved to _trigger_mask duh
                 if (group.TriggerMask.at(ch)) {
                     auto g_ch = ch + model_constants.NumChannelsPerGroup * group_num;
                     _trigger_mask[0] |= (1 << g_ch);

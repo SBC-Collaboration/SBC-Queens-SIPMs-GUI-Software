@@ -80,6 +80,8 @@ void CAENGeneralConfigTab::draw() {
         &_sipm_doe.GlobalConfig.MaxEventsPerRead);
     ImGui::InputScalar("Record Length [counts]", ImGuiDataType_U32,
         &_sipm_doe.GlobalConfig.RecordLength);
+    ImGui::InputScalar("Decimation Factor", ImGuiDataType_U16,
+                       &_sipm_doe.GlobalConfig.DecimationFactor);
     ImGui::InputScalar("Post-Trigger buffer %", ImGuiDataType_U32,
         &_sipm_doe.GlobalConfig.PostTriggerPorcentage);
 

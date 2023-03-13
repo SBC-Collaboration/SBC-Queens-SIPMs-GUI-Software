@@ -521,6 +521,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             try {
                 _caen_file = std::make_unique<BinaryFormat::SiPMDynamicWriter>(
                         _doe.RunDir + "/" + _run_name + "/" + _doe.SiPMOutputName + ".bin",
+                        caen_port->Family,
                         caen_port->ModelConstants,
                         caen_port->GetGlobalConfiguration(),
                         caen_port->GetGroupConfigurations());

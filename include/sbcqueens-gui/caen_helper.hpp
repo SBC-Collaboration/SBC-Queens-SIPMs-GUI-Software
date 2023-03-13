@@ -249,6 +249,13 @@ struct CAENGlobalConfig {
     CAEN_DGTZ_TriggerPolarity_t TriggerPolarity =
         CAEN_DGTZ_TriggerPolarity_t::CAEN_DGTZ_TriggerOnRisingEdge;
 
+    // Only available for x740 and x724 digitizer families.
+    // Reduces the effective sampling frequency by
+    //  {SAMPLE_RATE}/2^{DecimationFactor}
+    // Using the average of the consecutive 2*DecimationFactor
+    // samples for the output value. Trigger is processed after decimation
+    uint16_t DecimationFactor = 1;
+
     // From CAEN API: For a MajorityLevel, m, the trigger fires when at
     // least m+1 of the enabled trigger requests are over-threshold inside
     // the majority coincidence window. Max is 7.
@@ -1025,6 +1032,22 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
     ReadRegister(0x800C, _current_max_buffers);
     _current_max_buffers = std::exp2(_current_max_buffers);
 
+    if (Family == CAENDigitizerFamilies::x740 or Family == CAENDigitizerFamilies::x724) {
+        if(_global_config.DecimationFactor < 1) {
+            _global_config.DecimationFactor = 1;
+        } else if (_global_config.DecimationFactor > 128) {
+            _global_config.DecimationFactor = 128;
+        }
+
+        // Next lines is to round to the next power of 2
+        // as CAEN_DGTZ_SetDecimationFactor only allows
+        // powers of 2 up to 128
+        uint16_t out = std::log2(_global_config.DecimationFactor);
+        _global_config.DecimationFactor = 1 << out;
+
+        _err_code = CAEN_DGTZ_SetDecimationFactor(handle, _global_config.DecimationFactor);
+    }
+
     if (Model == CAENDigitizerModel::V1740D) {
         _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
         uint32_t posttrigval = 0.01*_global_config.PostTriggerPorcentage * _global_config.RecordLength;
@@ -1150,8 +1173,8 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
             _print_if_err("CAEN_DGTZ_SetChannelGroupMask", __FUNCTION__);
 
             // Set acquisition mask
-            auto acq_mask = gr_config.AcquisitionMask.get();
-            WriteBits(0x10A8 | (grp_n << 8), acq_mask, 0, 8);
+//            auto acq_mask = gr_config.AcquisitionMask.get();
+//            WriteBits(0x10A8 | (grp_n << 8), acq_mask, 0, 8);
 
             // DCCorrections should be of length
             // NumberofChannels / NumberofGroups.
