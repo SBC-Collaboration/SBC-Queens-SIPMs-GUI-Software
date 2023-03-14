@@ -350,6 +350,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
         while (not caen_res->HasError()) {
             switch(_doe.AcquisitionState) {
                 case SiPMAcquisitionStates::Oscilloscope:
+                    main_loop_state->ChangeWaitTime(std::chrono::milliseconds(200));
                     if(_caen_file) {
                         _caen_file.reset();
                     }
@@ -358,6 +359,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                     break;
 
                 case SiPMAcquisitionStates::EndlessAcquisition:
+                    main_loop_state->ChangeWaitTime(std::chrono::milliseconds(1));
                     caen_res = acquisition_endless(std::move(caen_res));
                     break;
 
@@ -473,14 +475,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
     // Similar to an oscilloscope
     SiPMCAEN_ptr oscilloscope(SiPMCAEN_ptr caen_port) {
         auto n_events = caen_port->GetEventsInBuffer();
-        // _indicator_sender(IndicatorNames::CAENBUFFEREVENTS, events);
         _doe.NumEventsInBuffer = n_events;
         software_trigger(caen_port);
-
-//        static BinaryFormat::SiPMDynamicWriter _file("sipm_waveforms.bin",
-//                                       caen_port->ModelConstants,
-//                                       caen_port->GetGlobalConfiguration(),
-//                                       caen_port->GetGroupConfigurations());
 
         caen_port->RetrieveData();
         // GetNumberOfEvents gets the actual acquired events
@@ -498,9 +494,6 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
 
             // Decode events
             caen_port->DecodeEvents();
-
-            auto waveform = caen_port->GetWaveform(0);
-//            _file.save_waveform(waveform);
 
             // spdlog::info("Event size: {0}", _osc_event->Info.EventSize);
             // spdlog::info("Event counter: {0}", _osc_event->Info.EventCounter);
@@ -546,7 +539,7 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
             // This should update the values under _waveforms
             caen_port->DecodeEvents();
 
-            // TODO: here be the filtering/software threshold routine
+            // TODO(Any): here be the filtering/software threshold routine
 
             std::for_each_n(_waveforms.begin(),
                             n_events,
