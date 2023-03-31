@@ -518,6 +518,8 @@ class SiPMAcquisitionManager : public ThreadManager<Pipes> {
                         caen_port->ModelConstants,
                         caen_port->GetGlobalConfiguration(),
                         caen_port->GetGroupConfigurations());
+
+                _doe.FileStatistics = 0;
             } catch(std::runtime_error& err) {
                 if (not _caen_file->isOpen()) {
                     _logger->error("SiPM file saving was not created with error: {}",

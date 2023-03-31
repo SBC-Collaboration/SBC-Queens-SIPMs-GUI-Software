@@ -1,6 +1,6 @@
 include(cmake/CPM.cmake)
 
-set(SIPM_ANALYSIS_LIB_DIR ../../../../SiPMCharacterization
+set(SIPM_ANALYSIS_LIB_DIR ../../../../SiPMCharacterization/GUIAnalysisTools
         CACHE FILEPATH "Directory of where the SiPM Characterization/analysis lib is located" )
 
 # OpenGL
