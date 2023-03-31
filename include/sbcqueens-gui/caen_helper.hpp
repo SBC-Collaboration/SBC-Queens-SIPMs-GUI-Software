@@ -1050,7 +1050,7 @@ void CAEN<T, N>::Setup(const CAENGlobalConfig& global_config,
 
     if (Model == CAENDigitizerModel::V1740D) {
         _print_if_err("CAEN_DGTZ_SetPostTriggerSize", __FUNCTION__);
-        uint32_t posttrigval = 0.01*_global_config.PostTriggerPorcentage*_global_config.RecordLength;
+        uint32_t posttrigval = 0.01*_global_config.PostTriggerPorcentage*_global_config.RecordLength*_global_config.DecimationFactor;
         WriteRegister(0x8114, posttrigval);
     } else {
         _err_code = CAEN_DGTZ_SetPostTriggerSize(handle, _global_config.PostTriggerPorcentage);

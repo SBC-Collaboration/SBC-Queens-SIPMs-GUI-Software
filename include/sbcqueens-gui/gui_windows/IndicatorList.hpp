@@ -93,7 +93,7 @@ constexpr auto fill_same(Value value) {
 constexpr static auto GUIPlots = std::make_tuple(
 	PlotIndicator<"I-V", 2, 2>(
 		PlotOptions<2, 2>{
-		.PlotType = PlotTypeEnum::Line,
+		.PlotType = PlotTypeEnum::Scatter,
 		.PlotLabels = {"Current", "Voltage"},
 		.PlotGroupings = {PlotGroupingsEnum::One, PlotGroupingsEnum::Two},
 		.XAxisLabel = "time ",
@@ -108,7 +108,7 @@ constexpr static auto GUIPlots = std::make_tuple(
     ),
     PlotIndicator<"Vacuum pressure", 1, 1>(
         PlotOptions<1, 1>{
-            .PlotType = PlotTypeEnum::Line,
+            .PlotType = PlotTypeEnum::Scatter,
             .PlotLabels = {"Pressure"},
             .PlotGroupings = {PlotGroupingsEnum::One},
             .XAxisLabel = "time ",
@@ -124,7 +124,7 @@ constexpr static auto GUIPlots = std::make_tuple(
     ),
     PlotIndicator<"Temperatures", 9, 1>(
         PlotOptions<9, 1>{
-            .PlotType = PlotTypeEnum::Line,
+            .PlotType = PlotTypeEnum::Scatter,
             .PlotLabels = {"RTD1", "RTD2", "RTD3", "RTD4", "RTD5", "RTD6", "RTD7", "RTD8", "RTD9"},
             .PlotGroupings = fill_same<9>(PlotGroupingsEnum::One),
             .XAxisLabel = "time ",
